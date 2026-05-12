@@ -47,6 +47,21 @@ router.post('/google', async (req, res) => {
             await user.save();
         }
 
+        // Check if user is blocked
+        if (['coach', 'hr', 'employee'].includes(user.role)) {
+            const Employee = require('../models/Employee');
+            const employee = await Employee.findOne({ user: user._id });
+            if (employee && employee.status === 'inactive') {
+                return res.status(403).json({ message: 'Your account has been blocked by the administration. Please contact support.' });
+            }
+        } else if (user.role === 'student') {
+            const Student = require('../models/Student');
+            const student = await Student.findOne({ user: user._id });
+            if (student && student.status === 'inactive') {
+                return res.status(403).json({ message: 'Your account has been blocked by the administration. Please contact support.' });
+            }
+        }
+
         res.json({
             _id: user._id,
             name: user.name,
@@ -114,6 +129,24 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ email });
 
         if (user && (await user.matchPassword(password))) {
+            // Check if user is blocked
+            if (['coach', 'hr', 'employee'].includes(user.role)) {
+                const Employee = require('../models/Employee');
+                const employee = await Employee.findOne({ user: user._id });
+                if (employee && employee.status === 'inactive') {
+                    return res.status(403).json({ message: 'Your account has been blocked by the administration. Please contact support.' });
+                }
+                if (student && student.status === 'inactive') {
+                    return res.status(403).json({ message: 'Your account has been blocked by the administration. Please contact support.' });
+                }
+            } else if (user.role === 'vendor') {
+                const Vendor = require('../models/Vendor');
+                const vendor = await Vendor.findOne({ user: user._id });
+                if (vendor && vendor.status === 'inactive') {
+                    return res.status(403).json({ message: 'Your account has been blocked by the administration. Please contact support.' });
+                }
+            }
+
             // Check for 2FA
             if (user.isTwoFactorEnabled) {
                 return res.json({
@@ -473,6 +506,117 @@ router.post('/register-parent', protect, async (req, res) => {
             });
         } else {
             res.status(400).json({ message: 'Invalid user data' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Get all administrative users (Admin Only)
+// @route   GET /api/auth/admin-users
+// @access  Private (Admin)
+router.get('/admin-users', protect, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized as admin' });
+    }
+
+    try {
+        const users = await User.find({
+            role: { $in: ['admin', 'sub-admin', 'hr', 'finance', 'vendor'] }
+        }).select('-password');
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Create an administrative user (Admin Only)
+// @route   POST /api/auth/create-admin-user
+// @access  Private (Admin)
+router.post('/create-admin-user', protect, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized as admin' });
+    }
+
+    const { name, email, password, role, mobile } = req.body;
+
+    try {
+        const userExists = await User.findOne({ email });
+
+        if (userExists) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        const user = await User.create({
+            name,
+            email,
+            password,
+            role,
+            mobile
+        });
+
+        if (user) {
+            // For roles that might need a profile, we could trigger creation here,
+            // but for simple "logins" as requested, this is sufficient.
+            // If they need to add full details, they can go to HR/Vendor management.
+            
+            res.status(201).json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+            });
+        } else {
+            res.status(400).json({ message: 'Invalid user data' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Update administrative user
+// @route   PUT /api/auth/admin-users/:id
+// @access  Private (Admin)
+router.put('/admin-users/:id', protect, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized as admin' });
+    }
+
+    try {
+        const user = await User.findById(req.params.id);
+        if (user) {
+            user.name = req.body.name || user.name;
+            user.email = req.body.email || user.email;
+            user.mobile = req.body.mobile || user.mobile;
+            user.role = req.body.role || user.role;
+            if (req.body.password) {
+                user.password = req.body.password;
+            }
+            const updatedUser = await user.save();
+            res.json(updatedUser);
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Delete administrative user
+// @route   DELETE /api/auth/admin-users/:id
+// @access  Private (Admin)
+router.delete('/admin-users/:id', protect, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized as admin' });
+    }
+
+    try {
+        const user = await User.findById(req.params.id);
+        if (user) {
+            await user.deleteOne();
+            res.json({ message: 'User removed' });
+        } else {
+            res.status(404).json({ message: 'User not found' });
         }
     } catch (error) {
         res.status(500).json({ message: error.message });

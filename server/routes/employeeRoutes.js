@@ -49,6 +49,7 @@ router.post(
       const allowedRoles = [
         "student",
         "admin",
+        "sub-admin",
         "employee",
         "parent",
         "coach",
@@ -309,6 +310,7 @@ router.put(
         const allowedRoles = [
           "student",
           "admin",
+          "sub-admin",
           "employee",
           "parent",
           "coach",
@@ -421,5 +423,30 @@ router.put(
     }
   }
 );
+
+//////////////////////////////////////////////////////
+// UPDATE EMPLOYEE STATUS
+//////////////////////////////////////////////////////
+router.patch("/:id/status", protect, async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const newStatus = employee.status === "active" ? "inactive" : "active";
+    await Employee.updateOne({ _id: employee._id }, { $set: { status: newStatus } });
+    employee.status = newStatus;
+
+    res.json({
+      message: `Employee ${employee.status === "active" ? "unblocked" : "blocked"} successfully`,
+      status: employee.status,
+    });
+  } catch (err) {
+    console.error("Error updating status:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
 
 module.exports = router;

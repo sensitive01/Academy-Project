@@ -138,4 +138,114 @@ router.get("/my-interns", protect, async (req, res) => {
   }
 });
 
+// ==========================================
+// UPDATE VENDOR (Admin)
+// ==========================================
+router.put("/:id", protect, async (req, res) => {
+  try {
+    const role = req.user.role?.toLowerCase();
+    if (role !== 'admin' && role !== 'sub-admin') {
+      return res.status(403).json({ message: "Only admin and sub-admin can update a vendor" });
+    }
+
+    const { name, email, companyName, contactPerson, mobile, address, website } = req.body;
+    const vendor = await Vendor.findById(req.params.id);
+
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    // Update Vendor Details
+    vendor.companyName = companyName || vendor.companyName;
+    vendor.contactPerson = contactPerson || vendor.contactPerson;
+    vendor.mobile = mobile || vendor.mobile;
+    vendor.email = email || vendor.email;
+    vendor.address = address || vendor.address;
+    vendor.website = website || vendor.website;
+
+    await vendor.save();
+
+    // Update associated User
+    const user = await User.findById(vendor.user);
+    if (user) {
+        user.name = name || user.name;
+        user.email = email || user.email;
+        await user.save();
+    }
+
+    res.json({ message: "Vendor updated successfully", vendor });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ==========================================
+// TOGGLE VENDOR STATUS (Admin)
+// ==========================================
+router.patch("/:id/status", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const role = req.user.role?.toLowerCase();
+    console.log(`[VENDOR_STATUS_TOGGLE] Request by: ${req.user.email} (Role: ${role}) for Vendor ID: ${id}`);
+
+    if (role !== 'admin' && role !== 'sub-admin') {
+      return res.status(403).json({ message: "Only admin and sub-admin can toggle vendor status" });
+    }
+
+    const vendor = await Vendor.findById(id);
+    if (!vendor) {
+      console.error(`[VENDOR_STATUS_TOGGLE] Vendor not found: ${id}`);
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    // Ensure status exists
+    if (!vendor.status) {
+        vendor.status = "active";
+    }
+
+    const oldStatus = vendor.status;
+    vendor.status = oldStatus === "active" ? "inactive" : "active";
+    
+    console.log(`[VENDOR_STATUS_TOGGLE] Changing status from ${oldStatus} to ${vendor.status}`);
+    
+    await vendor.save();
+
+    res.json({ 
+        success: true,
+        message: `Vendor ${vendor.companyName} is now ${vendor.status}`, 
+        status: vendor.status 
+    });
+  } catch (err) {
+    console.error("[VENDOR_STATUS_TOGGLE] CRITICAL ERROR:", err);
+    res.status(500).json({ message: "Internal server error while toggling status: " + err.message });
+  }
+});
+
+// ==========================================
+// DELETE VENDOR (Admin)
+// ==========================================
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const role = req.user.role?.toLowerCase();
+    if (role !== 'admin' && role !== 'sub-admin') {
+      return res.status(403).json({ message: "Only admin and sub-admin can delete a vendor" });
+    }
+
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    // Remove user associated with vendor
+    await User.findByIdAndDelete(vendor.user);
+    
+    // Remove vendor profile
+    await Vendor.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Vendor deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

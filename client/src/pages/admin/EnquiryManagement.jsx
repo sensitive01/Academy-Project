@@ -118,26 +118,10 @@ const EnquiryManagement = () => {
       )
     },
     {
-      name: 'Date',
-      selector: row => row.createdAt,
-      sortable: true,
-      width: '150px',
-      cell: row => (
-        <div className="flex flex-col">
-          <span className="text-slate-900 font-bold">
-            {new Date(row.createdAt).toLocaleDateString()}
-          </span>
-          <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">
-            {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        </div>
-      )
-    },
-    {
       name: 'Enquirer Details',
       selector: row => row.name,
       sortable: true,
-      width: '280px',
+      width: '350px',
       cell: row => (
         <div className="flex items-center gap-3 py-3">
           <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center font-black text-sm shrink-0 border border-slate-200">
@@ -159,16 +143,28 @@ const EnquiryManagement = () => {
       name: 'Enquiry Message',
       selector: row => row.message,
       sortable: false,
+      width: '300px',
       cell: row => (
         <div className="py-2 max-w-md">
           <div className="text-xs text-slate-600 line-clamp-2 leading-relaxed font-medium">
             "{row.message}"
           </div>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="inline-block px-2 py-0.5 rounded-[4px] text-[9px] font-black uppercase tracking-widest bg-brand-50 text-brand-600 border border-brand-100">
-                {row.type}
-            </span>
-          </div>
+        </div>
+      )
+    },
+    {
+      name: 'Date',
+      selector: row => row.createdAt,
+      sortable: true,
+      width: '150px',
+      cell: row => (
+        <div className="flex flex-col">
+          <span className="text-slate-900 font-bold">
+            {new Date(row.createdAt).toLocaleDateString()}
+          </span>
+          <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">
+            {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
         </div>
       )
     },
@@ -310,136 +306,116 @@ const EnquiryManagement = () => {
 
       {/* Enquiry Detail Modal */}
       {showDetailModal && selectedEnquiry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="bg-white rounded-[48px] w-full max-w-2xl overflow-hidden shadow-2xl relative animate-in fade-in slide-in-from-bottom-8 duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
             {/* Modal Header */}
-            <div className="px-10 py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-3xl bg-slate-900 text-white flex items-center justify-center font-black text-2xl shadow-xl shadow-slate-900/20">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-md z-10 shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-xl shadow-inner border border-brand-100">
                   {selectedEnquiry.name?.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black font-heading text-slate-900 tracking-tight">
-                    Enquiry Insight
-                  </h2>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
-                    <Calendar size={12} />
+                  <h2 className="text-xl font-bold text-slate-900">Enquiry Details</h2>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 font-medium">
+                    <Calendar size={14} />
                     Received: {new Date(selectedEnquiry.createdAt).toLocaleString()}
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="text-slate-400 hover:text-slate-900 transition-all p-3 bg-slate-100 rounded-full hover:rotate-90"
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-10 space-y-10">
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
               {/* Profile Context */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <div className="text-[10px] font-black text-slate-301 uppercase tracking-[0.2em]">Contact Person</div>
-                  <div className="flex items-center gap-3 text-slate-900 font-black text-sm uppercase">
-                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
-                        <User size={16} />
-                    </div>
-                    {selectedEnquiry.name}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <User size={16} className="text-brand-600" /> Contact Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <p className="text-xs font-bold text-slate-500 mb-1">Contact Person</p>
+                    <p className="text-sm font-semibold text-slate-900">{selectedEnquiry.name}</p>
+                  </div>
+                  <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <p className="text-xs font-bold text-slate-500 mb-1">Email Channel</p>
+                    <a href={`mailto:${selectedEnquiry.email}`} className="text-sm font-semibold text-brand-600 hover:underline flex items-center gap-2">
+                        {selectedEnquiry.email || 'No email provided'}
+                    </a>
+                  </div>
+                  <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <p className="text-xs font-bold text-slate-500 mb-1">Phone Identity</p>
+                    <a href={`tel:${selectedEnquiry.phone}`} className="text-sm font-semibold text-slate-900 hover:text-brand-600 flex items-center gap-2">
+                        {selectedEnquiry.phone}
+                    </a>
+                  </div>
+                  <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <p className="text-xs font-bold text-slate-500 mb-1">Current Status</p>
+                    <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
+                        selectedEnquiry.status === 'new' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 
+                        selectedEnquiry.status === 'contacted' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 
+                        'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                    }`}>
+                        {selectedEnquiry.status}
+                    </span>
                   </div>
                 </div>
-                <div className="space-y-2">
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</div>
-                    <div className="flex items-center gap-2">
-                        <span className="px-3 py-1.5 rounded-xl text-[10px] font-black bg-brand-50 text-brand-600 border border-brand-100 uppercase tracking-widest">
-                            {selectedEnquiry.type || 'General'}
-                        </span>
-                    </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Email Channel</div>
-                  <a href={`mailto:${selectedEnquiry.email}`} className="flex items-center gap-3 text-slate-900 font-bold text-sm hover:text-brand-600 transition-colors">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
-                        <Mail size={16} />
-                    </div>
-                    {selectedEnquiry.email || 'No email provided'}
-                  </a>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Phone Identity</div>
-                  <a href={`tel:${selectedEnquiry.phone}`} className="flex items-center gap-3 text-slate-900 font-bold text-sm hover:text-brand-600 transition-colors">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
-                        <Phone size={16} />
-                    </div>
-                    {selectedEnquiry.phone}
-                  </a>
-                </div>
               </div>
+
+              <div className="h-px bg-slate-100"></div>
 
               {/* Message Context */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-slate-900 font-black text-[10px] uppercase tracking-[0.2em]">
-                  <MessageSquare size={14} className="text-slate-400" />
-                  Conversation Details
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <MessageSquare size={16} className="text-brand-600" /> Message Details
+                </h3>
+                <div className="p-5 rounded-xl border border-slate-100 bg-slate-50 relative">
+                  <MessageSquare className="absolute top-4 right-4 text-slate-200" size={32} />
+                  <p className="text-sm text-slate-700 leading-relaxed relative z-10 whitespace-pre-wrap">
+                    {selectedEnquiry.message}
+                  </p>
                 </div>
-                <div className="bg-slate-50 p-8 rounded-[40px] text-slate-600 leading-relaxed font-medium border border-slate-100 italic relative overflow-hidden">
-                  <div className="absolute top-4 left-4 text-4xl text-slate-200 font-serif leading-none italic opacity-50">"</div>
-                  <span className="relative z-10">{selectedEnquiry.message}</span>
-                </div>
-              </div>
-
-              {/* Status & Cleanup */}
-              <div className="pt-10 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-6">
-                <div className="flex items-center gap-4">
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Transition:</span>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => handleStatusUpdate(selectedEnquiry._id, 'contacted')}
-                            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                selectedEnquiry.status === 'contacted' 
-                                ? 'bg-amber-500 text-white border-amber-500 shadow-xl shadow-amber-200' 
-                                : 'bg-white text-amber-600 border-amber-100 hover:bg-amber-50'
-                            }`}
-                        >
-                            Mark Contacted
-                        </button>
-                        <button 
-                            onClick={() => handleStatusUpdate(selectedEnquiry._id, 'resolved')}
-                            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                selectedEnquiry.status === 'resolved' 
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-200' 
-                                : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50'
-                            }`}
-                        >
-                            Mark Resolved
-                        </button>
-                    </div>
-                </div>
-                <button
-                  onClick={() => handleDeleteEnquiry(selectedEnquiry._id)}
-                  className="flex items-center gap-2 px-4 py-2 text-rose-600 hover:bg-rose-50 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
-                >
-                  <Trash2 size={16} />
-                  Garbage Entry
-                </button>
               </div>
             </div>
             
             {/* Modal Actions */}
-            <div className="px-10 py-8 bg-slate-900 border-t border-white/5 flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row items-center justify-between p-6 border-t border-slate-100 bg-slate-50 mt-auto shrink-0 gap-4">
               <button
-                onClick={() => setShowDetailModal(false)}
-                className="text-white/60 hover:text-white font-black text-[10px] uppercase tracking-widest transition-colors"
+                onClick={() => handleDeleteEnquiry(selectedEnquiry._id)}
+                className="w-full sm:w-auto px-4 py-2.5 text-red-600 font-bold text-sm hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-red-100"
               >
-                Return to Dashboard
+                <Trash2 size={16} /> Delete Entry
               </button>
-              <a 
-                href={`mailto:${selectedEnquiry.email}?subject=Follow-up on your enquiry`}
-                className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-white/10 hover:bg-slate-100 transition-all flex items-center gap-3"
-              >
-                <Mail size={16} />
-                Send Email Reply
-              </a>
+              
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <a 
+                    href={`mailto:${selectedEnquiry.email}?subject=Follow-up on your enquiry`}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                    <Mail size={16} /> Reply
+                </a>
+                {selectedEnquiry.status !== 'contacted' && (
+                    <button 
+                        onClick={() => handleStatusUpdate(selectedEnquiry._id, 'contacted')}
+                        className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg font-bold text-sm hover:bg-amber-100 transition-colors shadow-sm"
+                    >
+                        Mark Contacted
+                    </button>
+                )}
+                {selectedEnquiry.status !== 'resolved' && (
+                    <button 
+                        onClick={() => handleStatusUpdate(selectedEnquiry._id, 'resolved')}
+                        className="flex-1 sm:flex-none px-4 py-2.5 bg-brand-600 text-white rounded-lg font-bold text-sm hover:bg-brand-700 transition-colors shadow-lg shadow-brand-600/20"
+                    >
+                        Mark Resolved
+                    </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

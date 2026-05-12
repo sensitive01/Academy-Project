@@ -19,7 +19,9 @@ import {
   Megaphone,
   Receipt,
   MessageSquare,
-  Briefcase
+  Briefcase,
+  Key,
+  ShieldAlert
 } from "lucide-react";
 import logo from "../assets/logo.png";
 import { useAuth } from "../context/AuthContext";
@@ -134,6 +136,16 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <UserCheck size={22} />, label: "Leave Requests", path: "/dashboard/vendor/leaves" },
   ];
 
+  const subAdminItems = [
+    { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
+    { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
+    { icon: <DollarSign size={22} />, label: "Finance", path: "/dashboard/finance" },
+    { icon: <Receipt size={22} />, label: "Expenses", path: "/dashboard/expenses" },
+    { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
+    { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <Briefcase size={22} />, label: "Vendor Management", path: "/dashboard/admin/vendors" },
+  ];
+
   // ================= ROLE BASED NAVIGATION =================
   let currentNavItems = [];
 
@@ -143,6 +155,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     currentNavItems = parentItems;
   } else if (role === "admin" || role === "hr") {
     currentNavItems = adminItems;
+  } else if (role === "sub-admin") {
+    currentNavItems = subAdminItems;
   } else if (role === "coach") {
     currentNavItems = coachItems;
   } else if (role === "employee") {
@@ -161,6 +175,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <Briefcase size={22} />, label: "Vendor Mgmt", path: "/dashboard/admin/vendors" },
     { icon: <Users size={22} />, label: "Parent Mgmt", path: "/dashboard/admin/parents" },
     { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
+    { icon: <Key size={22} />, label: "Sub-Admins", path: "/dashboard/admin/logins" },
     { icon: <Building2 size={22} />, label: "Administrative", path: "/dashboard/admin/configs" },
   ];
 

@@ -127,73 +127,105 @@ const ParentManagement = () => {
 
       {/* Parent Form */}
       {showForm && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border mb-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            
+            <div
+              className="bg-white w-full max-w-2xl shadow-lg flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              
+              {/* Header */}
+              <div className="flex justify-between items-center px-6 py-4 border-b">
+                <h2 className="text-lg font-bold">Add Parent</h2>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="text-gray-500 hover:text-gray-800"
+                >
+                  ✕
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  required
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
-                <input
-                  type="tel"
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  value={formData.mobile}
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                />
-              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Parent Name</label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <input
+                      type="email"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Password</label>
+                    <input
+                      type="password"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Mobile</label>
+                    <input
+                      type="tel"
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      value={formData.mobile}
+                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                    />
+                  </div>
+
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <Loader2 className="animate-spin" size={18} />
+                    ) : (
+                      <Check size={18} />
+                    )}
+                    Create
+                  </button>
+
+                </div>
+              </form>
             </div>
+          </div>
+        )}
 
-            <div className="flex justify-end pt-4 gap-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50"
-              >
-                {submitting ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
-                Create Parent Account
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-        <div className="overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100 pb-4">
+       <div className="overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100 pb-4">
           <CustomDataTable 
             columns={parentColumns} 
             data={filteredParents} 

@@ -35,6 +35,7 @@ import VendorManagement from "./pages/admin/VendorManagement";
 import EnquiryManagement from "./pages/admin/EnquiryManagement";
 import VendorDashboard from "./pages/dashboard/VendorDashboard";
 import ParentManagement from "./pages/admin/ParentManagement";
+import AdminLogins from "./pages/admin/AdminLogins";
 import ParentDashboard from "./pages/parent/ParentDashboard";
 import ChildAttendance from "./pages/parent/ChildAttendance";
 import ChildLeave from "./pages/parent/ChildLeave";
@@ -286,6 +287,7 @@ function App() {
             {/* Admin */}
             <Route path="admin/courses" element={<CourseManagement />} />
             <Route path="admin/configs" element={<AdministrativeConfigs />} />
+            <Route path="admin/logins" element={<AdminLogins />} />
             <Route path="admin/parents" element={<ParentManagement />} />
             <Route path="admin/vendors" element={<VendorManagement />} />
             <Route path="admin/enquiries" element={<EnquiryManagement />} />

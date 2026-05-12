@@ -224,8 +224,9 @@ const HR = () => {
       const res = await api.patch(`/employees/${id}/status`);
       toast.success(res.data.message);
       fetchEmployees();
-    } catch {
-      toast.error("Failed to update status");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to update status");
     }
   };
 

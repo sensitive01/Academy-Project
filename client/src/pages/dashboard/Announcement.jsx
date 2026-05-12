@@ -25,6 +25,7 @@ import {
 import toast from "react-hot-toast";
 import Loading from "../../components/Loading";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
+import CustomDataTable from "../../components/DataTable";
 
 const Announcement = () => {
   const { user } = useAuth();
@@ -37,6 +38,9 @@ const Announcement = () => {
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -69,8 +73,9 @@ const Announcement = () => {
   const fetchAnnouncements = async () => {
     try {
       setLoading(true);
-      const isAdmin = user?.role?.toLowerCase() === "admin";
-      const { data } = await api.get(`/announcements?page=${page}&search=${search}${isAdmin ? '&all=true' : ''}`);
+      const role = user?.role?.toLowerCase();
+      const isAdmin = role === "admin" || role === "sub-admin";
+      const { data } = await api.get(`/announcements?limit=1000&search=${search}&month=${selectedMonth}&year=${selectedYear}${isAdmin ? '&all=true' : ''}`);
       setAnnouncements(data.data || []);
       setTotalPages(data.pages || 1);
 
@@ -92,7 +97,7 @@ const Announcement = () => {
 
   useEffect(() => {
     fetchAnnouncements();
-  }, [page, search, user]);
+  }, [search, user, selectedMonth, selectedYear]);
 
   /* ================= CREATE ================= */
   const resetForm = () => {
@@ -155,7 +160,6 @@ const Announcement = () => {
       toast.success("Broadcast successfully dispatched");
       setShowModal(false);
       resetForm();
-      setPage(1);
       fetchAnnouncements();
     } catch {
       toast.error("Dispatch failed");
@@ -210,13 +214,7 @@ const Announcement = () => {
     try {
       await api.delete(`/announcements/${id}`);
       toast.success("Broadcast deleted");
-
-      // If last item on page → go to previous page
-      if (announcements.length === 1 && page > 1) {
-        setPage((prev) => prev - 1);
-      } else {
-        fetchAnnouncements();
-      }
+      fetchAnnouncements();
     } catch {
       toast.error("Delete failed");
     } finally {
@@ -299,23 +297,33 @@ const Announcement = () => {
 
       {/* CONTROLS */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-        <div className="relative flex flex-col w-full md:w-96 group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
-          <input
-            type="text"
-            placeholder="Search latest broadcasts..."
-            className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600 transition-all shadow-sm text-sm font-semibold text-slate-800"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
+        <div className="flex items-center gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+           <div className="flex items-center gap-2 px-3 border-r border-slate-100">
+              <Calendar size={18} className="text-indigo-500" />
+              <select 
+                value={selectedMonth} 
+                onChange={e => setSelectedMonth(Number(e.target.value))}
+                className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
+              >
+                 {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
+                 ))}
+              </select>
+           </div>
+           <select 
+              value={selectedYear} 
+              onChange={e => setSelectedYear(Number(e.target.value))}
+              className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer px-3 pr-4"
+           >
+              {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(y => (
+                 <option key={y} value={y}>{y}</option>
+              ))}
+           </select>
         </div>
 
         <div className="flex gap-3 w-full md:w-auto">
 
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "sub-admin") && (
             <button
               onClick={openCreateModal}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
@@ -326,125 +334,115 @@ const Announcement = () => {
         </div>
       </div>
 
-      {/* ANNOUNCEMENTS GRID */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-6">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <LayoutGrid size={20} className="text-indigo-600" />
-              Latest Broadcasts
-            </h3>
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              {["all", "unread", "pinned"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
-                    activeTab === tab
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-            <Filter size={14} />
-            Showing {announcements.length} items
-          </div>
-        </div>
-
-        {loading && announcements.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
+      {/* ANNOUNCEMENTS TABLE */}
+      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="py-20 flex flex-col items-center justify-center">
             <Loading message="Fetching institutional broadcasts..." />
           </div>
-        ) : announcements.length === 0 ? (
-          <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center">
-            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-              <CheckCheck size={32} className="text-slate-300" />
-            </div>
-            <h4 className="text-xl font-black text-slate-800">All Caught Up!</h4>
-            <p className="text-slate-500 max-w-xs mx-auto mt-2 font-medium">No active broadcasts found matching your criteria.</p>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {announcements
-              .filter(a => {
-                if (activeTab === "unread") return !a.readBy?.some(r => r.userId?.toString() === user?._id);
-                if (activeTab === "pinned") return a.isPinned;
-                return true;
-              })
-              .map((a) => {
-                const isUnread = !a.readBy?.some((r) => r.userId?.toString() === user?._id);
-                return (
-                  <div
-                    key={a._id}
-                    onClick={() => {
-                      setSelectedAnnouncement(a);
-                      setShowDetailModal(true);
-                      if (isUnread) markAsRead(a._id);
-                    }}
-                    className={`group bg-white rounded-[2rem] border p-6 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 cursor-pointer relative flex flex-col h-full ${
-                      isUnread ? "border-indigo-400/30" : "border-slate-100"
-                    }`}
-                  >
-                    {/* Top row */}
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex gap-2">
-                        {a.isPinned && (
-                          <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-                            <Pin size={14} fill="currentColor" />
-                          </div>
-                        )}
-                        {isUnread && (
-                          <span className="bg-indigo-600 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse flex items-center shadow-lg shadow-indigo-600/30">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                        <Clock size={12} /> {new Date(a.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-
-                    <h4 className="text-xl font-black text-slate-900 mb-3 line-clamp-2 group-hover:text-indigo-600 transition-colors leading-tight">
-                      {a.title}
-                    </h4>
-                    
-                    <p className="text-slate-500 text-sm leading-relaxed line-clamp-3 mb-6 font-medium">
-                      {a.message}
-                    </p>
-
-                    <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
-                      <div className="flex -space-x-2">
-                        {a.targetRoles?.slice(0, 2).map((role) => (
-                          <div key={role} className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black uppercase tracking-tighter text-slate-600" title={role}>
-                            {role.slice(0, 2)}
-                          </div>
-                        ))}
-                        {a.targetRoles?.length > 2 && (
-                          <div className="w-8 h-8 rounded-full bg-indigo-50 border-2 border-white flex items-center justify-center text-[8px] font-black text-indigo-600">
-                            +{a.targetRoles.length - 2}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 group/btn">
-                        <span className="text-xs font-black text-slate-400 group-hover/btn:text-indigo-600 transition-colors uppercase tracking-[0.1em]">Open Details</span>
-                        <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white transition-transform group-hover/btn:translate-x-1 group-hover/btn:bg-indigo-600">
-                          <ChevronRight size={16} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Decorative accent */}
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50/10 blur-3xl -mr-12 -mt-12 rounded-full pointer-events-none group-hover:bg-indigo-500/10 transition-colors duration-700"></div>
+          <CustomDataTable 
+            columns={[
+               {
+                name: "S.No",
+                width: "70px",
+                center: true,
+                cell: (row, index) => index + 1,
+              },
+              {
+                name: "Broadcast Details",
+                selector: row => row.title,
+                sortable: true,
+                width: '300px',
+                cell: row => (
+                  <div className="py-3 pr-4">
+                    <div className="font-bold text-slate-900 line-clamp-1">{row.title}</div>
+                    <div className="text-xs text-slate-500 line-clamp-1 mt-0.5">{row.message}</div>
                   </div>
-                );
-              })}
-          </div>
+                )
+              },
+              {
+                name: "Target Audience",
+                selector: row => row.targetRoles?.join(', '),
+                width: '200px',
+                cell: row => (
+                  <div className="flex flex-wrap gap-1.5 py-2">
+                    {row.targetRoles?.map(role => (
+                      <span key={role} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest rounded border border-indigo-100">
+                        {role}
+                      </span>
+                    ))}
+                    {row.targetUserId && (
+                      <span className="px-2 py-0.5 bg-slate-50 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded border border-slate-200">
+                        Specific User
+                      </span>
+                    )}
+                  </div>
+                )
+              },
+              {
+                name: "Date Posted",
+                selector: row => row.createdAt,
+                sortable: true,
+                width: '180px',
+                cell: row => (
+                  <div className="flex flex-col py-2">
+                    <span className="font-bold text-slate-900 text-sm">{new Date(row.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(row.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </div>
+                )
+              },
+              {
+                name: "Status",
+                selector: row => row.isPinned,
+                width: '140px',
+                cell: row => {
+                  const isUnread = !row.readBy?.some(r => r.userId?.toString() === user?._id);
+                  return (
+                    <div className="flex gap-2 items-center py-2">
+                      {row.isPinned && (
+                        <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-100" title="Pinned Priority">
+                          <Pin size={14} fill="currentColor" />
+                        </div>
+                      )}
+                      {isUnread && (
+                        <span className="px-2.5 py-1 bg-indigo-500 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-sm shadow-indigo-500/20 animate-pulse">
+                          New
+                        </span>
+                      )}
+                      {!row.isPinned && !isUnread && (
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-lg">
+                          Read
+                        </span>
+                      )}
+                    </div>
+                  )
+                }
+              },
+              {
+                name: "Actions",
+                width: '140px',
+                cell: row => (
+                  <button
+                    onClick={() => {
+                      setSelectedAnnouncement(row);
+                      setShowDetailModal(true);
+                      if (!row.readBy?.some(r => r.userId?.toString() === user?._id)) {
+                        markAsRead(row._id);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100"
+                  >
+                    View <ChevronRight size={14} />
+                  </button>
+                )
+              }
+            ]} 
+            data={announcements} 
+            search={search}
+            setSearch={setSearch}
+            searchPlaceholder="Search broadcasts..."
+          />
         )}
       </div>
 
@@ -487,7 +485,7 @@ const Announcement = () => {
                  </div>
                </div>
 
-               {user?.role === "admin" && (
+               {(user?.role === "admin" || user?.role === "sub-admin") && (
                   <div className="flex gap-2">
                      <button
                         onClick={(e) => {
@@ -565,31 +563,6 @@ const Announcement = () => {
         </div>
       )}
 
-      {/* ================= PAGINATION ================= */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-12 bg-white inline-flex mx-auto rounded-xl p-1 shadow-sm border border-slate-100">
-          <button
-            disabled={page === 1}
-            onClick={() => setPage(page - 1)}
-            className="px-4 py-2 font-bold text-sm rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-          >
-            Previous
-          </button>
-
-          <span className="px-4 py-2 font-black text-sm text-indigo-600 bg-indigo-50 rounded-lg">
-            {page} / {totalPages}
-          </span>
-
-          <button
-            disabled={page === totalPages}
-            onClick={() => setPage(page + 1)}
-            className="px-4 py-2 font-bold text-sm rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-          >
-            Next
-          </button>
-        </div>
-      )}
-
       {/* ================= MODAL ================= */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
@@ -639,6 +612,7 @@ const Announcement = () => {
                   <option value="hr">HR</option>
                   <option value="coach">Coach</option>
                   <option value="finance">Finance</option>
+                  <option value="sub-admin">Sub-Admin</option>
                   <option value="all">All Users</option>
                 </select>
               </div>

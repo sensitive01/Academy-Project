@@ -125,10 +125,11 @@ router.get("/unread/count", protect, async (req, res) => {
 ===================================================== */
 router.post("/", protect, upload.array("images", 5), async (req, res) => {
   try {
-    if (req.user.role?.toLowerCase() !== "admin") {
+    const role = req.user.role?.toLowerCase();
+    if (role !== "admin" && role !== "sub-admin") {
       return res.status(403).json({
         success: false,
-        message: "Only admin can create announcements",
+        message: "Only admin and sub-admin can create announcements",
       });
     }
 
@@ -192,10 +193,11 @@ router.post("/", protect, upload.array("images", 5), async (req, res) => {
 ===================================================== */
 router.patch("/:id", protect, upload.array("images", 5), async (req, res) => {
   try {
-    if (req.user.role?.toLowerCase() !== "admin") {
+    const role = req.user.role?.toLowerCase();
+    if (role !== "admin" && role !== "sub-admin") {
       return res.status(403).json({
         success: false,
-        message: "Only admin can update announcements",
+        message: "Only admin and sub-admin can update announcements",
       });
     }
 
@@ -291,8 +293,8 @@ router.get("/", protect, async (req, res) => {
       ]
     }; 
 
-    // If Admin is in Management Page (not Dashboard ticker) or specifically wants all
-    if (role === "admin") {
+    // If Admin/Sub-Admin is in Management Page (not Dashboard ticker) or specifically wants all
+    if (role === "admin" || role === "sub-admin") {
       if (req.query.all === "true") {
         query = {}; // See EVERYTHING
       } else {
@@ -328,6 +330,17 @@ router.get("/", protect, async (req, res) => {
         query.$and.push(searchObj);
       } else {
         query = { ...query, ...searchObj };
+      }
+    }
+
+    if (req.query.month && req.query.year) {
+      const startOfMonth = new Date(req.query.year, req.query.month - 1, 1);
+      const endOfMonth = new Date(req.query.year, req.query.month, 0, 23, 59, 59, 999);
+      const monthQuery = { createdAt: { $gte: startOfMonth, $lte: endOfMonth } };
+      if (query.$and) {
+        query.$and.push(monthQuery);
+      } else {
+        query = { ...query, ...monthQuery };
       }
     }
 
@@ -399,10 +412,11 @@ router.patch("/:id/read", protect, async (req, res) => {
 ===================================================== */
 router.patch("/:id/pin", protect, async (req, res) => {
   try {
-    if (req.user.role?.toLowerCase() !== "admin") {
+    const role = req.user.role?.toLowerCase();
+    if (role !== "admin" && role !== "sub-admin") {
       return res.status(403).json({
         success: false,
-        message: "Only admin can pin announcements",
+        message: "Only admin and sub-admin can pin announcements",
       });
     }
 
@@ -435,10 +449,11 @@ router.patch("/:id/pin", protect, async (req, res) => {
 ===================================================== */
 router.delete("/:id", protect, async (req, res) => {
   try {
-    if (req.user.role?.toLowerCase() !== "admin") {
+    const role = req.user.role?.toLowerCase();
+    if (role !== "admin" && role !== "sub-admin") {
       return res.status(403).json({
         success: false,
-        message: "Only admin can delete",
+        message: "Only admin and sub-admin can delete",
       });
     }
 

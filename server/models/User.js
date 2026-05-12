@@ -27,7 +27,7 @@ const userSchema = mongoose.Schema({
     role: {
         type: String,
         default: 'student',
-        enum: ['student', 'admin', 'employee', 'parent', 'coach', 'hr', 'finance', 'center', 'vendor'],
+        enum: ['student', 'admin', 'sub-admin', 'employee', 'parent', 'coach', 'hr', 'finance', 'center', 'vendor'],
         set: v => v.toLowerCase(),
     },
 
