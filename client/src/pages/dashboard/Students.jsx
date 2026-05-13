@@ -355,7 +355,10 @@ const Students = () => {
           >
             Export XL
           </button>
-          <button className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">
+          <button 
+            onClick={() => window.open("/student-registration", "_blank")}
+            className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
+          >
             <UserPlus size={18} /> Add Student
           </button>
         </div>
