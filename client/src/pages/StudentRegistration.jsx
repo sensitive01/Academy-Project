@@ -7,12 +7,14 @@ import {
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const StudentRegistration = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [centers, setCenters] = useState([]);
+  const { user } = useAuth();
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [otp, setOtp] = useState("");
@@ -22,7 +24,7 @@ const StudentRegistration = () => {
   const [timer, setTimer] = useState(0);
 
   const [formData, setFormData] = useState({
-    center: "",
+    center: (user?.role === 'center' || user?.role === 'hr') ? (user.center?._id || user.center) : "",
     studentNameEnglish: "",
     studentNameMotherTongue: "",
     dob: "",
@@ -383,7 +385,7 @@ const StudentRegistration = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <SelectBox label="Marital Status" name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} options={["Married", "Unmarried"]} />
-                    <SelectBox label="Select Center *" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions />
+                    <SelectBox label="Select Center *" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
                   </div>
                 </div>
               </div>
@@ -882,7 +884,7 @@ const FormInput = ({ label, ...props }) => (
 const SelectBox = ({ label, options, isObjectOptions, ...props }) => (
   <div className="group space-y-2">
     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <select {...props} className="w-full px-6 py-5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none transition-all text-[13px] font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700">
+    <select {...props} className="w-full px-6 py-5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none transition-all text-[13px] font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 disabled:bg-slate-100 disabled:text-slate-500">
       <option value="">Select Option</option>
       {options.map((opt, i) => (
         <option key={i} value={isObjectOptions ? opt.value : opt}>{isObjectOptions ? opt.label : opt}</option>

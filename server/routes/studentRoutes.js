@@ -12,7 +12,8 @@ const Vendor = require('../models/Vendor');
 // ======================================================
 // PUBLIC REGISTRATION (Apply Now)
 // ======================================================
-router.post('/public-registration', async (req, res) => {
+const { protect, optionalProtect } = require("../middleware/authMiddleware");
+router.post('/public-registration', optionalProtect, async (req, res) => {
   try {
     const {
       studentNameEnglish,
@@ -104,7 +105,7 @@ router.post('/public-registration', async (req, res) => {
       religion,
       community,
       maritalStatus,
-      center,
+      center: (req.user && (req.user.role === 'center' || req.user.role === 'hr')) ? req.user.center : center,
       nationality,
 
       // Identifiers
@@ -303,7 +304,6 @@ router.post('/public-registration', async (req, res) => {
 // ======================================================
 // GET ALL STUDENTS (FULL DATA)
 // ======================================================
-const { protect } = require("../middleware/authMiddleware");
 router.get("/", protect, async (req, res) => {
   try {
     let query = {};

@@ -23,7 +23,7 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
   const [designations, setDesignations] = useState([]);
   const [preview, setPreview] = useState(null);
   const [centers, setCenters] = useState([]);
-  const { sendOtp } = useAuth();
+  const { sendOtp, user } = useAuth();
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
 
@@ -124,7 +124,7 @@ const [formData, setFormData] = useState({
           salary: "",
           shiftStart: "",
           shiftEnd: "",
-          center: "",
+          center: (user?.role === 'center' || user?.role === 'hr') ? (user.center?._id || user.center) : "",
           profilePic: null,
           idFile: null,
           certificateFile: null,
@@ -596,8 +596,9 @@ const [formData, setFormData] = useState({
                 </label>
                 <select
                   required
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm disabled:bg-slate-100 disabled:text-slate-500"
                   value={formData.center}
+                  disabled={(user?.role === 'center' || user?.role === 'hr')}
                   onChange={(e) =>
                     setFormData({ ...formData, center: e.target.value })
                   }

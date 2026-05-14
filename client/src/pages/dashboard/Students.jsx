@@ -557,7 +557,7 @@ const Students = () => {
                   </div>
                 </section>
               </div>
-
+ 
               <section>
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
                   <BookOpen size={16} className="text-brand-600" /> 4. Academic History

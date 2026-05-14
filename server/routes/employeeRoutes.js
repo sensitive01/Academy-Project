@@ -112,7 +112,7 @@ router.post(
         department,
         designation,
         employmentType,
-        center: center || null,
+        center: (req.user.role === 'center' || req.user.role === 'hr') ? req.user.center : (center || null),
 
         salary:
           salary !== undefined && salary !== ""
