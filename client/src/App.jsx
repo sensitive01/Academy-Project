@@ -247,7 +247,7 @@ function App() {
             <Route path="/register" element={<Login />} />
             <Route path="/student-registration" element={<StudentRegistration />} />
           </Route>
-          
+
           <Route path="/public-attendance" element={<PublicAttendance />} />
 
           {/* ================= DASHBOARD ROUTES ================= */}

@@ -34,18 +34,16 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => (
       end
       onClick={closeMobile}
       className={({ isActive }) =>
-        `flex items-center p-3 my-1 rounded-xl transition-all duration-200 group overflow-hidden whitespace-nowrap ${
-          isActive
-            ? "bg-brand-600 text-white shadow-lg shadow-brand-900/30"
-            : "text-slate-400 hover:bg-slate-800 hover:text-white"
+        `flex items-center p-3 my-1 rounded-xl transition-all duration-200 group overflow-hidden whitespace-nowrap ${isActive
+          ? "bg-brand-600 text-white shadow-lg shadow-brand-900/30"
+          : "text-slate-400 hover:bg-slate-800 hover:text-white"
         }`
       }
     >
       <div className="flex-shrink-0">{item.icon}</div>
       <span
-        className={`ml-3 font-medium transition-opacity duration-300 ${
-          isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
-        }`}
+        className={`ml-3 font-medium transition-opacity duration-300 ${isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
+          }`}
       >
         {item.label}
       </span>
@@ -187,9 +185,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const sidebarClasses =
     "fixed left-0 top-0 z-50 h-screen bg-slate-900 text-white transition-all duration-300 ease-in-out shadow-xl flex flex-col";
 
-  const responsiveClasses = `${
-    mobileOpen ? "translate-x-0" : "-translate-x-[110%]"
-  } lg:translate-x-0 lg:static lg:h-screen lg:m-0 lg:shadow-none`;
+  const responsiveClasses = `${mobileOpen ? "translate-x-0" : "-translate-x-[110%]"
+    } lg:translate-x-0 lg:static lg:h-screen lg:m-0 lg:shadow-none`;
 
   return (
     <>
@@ -201,9 +198,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
       )}
 
       <aside
-        className={`${sidebarClasses} ${responsiveClasses} ${
-          isCollapsed ? "lg:w-20" : "lg:w-72"
-        }`}
+        className={`${sidebarClasses} ${responsiveClasses} ${isCollapsed ? "lg:w-20" : "lg:w-72"
+          }`}
       >
         {/* HEADER */}
         <div className="h-20 flex items-center px-6 border-b border-white/10 relative">
@@ -271,9 +267,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
         {/* USER FOOTER */}
         <div className="p-4 border-t border-white/10 bg-slate-800/50">
           <div
-            className={`flex items-center gap-3 ${
-              isCollapsed ? "justify-center" : ""
-            }`}
+            className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""
+              }`}
           >
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-500 to-brand-700 flex items-center justify-center text-sm font-bold border border-white/10">
               {user?.name?.charAt(0)}

@@ -10,6 +10,7 @@ import {
   Key,
   Layers,
   BookOpen,
+  DollarSign,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -40,8 +41,16 @@ const AdministrativeConfigs = () => {
     code: "",
     type: "Theory",
     semester: 1,
+    center: "",
+    course: "",
+    batch: "",
+    fee: 0,
   });
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [centersList, setCentersList] = useState([]);
+  const [coursesList, setCoursesList] = useState([]);
+  const [batchesList, setBatchesList] = useState([]);
 
   // Login Management State
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -90,13 +99,32 @@ const AdministrativeConfigs = () => {
       endpoint: "/subjects",
       icon: <BookOpen size={20} />,
     },
+    examFees: {
+      title: "Exam Fees",
+      singular: "Exam Fee",
+      endpoint: "/exam-fees",
+      icon: <DollarSign size={20} />,
+    },
   };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(config[activeTab].endpoint);
-      setData(data);
+      if (activeTab === "examFees") {
+        const [feesRes, centersRes, coursesRes, batchesRes] = await Promise.all([
+          api.get("/exam-fees"),
+          api.get("/centers"),
+          api.get("/courses"),
+          api.get("/batches"),
+        ]);
+        setData(feesRes.data);
+        setCentersList(centersRes.data);
+        setCoursesList(coursesRes.data);
+        setBatchesList(batchesRes.data);
+      } else {
+        const { data } = await api.get(config[activeTab].endpoint);
+        setData(data);
+      }
     } catch {
       toast.error(`Error fetching ${activeTab}`);
     } finally {
@@ -128,7 +156,7 @@ const AdministrativeConfigs = () => {
     e.preventDefault();
     const formattedData = {
       ...formData,
-      name: toTitleCase(formData.name.trim()),
+      name: formData.name ? toTitleCase(formData.name.trim()) : undefined,
     };
 
     try {
@@ -165,6 +193,10 @@ const AdministrativeConfigs = () => {
         code: item.code || "",
         type: item.type || "Theory",
         semester: item.semester || 1,
+        center: item.center?._id || item.center || "",
+        course: item.course?._id || item.course || "",
+        batch: item.batch?._id || item.batch || "",
+        fee: item.fee || 0,
       });
       setIsEditing(true);
       setCurrentId(item._id);
@@ -177,6 +209,10 @@ const AdministrativeConfigs = () => {
         code: "",
         type: "Theory",
         semester: 1,
+        center: "",
+        course: "",
+        batch: "",
+        fee: 0,
       });
       setIsEditing(false);
     }
@@ -230,6 +266,7 @@ const columns = [
     name: `${config[activeTab].singular} Name`,
     selector: r => r.name,
     sortable: true,
+    omit: activeTab === "examFees",
     cell: r => (
       <div className="flex items-center">
         <div className="h-10 w-10 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center">
@@ -294,6 +331,19 @@ const columns = [
         },
       ]
     : []),
+  ...(activeTab === "examFees"
+    ? [
+        { name: "Center", selector: r => r.center?.name, sortable: true },
+        { name: "Course", selector: r => r.course?.title, sortable: true },
+        { name: "Batch", selector: r => r.batch?.name, sortable: true },
+        { 
+          name: "Fee", 
+          selector: r => r.fee, 
+          sortable: true, 
+          cell: r => <span className="font-bold text-green-600">₹{r.fee}</span> 
+        },
+      ]
+    : []),
 
   {
     name: "Actions",
@@ -317,7 +367,15 @@ const columns = [
   }
 ];
 
-  const filteredData = data.filter(item => item.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredData = data.filter(item => {
+    if (activeTab === "examFees") {
+      return (
+        item.center?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return item.name?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
@@ -387,22 +445,54 @@ const columns = [
               </h2>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  {config[activeTab].singular} Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
-                  placeholder={`Enter ${config[activeTab].singular.toLowerCase()} name...`}
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                />
-              </div>
+              {activeTab !== "examFees" && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    {config[activeTab].singular} Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
+                    placeholder={`Enter ${config[activeTab].singular.toLowerCase()} name...`}
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                  />
+                </div>
+              )}
+
+              {activeTab === "examFees" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Center</label>
+                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})}>
+                      <option value="">Select Center</option>
+                      {centersList.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
+                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.course} onChange={e => setFormData({...formData, course: e.target.value})}>
+                      <option value="">Select Course</option>
+                      {coursesList.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Batch</label>
+                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})}>
+                      <option value="">Select Batch</option>
+                      {batchesList.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Fee Amount (₹)</label>
+                    <input type="number" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.fee} onChange={e => setFormData({...formData, fee: Number(e.target.value)})} />
+                  </div>
+                </>
+              )}
 
               {activeTab === "centers" && (
                 <>

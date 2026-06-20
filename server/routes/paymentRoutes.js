@@ -310,7 +310,7 @@ router.get("/my-subscriptions", protect, async (req, res) => {
       return res.status(404).json({ message: "Student record not found" });
     }
 
-    const subscriptions = await Payment.find({ 
+    const subscriptions = await Payment.find({
       student: student._id,
       type: "inward",
       status: "success"
@@ -354,44 +354,44 @@ router.get("/invoice/:id", protect, async (req, res) => {
 
     // Header / Logo area
     doc.fillColor(primaryColor)
-       .fontSize(24).font('Helvetica-Bold')
-       .text("DR ACADEMY", 50, 50);
-    
+      .fontSize(24).font('Helvetica-Bold')
+      .text("DR ACADEMY", 50, 50);
+
     doc.fontSize(10).font('Helvetica')
-       .fillColor(textLight)
-       .text("Empowering Excellence in Education", 50, 80);
+      .fillColor(textLight)
+      .text("Empowering Excellence in Education", 50, 80);
 
     // Invoice Header
     doc.fillColor(primaryColor)
-       .fontSize(20).font('Helvetica-Bold')
-       .text("TAX INVOICE", doc.page.width - 250, 50, { align: 'right' });
+      .fontSize(20).font('Helvetica-Bold')
+      .text("TAX INVOICE", doc.page.width - 250, 50, { align: 'right' });
 
     doc.fontSize(10).font('Helvetica')
-       .fillColor(textLight)
-       .text(`Invoice No: INV-${payment._id.toString().substring(0, 8).toUpperCase()}`, doc.page.width - 250, 75, { align: 'right' })
-       .text(`Date: ${new Date(payment.createdAt).toLocaleDateString('en-IN')}`, doc.page.width - 250, 90, { align: 'right' })
-       .text(`Transaction ID: ${payment.razorpayPaymentId || 'MANUAL'}`, doc.page.width - 250, 105, { align: 'right' });
+      .fillColor(textLight)
+      .text(`Invoice No: INV-${payment._id.toString().substring(0, 8).toUpperCase()}`, doc.page.width - 250, 75, { align: 'right' })
+      .text(`Date: ${new Date(payment.createdAt).toLocaleDateString('en-IN')}`, doc.page.width - 250, 90, { align: 'right' })
+      .text(`Transaction ID: ${payment.razorpayPaymentId || 'MANUAL'}`, doc.page.width - 250, 105, { align: 'right' });
 
     doc.moveDown(3);
 
     // Bill To & Company Info
     const startY = 150;
-    
+
     // Left: Bill To
     doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold').text("BILL TO:", 50, startY);
     doc.fontSize(10).font('Helvetica').fillColor(textDark);
     doc.text(payment.student?.studentNameEnglish || "Student", 50, startY + 20)
-       .text(`ID: ${payment.student?._id.toString().substring(0, 8).toUpperCase()}`, 50, startY + 35)
-       .text(payment.student?.email || "", 50, startY + 50)
-       .text(payment.student?.phone || "", 50, startY + 65);
+      .text(`ID: ${payment.student?._id.toString().substring(0, 8).toUpperCase()}`, 50, startY + 35)
+      .text(payment.student?.email || "", 50, startY + 50)
+      .text(payment.student?.phone || "", 50, startY + 65);
 
     // Right: Center/Company Info
     doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold').text("ISSUED BY:", 300, startY);
     doc.fontSize(10).font('Helvetica').fillColor(textDark);
     doc.text("DR Academy HQ", 300, startY + 20)
-       .text("123 Education Lane, Knowledge Park", 300, startY + 35)
-       .text("Chennai, Tamil Nadu - 600001", 300, startY + 50)
-       .text("Contact: +91 98765 43210", 300, startY + 65);
+      .text("123 Education Lane, Knowledge Park", 300, startY + 35)
+      .text("Chennai, Tamil Nadu - 600001", 300, startY + 50)
+      .text("Contact: +91 98765 43210", 300, startY + 65);
 
     doc.moveDown(4);
 
@@ -422,8 +422,8 @@ router.get("/invoice/:id", protect, async (req, res) => {
       const words = toWords.toWords(payment.amount).replace(/-/g, ' ');
       doc.moveDown(3);
       doc.fillColor(textLight).fontSize(9).font('Helvetica-Oblique')
-         .text(`Amount in words: Rupees ${words} only.`, 50, summaryY + 60);
-    } catch (e) {}
+        .text(`Amount in words: Rupees ${words} only.`, 50, summaryY + 60);
+    } catch (e) { }
 
     // Status Stamp
     if (payment.status === 'success') {
@@ -433,7 +433,7 @@ router.get("/invoice/:id", protect, async (req, res) => {
 
     // Footer
     doc.fontSize(8).fillColor(textLight)
-       .text("This is an electronically generated invoice and does not require a physical signature.", 0, doc.page.height - 50, { align: 'center' });
+      .text("This is an electronically generated invoice and does not require a physical signature.", 0, doc.page.height - 50, { align: 'center' });
 
     doc.end();
 
@@ -443,4 +443,4 @@ router.get("/invoice/:id", protect, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;

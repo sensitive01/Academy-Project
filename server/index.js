@@ -18,11 +18,11 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const passwordRoutes = require("./routes/passwordRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const announcementRoutes = require("./routes/announcementRoutes");
-const forumRoutes = require("./routes/forumRoutes");  
+const forumRoutes = require("./routes/forumRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
-const centerRoutes = require("./routes/centerRoutes"); 
+const centerRoutes = require("./routes/centerRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
 const enquiryRoutes = require("./routes/enquiryRoutes");
 const publicAttendanceRoutes = require("./routes/publicAttendanceRoutes");
@@ -31,6 +31,7 @@ const batchRoutes = require("./routes/batchRoutes");
 const subjectRoutes = require("./routes/subjectRoutes");
 const examRoutes = require("./routes/examRoutes");
 const markRoutes = require("./routes/markRoutes");
+const examFeeRoutes = require("./routes/examFeeRoutes");
 
 
 
@@ -80,6 +81,7 @@ app.use("/api/batches", batchRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/exams", examRoutes);
 app.use("/api/marks", markRoutes);
+app.use("/api/exam-fees", examFeeRoutes);
 
 
 
