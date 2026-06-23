@@ -847,36 +847,7 @@ const CourseManagement = () => {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Course Subjects
-                      </label>
-                      <div className="border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-white space-y-2 shadow-sm">
-                        {availableSubjects.map((subject) => {
-                          const isChecked = formData.subjects.includes(subject._id);
-                          return (
-                            <label key={subject._id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors">
-                              <input
-                                type="checkbox"
-                                className="w-4 h-4 text-brand-600 rounded border-gray-300 focus:ring-brand-500"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setFormData({ ...formData, subjects: [...formData.subjects, subject._id] });
-                                  } else {
-                                    setFormData({ ...formData, subjects: formData.subjects.filter((id) => id !== subject._id) });
-                                  }
-                                }}
-                              />
-                              <span className="text-sm text-gray-700">{subject.name} ({subject.code})</span>
-                            </label>
-                          );
-                        })}
-                        {availableSubjects.length === 0 && (
-                          <p className="text-xs text-gray-400 italic">No subjects available.</p>
-                        )}
-                      </div>
-                    </div>
+
                   </div>
 
                   {/* Right Column: Thumbnail */}

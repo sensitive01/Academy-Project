@@ -17,6 +17,7 @@ import api from "../../services/api";
 import toast from "react-hot-toast";
 import CustomDataTable from "../../components/DataTable";
 import AssignStudentsModal from "../../components/AssignStudentsModal";
+import MultiSelectSubjects from "../../components/MultiSelectSubjects";
 
 const toTitleCase = (str) => {
   return str
@@ -132,7 +133,7 @@ const AdministrativeConfigs = () => {
       icon: <BookOpen size={20} />,
     },
     examFees: {
-      title: "Exam Fees",
+      title: "Fees",
       singular: "Exam Fee",
       endpoint: "/exam-fees",
       icon: <DollarSign size={20} />,
@@ -872,24 +873,16 @@ const AdministrativeConfigs = () => {
                     {sem.noOfSubjects > 0 && (
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects</label>
-                        <select
-                          multiple
-                          className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 min-h-[200px] bg-white"
-                          value={sem.subjects}
-                          onChange={(e) => {
-                            const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
-                            if (selectedOptions.length <= sem.noOfSubjects) {
-                              const newData = [...assignSubjectsData];
-                              newData[index].subjects = selectedOptions;
-                              setAssignSubjectsData(newData);
-                            } else {
-                              toast.error(`You can only select up to ${sem.noOfSubjects} subjects`);
-                            }
+                        <MultiSelectSubjects
+                          subjectsList={subjectsList}
+                          selectedSubjects={sem.subjects || []}
+                          maxSelection={sem.noOfSubjects}
+                          onChange={(selectedIds) => {
+                            const newData = [...assignSubjectsData];
+                            newData[index].subjects = selectedIds;
+                            setAssignSubjectsData(newData);
                           }}
-                        >
-                          {subjectsList.map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
-                        </select>
-                        <p className="text-xs text-gray-500 mt-2">Hold Ctrl/Cmd to select multiple subjects (up to {sem.noOfSubjects})</p>
+                        />
                       </div>
                     )}
                   </div>

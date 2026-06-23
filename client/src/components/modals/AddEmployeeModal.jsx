@@ -593,7 +593,8 @@ const [formData, setFormData] = useState({
                   }
                 >
                   <option value="">Select Role</option>
-                  {roles.map((role) => (
+                  <option value="sub-admin">Sub-Admin</option>
+                  {roles.filter(r => r.name.toLowerCase() !== "sub-admin").map((role) => (
                     <option key={role._id} value={role.name}>
                       {role.name}
                     </option>

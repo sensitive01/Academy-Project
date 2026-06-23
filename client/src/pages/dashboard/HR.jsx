@@ -328,14 +328,14 @@ const HR = () => {
       {/* Tab Content */}
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === "employees" && (
-          <EmployeeList
-            employees={employees}
-            loading={loading}
-            onRefresh={fetchEmployees}
-            onEdit={handleEditInitiate}
-            onToggleStatus={handleToggleStatus}
-            onDelete={handleDeleteEmployee}
-          />
+        <EmployeeList
+          employees={employees}
+          loading={loading}
+          onRefresh={fetchEmployees}
+          onEdit={handleEditInitiate}
+          onToggleStatus={handleToggleStatus}
+          onDelete={handleDeleteEmployee}
+        />
         )}
 
       </div>
