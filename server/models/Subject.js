@@ -14,7 +14,7 @@ const subjectSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['Theory', 'Practical'],
+      enum: ['Theory', 'Practical', 'Both'],
       required: true,
       default: 'Theory'
     },
@@ -22,8 +22,13 @@ const subjectSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 1,
-      max: 6,
+      max: 8,
       default: 1
+    },
+    course: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Course',
+      required: true,
     },
   },
   { timestamps: true }

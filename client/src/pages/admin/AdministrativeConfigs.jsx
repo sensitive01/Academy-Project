@@ -31,6 +31,7 @@ const AdministrativeConfigs = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
+  const [batchStep, setBatchStep] = useState(1);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -45,12 +46,18 @@ const AdministrativeConfigs = () => {
     course: "",
     batch: "",
     fee: 0,
+    batchId: "",
+    numberOfSemesters: 1,
+    period: { startDate: "", endDate: "" },
+    numberOfStudents: 0,
+    semesters: [],
   });
   const [searchQuery, setSearchQuery] = useState("");
 
   const [centersList, setCentersList] = useState([]);
   const [coursesList, setCoursesList] = useState([]);
   const [batchesList, setBatchesList] = useState([]);
+  const [subjectsList, setSubjectsList] = useState([]);
 
   // Login Management State
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -121,6 +128,24 @@ const AdministrativeConfigs = () => {
         setCentersList(centersRes.data);
         setCoursesList(coursesRes.data);
         setBatchesList(batchesRes.data);
+      } else if (activeTab === "batches") {
+        const [batchesRes, coursesRes, subjectsRes, centersRes] = await Promise.all([
+          api.get("/batches"),
+          api.get("/courses"),
+          api.get("/subjects"),
+          api.get("/centers")
+        ]);
+        setData(batchesRes.data);
+        setCoursesList(coursesRes.data);
+        setSubjectsList(subjectsRes.data);
+        setCentersList(centersRes.data);
+      } else if (activeTab === "subjects") {
+        const [subjectsRes, coursesRes] = await Promise.all([
+          api.get("/subjects"),
+          api.get("/courses")
+        ]);
+        setData(subjectsRes.data);
+        setCoursesList(coursesRes.data);
       } else {
         const { data } = await api.get(config[activeTab].endpoint);
         setData(data);
@@ -134,7 +159,7 @@ const AdministrativeConfigs = () => {
 
   useEffect(() => {
     fetchData();
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const handleDelete = async (id) => {
     if (
@@ -154,6 +179,12 @@ const AdministrativeConfigs = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (activeTab === "batches" && batchStep === 1) {
+      setBatchStep(2);
+      return;
+    }
+
     const formattedData = {
       ...formData,
       name: formData.name ? toTitleCase(formData.name.trim()) : undefined,
@@ -184,6 +215,7 @@ const AdministrativeConfigs = () => {
   };
 
   const openModal = (item = null) => {
+    setBatchStep(1);
     if (item) {
       setFormData({
         name: item.name || "",
@@ -197,6 +229,11 @@ const AdministrativeConfigs = () => {
         course: item.course?._id || item.course || "",
         batch: item.batch?._id || item.batch || "",
         fee: item.fee || 0,
+        batchId: item.batchId || "",
+        numberOfSemesters: item.numberOfSemesters || 1,
+        period: item.period || { startDate: "", endDate: "" },
+        numberOfStudents: item.numberOfStudents || 0,
+        semesters: item.semesters || [],
       });
       setIsEditing(true);
       setCurrentId(item._id);
@@ -213,6 +250,11 @@ const AdministrativeConfigs = () => {
         course: "",
         batch: "",
         fee: 0,
+        batchId: "",
+        numberOfSemesters: 1,
+        period: { startDate: "", endDate: "" },
+        numberOfStudents: 0,
+        semesters: [],
       });
       setIsEditing(false);
     }
@@ -259,25 +301,25 @@ const AdministrativeConfigs = () => {
     }
   };
 
-const columns = [
-  { name: "S.No", selector: (r, i) => i + 1, width: "70px", center: true },
+  const columns = [
+    { name: "S.No", selector: (r, i) => i + 1, width: "70px", center: true },
 
-  {
-    name: `${config[activeTab].singular} Name`,
-    selector: r => r.name,
-    sortable: true,
-    omit: activeTab === "examFees",
-    cell: r => (
-      <div className="flex items-center">
-        <div className="h-10 w-10 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center">
-          {config[activeTab].icon}
+    {
+      name: `${config[activeTab].singular} Name`,
+      selector: r => r.name,
+      sortable: true,
+      omit: activeTab === "examFees",
+      cell: r => (
+        <div className="flex items-center">
+          <div className="h-10 w-10 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center">
+            {config[activeTab].icon}
+          </div>
+          <div className="ml-3 font-medium text-gray-900">{r.name}</div>
         </div>
-        <div className="ml-3 font-medium text-gray-900">{r.name}</div>
-      </div>
-    )
-  },
-  ...(activeTab === "centers"
-    ? [
+      )
+    },
+    ...(activeTab === "centers"
+      ? [
         {
           name: "Center ID",
           selector: r => r.centerId,
@@ -301,9 +343,9 @@ const columns = [
           ),
         },
       ]
-    : []),
-  ...(activeTab === "subjects"
-    ? [
+      : []),
+    ...(activeTab === "subjects"
+      ? [
         {
           name: "Subject Code",
           selector: r => r.code,
@@ -317,6 +359,11 @@ const columns = [
           ),
         },
         {
+          name: "Course",
+          selector: r => r.course?.title,
+          sortable: true,
+        },
+        {
           name: "Type",
           selector: r => r.type,
           sortable: true,
@@ -326,46 +373,92 @@ const columns = [
           name: "Semester",
           selector: r => r.semester,
           sortable: true,
-          width: "100px",
+          width: "130px",
           center: true,
         },
       ]
-    : []),
-  ...(activeTab === "examFees"
-    ? [
+      : []),
+    ...(activeTab === "batches"
+      ? [
+        {
+          name: "Batch ID",
+          selector: r => r.batchId,
+          sortable: true,
+          width: "150px",
+          center: true,
+          cell: r => (
+            <span className="font-mono text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-1 rounded">
+              {r.batchId || "N/A"}
+            </span>
+          ),
+        },
+        {
+          name: "Course",
+          selector: r => r.course?.title || "N/A",
+          sortable: true,
+        },
+        {
+          name: "Center",
+          selector: r => r.center?.name || "N/A",
+          sortable: true,
+        },
+        {
+          name: "Semesters",
+          selector: r => r.numberOfSemesters,
+          sortable: true,
+          width: "125px",
+          center: true,
+        },
+        {
+          name: "Period",
+          selector: r => r.period ? `${r.period.startDate} to ${r.period.endDate}` : "N/A",
+          sortable: true,
+          width: "160px",
+        },
+        {
+          name: "Students",
+          selector: r => r.numberOfStudents,
+          sortable: true,
+          width: "120px",
+          center: true,
+        },
+      ]
+      : []),
+    ...(activeTab === "examFees"
+      ? [
         { name: "Center", selector: r => r.center?.name, sortable: true },
         { name: "Course", selector: r => r.course?.title, sortable: true },
         { name: "Batch", selector: r => r.batch?.name, sortable: true },
-        { 
-          name: "Fee", 
-          selector: r => r.fee, 
-          sortable: true, 
-          cell: r => <span className="font-bold text-green-600">₹{r.fee}</span> 
+        {
+          name: "Fee",
+          selector: r => r.fee,
+          sortable: true,
+          cell: r => <span className="font-bold text-green-600">₹{r.fee}</span>
         },
       ]
-    : []),
+      : []),
 
-  {
-    name: "Actions",
-    center: true,
-    width: "140px",
-    cell: r => (
-      <div className="flex justify-center gap-2">
-        {activeTab === "centers" && (
-          <button onClick={() => openLoginModal(r)} className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50">
-            <Key size={18} />
+    {
+      name: "Actions",
+      center: true,
+      width: "140px",
+      cell: r => (
+        <div className="flex justify-center gap-2">
+          {activeTab === "centers" && (
+            <button onClick={() => openLoginModal(r)} className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50">
+              <Key size={18} />
+            </button>
+          )}
+          <button onClick={() => openModal(r)} className="text-brand-600 hover:text-brand-900 p-2 rounded-lg hover:bg-brand-50">
+            <Edit size={18} />
           </button>
-        )}
-        <button onClick={() => openModal(r)} className="text-brand-600 hover:text-brand-900 p-2 rounded-lg hover:bg-brand-50">
-          <Edit size={18} />
-        </button>
-        <button onClick={() => handleDelete(r._id)} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50">
-          <Trash2 size={18} />
-        </button>
-      </div>
-    )
-  }
-];
+          <button onClick={() => handleDelete(r._id)} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50">
+            <Trash2 size={18} />
+          </button>
+        </div>
+      )
+    }
+  ];
 
   const filteredData = data.filter(item => {
     if (activeTab === "examFees") {
@@ -403,8 +496,8 @@ const columns = [
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === tab
-                ? "text-brand-600"
-                : "text-gray-500 hover:text-gray-700"
+              ? "text-brand-600"
+              : "text-gray-500 hover:text-gray-700"
               }`}
           >
             <div className="flex items-center gap-2">
@@ -432,7 +525,7 @@ const columns = [
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-start justify-center p-4 py-10">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl scale-in-center">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-brand-50 text-brand-600 rounded-lg">
@@ -445,7 +538,7 @@ const columns = [
               </h2>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {activeTab !== "examFees" && (
+              {activeTab !== "examFees" && (activeTab !== "batches" || batchStep === 1) && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     {config[activeTab].singular} Name
@@ -468,28 +561,28 @@ const columns = [
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Center</label>
-                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})}>
+                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.center} onChange={e => setFormData({ ...formData, center: e.target.value })}>
                       <option value="">Select Center</option>
                       {centersList.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
-                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.course} onChange={e => setFormData({...formData, course: e.target.value})}>
+                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.course} onChange={e => setFormData({ ...formData, course: e.target.value })}>
                       <option value="">Select Course</option>
                       {coursesList.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Batch</label>
-                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})}>
+                    <select required className="w-full rounded-xl border-gray-200 p-3 bg-white border shadow-sm focus:border-brand-500" value={formData.batch} onChange={e => setFormData({ ...formData, batch: e.target.value })}>
                       <option value="">Select Batch</option>
                       {batchesList.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Fee Amount (₹)</label>
-                    <input type="number" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.fee} onChange={e => setFormData({...formData, fee: Number(e.target.value)})} />
+                    <input type="number" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.fee} onChange={e => setFormData({ ...formData, fee: Number(e.target.value) })} />
                   </div>
                 </>
               )}
@@ -530,88 +623,202 @@ const columns = [
 
               {activeTab === "subjects" && (
                 <>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Subject Code
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
-                    placeholder="Enter subject code..."
-                    value={formData.code}
-                    onChange={(e) =>
-                      setFormData({ ...formData, code: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Subject Type
-                  </label>
-                  <select
-                    required
-                    className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
-                    value={formData.type}
-                    onChange={(e) =>
-                      setFormData({ ...formData, type: e.target.value })
-                    }
-                  >
-                    <option value="Theory">Theory</option>
-                    <option value="Practical">Practical</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Semester
-                  </label>
-                  <select
-                    required
-                    className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
-                    value={formData.semester}
-                    onChange={(e) =>
-                      setFormData({ ...formData, semester: Number(e.target.value) })
-                    }
-                  >
-                    {[1, 2, 3, 4, 5, 6].map(sem => (
-                      <option key={sem} value={sem}>{sem}</option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Subject Code
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
+                      placeholder="Enter subject code..."
+                      value={formData.code}
+                      onChange={(e) =>
+                        setFormData({ ...formData, code: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Subject Type
+                    </label>
+                    <select
+                      required
+                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
+                      value={formData.type}
+                      onChange={(e) =>
+                        setFormData({ ...formData, type: e.target.value })
+                      }
+                    >
+                      <option value="Theory">Theory</option>
+                      <option value="Practical">Practical</option>
+                      <option value="Both">Both</option>
+                    </select>
+                  </div>
+                                   <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Course
+                    </label>
+                    <select
+                      required
+                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white"
+                      value={formData.course}
+                      onChange={(e) =>
+                        setFormData({ ...formData, course: e.target.value })
+                      }
+                    >
+                      <option value="">Select Course</option>
+                      {coursesList.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Semester
+                    </label>
+                    <select
+                      required
+                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
+                      value={formData.semester}
+                      onChange={(e) =>
+                        setFormData({ ...formData, semester: Number(e.target.value) })
+                      }
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                        <option key={sem} value={sem}>{sem}</option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               )}
 
-              {activeTab === "batches" && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Certificate Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3"
-                    value={formData.certificateDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, certificateDate: e.target.value })
-                    }
-                  />
+              {activeTab === "batches" && batchStep === 1 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Batch ID</label>
+                    <input type="text" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.batchId} onChange={e => setFormData({ ...formData, batchId: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Center</label>
+                    <select required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white" value={formData.center} onChange={e => setFormData({ ...formData, center: e.target.value })}>
+                      <option value="">Select Center</option>
+                      {centersList.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
+                    <select required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white" value={formData.course} onChange={e => setFormData({ ...formData, course: e.target.value })}>
+                      <option value="">Select Course</option>
+                      {coursesList.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Start Date</label>
+                      <input type="month" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.period?.startDate} onChange={e => setFormData({ ...formData, period: { ...formData.period, startDate: e.target.value } })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">End Date</label>
+                      <input type="month" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.period?.endDate} onChange={e => setFormData({ ...formData, period: { ...formData.period, endDate: e.target.value } })} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Number of Students</label>
+                    <input type="number" min="1" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.numberOfStudents} onChange={e => setFormData({ ...formData, numberOfStudents: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Certificate Date (Optional)</label>
+                    <input type="date" className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.certificateDate} onChange={e => setFormData({ ...formData, certificateDate: e.target.value })} />
+                  </div>
+                </>
+              )}
+              {activeTab === "batches" && batchStep === 2 && (
+                <div className="space-y-4">
+                  <div className="bg-brand-50 p-4 rounded-xl border border-brand-100 mb-4">
+                    <p className="text-sm text-brand-800 flex justify-between"><span className="font-semibold">Batch Name:</span> {formData.name}</p>
+                    <p className="text-sm text-brand-800 flex justify-between mt-1"><span className="font-semibold">Course:</span> {coursesList.find(c => c._id === formData.course)?.title}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Number of Semesters</label>
+                    <input type="number" min="1" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.numberOfSemesters} onChange={e => {
+                      const num = Number(e.target.value);
+                      setFormData(prev => ({ ...prev, numberOfSemesters: num, semesters: prev.semesters.slice(0, num) }));
+                    }} />
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto space-y-4 pr-2">
+                    {Array.from({ length: formData.numberOfSemesters }).map((_, i) => {
+                      const semNum = i + 1;
+                      const semData = formData.semesters.find(s => s.semesterNumber === semNum) || { semesterNumber: semNum, subjects: [] };
+
+                      const handleSubjectSelect = (e) => {
+                        const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                        setFormData(prev => {
+                          const newSems = [...prev.semesters];
+                          const idx = newSems.findIndex(s => s.semesterNumber === semNum);
+                          if (idx >= 0) {
+                            newSems[idx] = { ...newSems[idx], subjects: selectedOptions };
+                          } else {
+                            newSems.push({ semesterNumber: semNum, subjects: selectedOptions });
+                          }
+                          return { ...prev, semesters: newSems };
+                        });
+                      };
+
+                      return (
+                        <div key={semNum} className="border border-gray-200 rounded-xl p-4">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Semester {semNum} Subjects</label>
+                          <select
+                            multiple
+                            className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 min-h-[120px] bg-white"
+                            value={semData.subjects.map(s => typeof s === 'object' ? s._id : s)}
+                            onChange={handleSubjectSelect}
+                          >
+                            {subjectsList.filter(s => s.semester === semNum && (typeof s.course === 'object' ? s.course?._id === formData.course : s.course === formData.course)).map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-2">Hold Ctrl/Cmd to select multiple subjects</p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
               <div className="flex justify-end gap-3 mt-8">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 shadow-md shadow-brand-200 transition-all hover:scale-[1.02]"
-                >
-                  {isEditing
-                    ? "Save Changes"
-                    : `Add ${config[activeTab].singular}`}
-                </button>
+                {activeTab === "batches" && batchStep === 2 ? (
+                  <button
+                    type="button"
+                    onClick={() => setBatchStep(1)}
+                    className="px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    Back
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+
+                {activeTab === "batches" && batchStep === 1 ? (
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 shadow-md shadow-brand-200 transition-all hover:scale-[1.02]"
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 shadow-md shadow-brand-200 transition-all hover:scale-[1.02]"
+                  >
+                    {isEditing
+                      ? "Save Changes"
+                      : `Add ${config[activeTab].singular}`}
+                  </button>
+                )}
               </div>
             </form>
           </div>

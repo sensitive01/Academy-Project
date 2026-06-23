@@ -8,14 +8,16 @@ const { protect } = require("../middleware/authMiddleware");
 //////////////////////////////////////////////////////
 router.post("/", protect, async (req, res) => {
   try {
-    const { name, code, type, semester } = req.body;
+    const { name, code, type, semester, course } = req.body;
 
     const exists = await Subject.findOne({ $or: [{ name }, { code }] });
     if (exists) {
       return res.status(400).json({ message: "Subject with this name or code already exists" });
     }
 
-    const subject = await Subject.create({ name, code, type, semester });
+    const subject = await Subject.create({ name, code, type, semester, course });
+
+    await subject.populate("course");
 
     res.status(201).json(subject);
   } catch (err) {
@@ -29,7 +31,7 @@ router.post("/", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.get("/", protect, async (req, res) => {
   try {
-    const subjects = await Subject.find().lean();
+    const subjects = await Subject.find().populate("course").lean();
     res.json(subjects);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -41,7 +43,7 @@ router.get("/", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.put("/:id", protect, async (req, res) => {
   try {
-    const { name, code, type, semester } = req.body;
+    const { name, code, type, semester, course } = req.body;
 
     const subject = await Subject.findById(req.params.id);
     if (!subject) {
@@ -52,8 +54,11 @@ router.put("/:id", protect, async (req, res) => {
     if (code) subject.code = code;
     if (type) subject.type = type;
     if (semester) subject.semester = semester;
+    if (course) subject.course = course;
 
     await subject.save();
+    
+    await subject.populate("course");
 
     res.json(subject);
   } catch (err) {
