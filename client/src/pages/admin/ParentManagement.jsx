@@ -119,7 +119,7 @@ const ParentManagement = () => {
         <h1 className="text-2xl font-bold text-gray-800">Parent Management</h1>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
+          className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700"
         >
           <UserPlus size={20} /> Add Parent
         </button>
@@ -209,7 +209,7 @@ const ParentManagement = () => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                    className="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center gap-2 disabled:opacity-50"
                   >
                     {submitting ? (
                       <Loader2 className="animate-spin" size={18} />

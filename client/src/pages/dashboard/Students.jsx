@@ -404,16 +404,16 @@ const Students = () => {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeTab === tab
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === tab
               ? "text-brand-600"
-              : "text-gray-500 hover:text-gray-700"
+              : "text-gray-500 hover:text-brand-600"
               }`}
           >
             {tabs[tab].icon}
             {tabs[tab].label}
-            {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
-            )}
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
+              activeTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+            }`} />
           </button>
         ))}
       </div>
@@ -483,9 +483,9 @@ const Students = () => {
              <Attendance internOnly={true} hideHeader={true} />
          </div>
       ) : activeTab === "intern_payroll" ? (
-         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
-             <Payroll internOnly={true} hideHeader={true} />
-         </div>
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
+             <Payroll internOnly={true} hideHeader={false} />
+        </div>
       ) : activeTab === "leaves" ? (
          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
              <LeaveRequestList />

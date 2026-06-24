@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell,
+  Search,
   Menu,
   User,
   LogOut,
@@ -149,6 +150,13 @@ const DashboardHeader = ({ toggleMobileSidebar }) => {
 
       {/* Right */}
       <div className="flex items-center gap-4 sm:gap-6">
+
+        {/* 🔍 Search */}
+        <button
+          className="p-2 text-slate-600 hover:text-slate-800 transition-colors"
+        >
+          <Search size={20} />
+        </button>
 
         {/* 🔔 Notifications */}
         <div className="relative" ref={notifRef}>

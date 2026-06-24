@@ -326,7 +326,7 @@ const Announcement = () => {
           {(user?.role === "admin" || user?.role === "sub-admin") && (
             <button
               onClick={openCreateModal}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-brand-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 active:scale-95"
             >
               <Plus size={18} strokeWidth={3} /> New Broadcast
             </button>
@@ -737,7 +737,7 @@ const Announcement = () => {
 
               <button
                 onClick={isEditMode ? handleUpdate : handleCreate}
-                className="px-8 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                className="px-8 py-3 bg-brand-600 text-white font-black rounded-xl hover:bg-brand-700 active:scale-95 transition-all shadow-lg shadow-brand-600/20 flex items-center gap-2"
               >
                 {isEditMode ? "Update" : "Submit"} <Send size={16} />
               </button>

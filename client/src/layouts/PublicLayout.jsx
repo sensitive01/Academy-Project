@@ -729,7 +729,21 @@ const PublicLayout = () => {
           </div>
 
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] md:text-xs text-brand-200/60 font-medium">
-            <p>© 2024-2026 DR R G ACADEMY LLP. | ISO 9001:2015 Certified | All Rights Reserved.</p>
+            <div className="flex flex-col md:flex-row gap-2 md:gap-4 text-center md:text-left items-center">
+              <p>© 2024-2026 DR R G ACADEMY LLP. | ISO 9001:2015 Certified | All Rights Reserved.</p>
+              <span className="hidden md:inline text-brand-200/30">|</span>
+              <p>
+                Designed and developed by{" "}
+                <a 
+                  href="https://sensitive.co.in/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="hover:text-white transition-colors underline"
+                >
+                  sensitive technologies
+                </a>
+              </p>
+            </div>
             <div className="flex flex-wrap gap-4 md:gap-7 justify-center uppercase tracking-widest">
               <Link to="/?info=Privacy+Policy" className="hover:text-white transition-colors">Privacy</Link>
               <Link to="/?info=Terms+%26+Condition" className="hover:text-white transition-colors">Terms</Link>

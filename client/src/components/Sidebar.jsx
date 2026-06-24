@@ -137,8 +137,10 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   // ================= ADMIN / HR MENU =================
   const adminItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
-    { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
+    { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <Users size={22} />, label: "Parent Mgmt", path: "/dashboard/admin/parents" },
+    { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
     { 
       icon: <CreditCard size={22} />, 
       label: "Payments", 
@@ -147,9 +149,11 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
         { label: "Outward", path: "/dashboard/payments/outward" }
       ]
     },
-    { icon: <FileText size={22} />, label: "Exam Management", path: "/dashboard/exams" },
+    { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
+    { icon: <Briefcase size={22} />, label: "Vendor Mgmt", path: "/dashboard/admin/vendors" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <MessageSquare size={22} />, label: "Enquiries", path: "/dashboard/admin/enquiries" },
   ];
 
   // ================= COACH MENU =================
@@ -245,15 +249,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     currentNavItems = vendorItems;
   }
 
-  // ================= ADMIN EXTRA ZONE =================
-  const superAdminItems = [
-    { icon: <MessageSquare size={22} />, label: "Enquiries", path: "/dashboard/admin/enquiries" },
-    { icon: <Briefcase size={22} />, label: "Vendor Mgmt", path: "/dashboard/admin/vendors" },
-    { icon: <Users size={22} />, label: "Parent Mgmt", path: "/dashboard/admin/parents" },
-    { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
-    { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
-  ];
-
   const sidebarClasses =
     "fixed left-0 top-0 z-50 h-screen bg-slate-900 text-white transition-all duration-300 ease-in-out shadow-xl flex flex-col";
 
@@ -306,33 +301,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
                 closeMobile={closeMobile}
               />
             ))}
-          </ul>
-
-          {/* SUPER ADMIN SECTION */}
-          {role === "admin" && (
-            <ul className="space-y-1 mb-8">
-              {superAdminItems.map((item) => (
-                <NavItem
-                  key={item.path}
-                  item={item}
-                  isCollapsed={isCollapsed}
-                  closeMobile={closeMobile}
-                />
-              ))}
-            </ul>
-          )}
-
-          {/* SETTINGS */}
-          <ul className="space-y-1">
-            <NavItem
-              item={{
-                icon: <Settings size={22} />,
-                label: "Settings",
-                path: "/dashboard/settings",
-              }}
-              isCollapsed={isCollapsed}
-              closeMobile={closeMobile}
-            />
           </ul>
         </div>
 

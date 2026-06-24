@@ -454,19 +454,19 @@ const Profile = () => {
            {authUser?.role !== "student" && (
              <button
                onClick={() => setActiveTab("personal")}
-               className={`px-1 py-3 mr-8 text-sm font-medium transition-colors relative ${activeTab === "personal" ? "text-indigo-600" : "text-gray-500 hover:text-gray-800"}`}
+               className={`px-1 py-3 mr-8 text-sm font-medium transition-colors relative group ${activeTab === "personal" ? "text-indigo-600" : "text-gray-500 hover:text-indigo-600"}`}
              >
                Personal Details
-               {activeTab === "personal" && <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-indigo-600 rounded-t-lg"></div>}
+               <div className={`absolute bottom-[-1px] left-0 w-full h-0.5 rounded-t-lg transition-colors ${activeTab === "personal" ? "bg-indigo-600" : "bg-transparent group-hover:bg-indigo-600"}`}></div>
              </button>
            )}
            {authUser?.role === "parent" && (
              <button
                onClick={() => setActiveTab("children")}
-               className={`px-1 py-3 text-sm font-medium transition-colors relative ${activeTab === "children" ? "text-indigo-600" : "text-gray-500 hover:text-gray-800"}`}
+               className={`px-1 py-3 text-sm font-medium transition-colors relative group ${activeTab === "children" ? "text-indigo-600" : "text-gray-500 hover:text-indigo-600"}`}
              >
                My Dependents
-               {activeTab === "children" && <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-indigo-600 rounded-t-lg"></div>}
+               <div className={`absolute bottom-[-1px] left-0 w-full h-0.5 rounded-t-lg transition-colors ${activeTab === "children" ? "bg-indigo-600" : "bg-transparent group-hover:bg-indigo-600"}`}></div>
              </button>
            )}
         </div>

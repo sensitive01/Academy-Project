@@ -221,7 +221,7 @@ const DiscussionForum = () => {
             setImage(null);
             setPreview(null);
           }}
-          className="w-full md:w-auto flex items-center justify-center gap-2 bg-violet-600 text-white px-8 py-3.5 rounded-2xl font-black hover:bg-violet-700 transition-all shadow-lg shadow-violet-600/20 active:scale-95"
+          className="w-full md:w-auto flex items-center justify-center gap-2 bg-brand-600 text-white px-8 py-3.5 rounded-2xl font-black hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 active:scale-95"
         >
           <MessageSquare size={18} /> Start a Discussion
         </button>
@@ -539,7 +539,7 @@ const DiscussionForum = () => {
 
               <button
                 onClick={handleSubmitPost}
-                className="px-8 py-3 bg-violet-600 text-white font-black rounded-xl hover:bg-violet-700 active:scale-95 transition-all shadow-lg shadow-violet-600/20 flex items-center gap-2"
+                className="px-8 py-3 bg-brand-600 text-white font-black rounded-xl hover:bg-brand-700 active:scale-95 transition-all shadow-lg shadow-brand-600/20 flex items-center gap-2"
               >
                 {editingPost ? "Update Post" : "Post to Forum"} <Send size={16} />
               </button>

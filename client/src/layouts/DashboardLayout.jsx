@@ -53,14 +53,28 @@ const DashboardLayout = () => {
           toggleMobileSidebar={() => setIsMobileSidebarOpen(true)}
           title={getPageTitle()}
         />
-        <main className="flex-1 p-6 overflow-y-auto no-scrollbar relative">
-          {isNavigating ? (
-            <div className="flex items-center justify-center h-full">
-              <Loading message="Loading..." />
-            </div>
-          ) : (
-            <Outlet />
-          )}
+        <main className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
+          <div className="flex-1 p-6">
+            {isNavigating ? (
+              <div className="flex items-center justify-center h-full">
+                <Loading message="Loading..." />
+              </div>
+            ) : (
+              <Outlet />
+            )}
+          </div>
+          {/* Dashboard Footer */}
+          <footer className="mt-auto py-4 px-6 text-center text-sm text-slate-500 border-t border-slate-200">
+            Designed and developed by{" "}
+            <a 
+              href="https://sensitive.co.in/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-brand-600 hover:text-brand-700 hover:underline font-medium transition-colors"
+            >
+              sensitive technologies
+            </a>
+          </footer>
         </main>
       </div>
     </div>

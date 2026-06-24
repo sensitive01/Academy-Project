@@ -315,7 +315,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
                   onClick={() => setActiveTab(tab)}
                   className={`pb-3 text-sm font-medium border-b-2 transition-colors capitalize ${activeTab === tab
                       ? "border-indigo-600 text-indigo-700"
-                      : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                      : "border-transparent text-slate-500 hover:text-indigo-700 hover:border-indigo-600"
                     }`}
                 >
                   {tab.replace("_", " ")}

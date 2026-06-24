@@ -685,7 +685,7 @@ const ExamManagement = () => {
       <div className="flex items-center gap-4 border-b border-slate-200">
         <button
           className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-700"
+            activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
           }`}
           onClick={() => setActiveTab("exams")}
         >
@@ -693,7 +693,7 @@ const ExamManagement = () => {
         </button>
         <button
           className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-700"
+            activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
           }`}
           onClick={() => setActiveTab("marks")}
         >
@@ -702,7 +702,7 @@ const ExamManagement = () => {
         {isAdmin && (
           <button
             className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === "payments" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-slate-700"
+              activeTab === "payments" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
             }`}
             onClick={() => setActiveTab("payments")}
           >

@@ -119,34 +119,34 @@ const PaymentsHub = () => {
               <button
                 key={tab}
                 onClick={() => setInwardTab(tab)}
-                className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 ${
+                className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
                   inwardTab === tab
                     ? "text-brand-600"
-                    : "text-slate-400 hover:text-slate-600"
+                    : "text-slate-400 hover:text-brand-600"
                 }`}
               >
                 {inwardTabs[tab].icon}
                 {inwardTabs[tab].label}
-                {inwardTab === tab && (
-                  <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-600 rounded-t-full" />
-                )}
+                <div className={`absolute bottom-0 left-0 w-full h-1 rounded-t-full transition-colors ${
+                  inwardTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+                }`} />
               </button>
             ))
           : Object.keys(outwardTabs).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setOutwardTab(tab)}
-                className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 ${
+                className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
                   outwardTab === tab
                     ? "text-brand-600"
-                    : "text-slate-400 hover:text-slate-600"
+                    : "text-slate-400 hover:text-brand-600"
                 }`}
               >
                 {outwardTabs[tab].icon}
                 {outwardTabs[tab].label}
-                {outwardTab === tab && (
-                  <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-600 rounded-t-full" />
-                )}
+                <div className={`absolute bottom-0 left-0 w-full h-1 rounded-t-full transition-colors ${
+                  outwardTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+                }`} />
               </button>
             ))}
       </div>

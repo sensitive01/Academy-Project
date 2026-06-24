@@ -268,10 +268,18 @@ const generatePayslip = async (payrollId, employeeName) => {
     { name: 'Advance', selector: row => row.advance, right: true, width: '100px', cell: row => <div className="font-bold text-orange-600 cursor-pointer hover:bg-orange-50 p-1 rounded" onClick={() => viewAdjustments(row, "advance")}>{row.advance > 0 ? <><span className="text-orange-300 mr-1">₹</span>{row.advance.toLocaleString("en-IN")}</> : '-'}</div> },
     { name: 'Net Salary', selector: row => row.netSalary, sortable: true, right: true, width: '130px', cell: row => <div className="font-bold text-gray-800"><span className="text-green-600 mr-1">₹</span><span className="text-[15px]">{row.netSalary?.toLocaleString("en-IN")}</span></div> },
     { 
-      name: 'Action', center: true, width: '100px',
-      cell: row => row._id ? (
-        <button className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition text-[11px] font-bold shadow-sm w-full" onClick={() => generatePayslip(row._id, row.name)}>Payslip</button>
-      ) : <span className="text-gray-400 text-xs">-</span>
+      name: 'Action', center: true, width: '110px',
+      cell: row => (
+        <div className="flex flex-col gap-1.5 w-full items-center">
+          <select className="bg-white border border-gray-300 text-slate-700 px-2 py-1 rounded text-[11px] font-bold w-full outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer shadow-sm text-center">
+            <option value="process">Process</option>
+            <option value="hold">Hold</option>
+          </select>
+          {row._id && (
+            <button className="text-brand-600 hover:text-brand-800 transition text-[10px] font-bold underline" onClick={() => generatePayslip(row._id, row.name)}>Payslip</button>
+          )} 
+        </div>
+      )
     }
   ];
 
@@ -338,8 +346,8 @@ const generatePayslip = async (payrollId, employeeName) => {
                     }}
                     className={`px-3 py-2 rounded-md text-sm font-medium transition ${
                       selectedMonth === m.value
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-                        : "bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                        ? "bg-brand-600 text-white shadow-md shadow-brand-200"
+                        : "bg-gray-50 text-gray-700 hover:bg-brand-50 hover:text-brand-600"
                     }`}
                   >
                     {m.label}
@@ -352,7 +360,7 @@ const generatePayslip = async (payrollId, employeeName) => {
 
         <button
           onClick={openPayrollForm}
-          className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-2.5 rounded-lg hover:from-green-600 hover:to-green-700 transition shadow-md shadow-green-200 font-medium"
+          className="flex items-center gap-2 bg-gradient-to-r from-brand-500 to-brand-600 text-white px-5 py-2.5 rounded-lg hover:from-brand-600 hover:to-brand-700 transition shadow-md shadow-brand-200 font-medium"
         >
           <Plus size={18} />
           Add Adjustment
