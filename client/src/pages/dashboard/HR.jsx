@@ -273,16 +273,18 @@ const HR = () => {
             Manage your staff profiles, roles, and records.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setSelectedEmployee(null);
-            setIsAddModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-lg font-bold shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all"
-        >
-          <UserPlus size={18} />
-          Add Employee
-        </button>
+        {activeTab === "employees" && (
+          <button
+            onClick={() => {
+              setSelectedEmployee(null);
+              setIsAddModalOpen(true);
+            }}
+            className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-lg font-bold shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all"
+          >
+            <UserPlus size={18} />
+            Add Employee
+          </button>
+        )}
       </div>
 
       {/* Quick Stats */}
@@ -325,6 +327,38 @@ const HR = () => {
         ))}
       </div>
 
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 gap-8 mt-2">
+        <button
+          onClick={() => setActiveTab("employees")}
+          className={`pb-4 px-2 text-sm font-medium transition-colors relative ${
+            activeTab === "employees" ? "text-brand-600" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Users size={18} />
+            All Employees
+          </div>
+          {activeTab === "employees" && (
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("coaches")}
+          className={`pb-4 px-2 text-sm font-medium transition-colors relative ${
+            activeTab === "coaches" ? "text-brand-600" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Briefcase size={18} />
+            Coach
+          </div>
+          {activeTab === "coaches" && (
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
+          )}
+        </button>
+      </div>
+
       {/* Tab Content */}
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
         {activeTab === "employees" && (
@@ -337,7 +371,16 @@ const HR = () => {
           onDelete={handleDeleteEmployee}
         />
         )}
-
+        {activeTab === "coaches" && (
+        <EmployeeList
+          employees={employees.filter(e => e.user?.role?.toLowerCase() === "coach")}
+          loading={loading}
+          onRefresh={fetchEmployees}
+          onEdit={handleEditInitiate}
+          onToggleStatus={handleToggleStatus}
+          onDelete={handleDeleteEmployee}
+        />
+        )}
       </div>
     </div>
   );

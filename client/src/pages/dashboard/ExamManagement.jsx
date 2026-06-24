@@ -13,7 +13,7 @@ const ExamManagement = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const [activeTab, setActiveTab] = useState("exams"); // 'exams' or 'marks'
+  const [activeTab, setActiveTab] = useState("exams");
 
   const [exams, setExams] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -96,7 +96,6 @@ const ExamManagement = () => {
     fetchData();
   }, []);
 
-  // ====== EXAM LOGIC ======
   const openModal = (exam = null) => {
     if (exam) {
       setFormData({
@@ -166,7 +165,6 @@ const ExamManagement = () => {
     }
   };
 
-  // ====== MARKS LOGIC ======
   const openMarkModal = (mark = null) => {
     if (mark) {
       setMarkFormData({
@@ -313,13 +311,11 @@ const ExamManagement = () => {
     let batchId = "";
     if (st && st.enrolledCourses && st.enrolledCourses.length > 0) {
       courseId = st.enrolledCourses[0].course?._id || st.enrolledCourses[0].course || "";
-      // If batch exists in enrolled courses
       batchId = st.enrolledCourses[0].batch || "";
     }
     setMarkFormData({ ...markFormData, student: studentId, course: courseId, batch: batchId });
   };
 
-  // ====== PAYMENTS LOGIC ======
   const handlePaymentSubmit = async (formData) => {
     try {
       await api.post("/student-fees", formData);
@@ -361,7 +357,6 @@ const ExamManagement = () => {
     return true;
   });
 
-  // ====== COLUMNS ======
   const examColumns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     {
@@ -438,7 +433,6 @@ const ExamManagement = () => {
     });
   }
 
-  // Group marks by Student + Semester
   const groupedMarksMap = {};
   marks.forEach(m => {
     if (!m.student) return;
@@ -681,13 +675,13 @@ const ExamManagement = () => {
 
         {isAdmin && activeTab === "payments" && (
           <button onClick={() => setShowPaymentModal(true)} className="bg-brand-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 shadow-md shadow-brand-600/20 transition-all hover:scale-[1.02]">
-            <Plus size={20} /> Add Payment
+            <Plus size={20} /> Add Fees
           </button>
         )}
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs */} 
       <div className="flex items-center gap-4 border-b border-slate-200">
         <button
           className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
@@ -712,7 +706,7 @@ const ExamManagement = () => {
             }`}
             onClick={() => setActiveTab("payments")}
           >
-            <DollarSign size={18} /> Payments
+            <DollarSign size={18} /> Fees
           </button>
         )}
       </div>
