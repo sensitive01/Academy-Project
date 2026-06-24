@@ -230,7 +230,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
         <div className="flex justify-center gap-2 flex-nowrap">
           <button
             onClick={() => setViewModal(row)}
-            className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 transition shadow-sm whitespace-nowrap"
+            className="bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-brand-700 transition shadow-sm whitespace-nowrap"
           >
             View
           </button>

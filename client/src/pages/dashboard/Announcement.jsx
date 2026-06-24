@@ -20,7 +20,8 @@ import {
   LayoutGrid,
   ChevronRight,
   Maximize2,
-  Filter
+  Filter,
+  ChevronDown
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Loading from "../../components/Loading";
@@ -41,6 +42,7 @@ const Announcement = () => {
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [showMonthGrid, setShowMonthGrid] = useState(false);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -298,22 +300,47 @@ const Announcement = () => {
       {/* CONTROLS */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-           <div className="flex items-center gap-2 px-3 border-r border-slate-100">
-              <Calendar size={18} className="text-indigo-500" />
-              <select 
-                value={selectedMonth} 
-                onChange={e => setSelectedMonth(Number(e.target.value))}
-                className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer"
-              >
-                 {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                    <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
-                 ))}
-              </select>
+           {/* Month Selector */}
+           <div className="relative">
+             <button
+               onClick={() => setShowMonthGrid(!showMonthGrid)}
+               className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm hover:border-brand-200 transition"
+             >
+               <Calendar size={18} className="text-gray-500" />
+               <span className="font-semibold text-gray-700 text-sm">
+                 {new Date(0, selectedMonth - 1).toLocaleString('default', { month: 'long' })}
+               </span>
+               <ChevronDown size={16} className={`text-gray-400 transition-transform ${showMonthGrid ? "rotate-180" : ""}`} />
+             </button>
+
+             {showMonthGrid && (
+               <div className="absolute top-full mt-2 left-0 bg-white border border-gray-100 rounded-xl shadow-xl p-4 z-50 w-72">
+                 <div className="grid grid-cols-3 gap-2">
+                   {Array.from({length: 12}, (_, i) => i + 1).map((m) => (
+                     <button
+                       key={m}
+                       onClick={() => {
+                         setSelectedMonth(m);
+                         setShowMonthGrid(false);
+                       }}
+                       className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                         selectedMonth === m
+                           ? "bg-brand-600 text-white shadow-md shadow-brand-200"
+                           : "bg-gray-50 text-gray-700 hover:bg-brand-50 hover:text-brand-600"
+                       }`}
+                     >
+                       {new Date(0, m - 1).toLocaleString('default', { month: 'short' })}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+             )}
            </div>
+
            <select 
               value={selectedYear} 
               onChange={e => setSelectedYear(Number(e.target.value))}
-              className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer px-3 pr-4"
+              className="bg-transparent font-bold text-slate-700 text-sm focus:outline-none cursor-pointer px-3 pr-4 border-l border-slate-100"
            >
               {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(y => (
                  <option key={y} value={y}>{y}</option>
@@ -431,7 +458,7 @@ const Announcement = () => {
                         markAsRead(row._id);
                       }
                     }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-100"
                   >
                     View <ChevronRight size={14} />
                   </button>
