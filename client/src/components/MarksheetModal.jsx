@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { X, Printer } from 'lucide-react';
+import logo from '../assets/logo-2.jpeg';
 
 const MarksheetModal = ({ data, onClose }) => {
   const printRef = useRef();
@@ -56,7 +57,7 @@ const MarksheetModal = ({ data, onClose }) => {
     }, 250);
   };
 
-  const { student, semester, course, marks } = data;
+  const { student, semester, course, marks, batch } = data;
 
   let grandMax = 0;
   let grandTotal = 0;
@@ -85,11 +86,8 @@ const MarksheetModal = ({ data, onClose }) => {
             {/* Header */}
             <div className="flex items-center justify-center mb-6 text-center border-b border-slate-200 pb-6">
               <div className="flex items-center">
-                {/* Placeholder Logo */}
-                <div className="w-20 h-24 bg-red-700 text-white flex flex-col justify-center items-center font-bold border-4 border-yellow-500 rounded-t-lg mr-4 shadow-sm relative">
-                    <span className="text-2xl">RG</span>
-                    <span className="text-[10px] bg-blue-900 w-full text-center mt-1">MODERN</span>
-                </div>
+                {/* Academy Logo */}
+                <img src={logo} alt="DRRG Academy Logo" className="w-20 h-auto mr-4 object-contain" />
                 <div className="text-left">
                   <h1 className="text-[#1e3a8a] text-3xl font-extrabold m-0 tracking-wide" style={{ fontFamily: 'Times New Roman, serif' }}>DR.R.G. Academy</h1>
                   <p className="text-[#2563eb] text-xs font-semibold m-0 mt-1">Managed By R.G.Modern Educational Trust</p>
@@ -102,9 +100,16 @@ const MarksheetModal = ({ data, onClose }) => {
               EXAMINATION RESULT
             </div>
 
-            <div className="mb-6 text-sm font-semibold text-slate-800 space-y-3">
-              <div>Student Name : {student.studentNameEnglish?.toUpperCase()}</div>
-              <div>Course & Year : {course?.title} - {student.year || 'I Year'}</div>
+            <div className="mb-6 text-sm font-semibold text-slate-800 grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div>Student Name : {student.studentNameEnglish?.toUpperCase()}</div>
+                <div>Course & Year : {course?.title} - {student.year || 'I Year'}</div>
+                <div>Batch : {batch?.name || 'N/A'}</div>
+              </div>
+              <div className="space-y-3">
+                <div>Exam Code : {marks.find(m => m.examConfig)?.examConfig?.name || 'N/A'}</div>
+                <div>Exam Date : {marks.find(m => m.examConfig)?.examConfig?.date ? new Date(marks.find(m => m.examConfig).examConfig.date).toLocaleDateString() : 'N/A'}</div>
+              </div>
             </div>
 
             <div className="text-center text-[#2563eb] text-sm font-bold mb-4 uppercase">

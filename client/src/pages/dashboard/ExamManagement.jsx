@@ -444,9 +444,10 @@ const ExamManagement = () => {
     if (!m.student) return;
     const key = `${m.student._id}_${m.semester}`;
     if (!groupedMarksMap[key]) {
-      const batchId = m.student.enrolledCourses?.[0]?.batch || null;
+      let batchId = m.batch?._id || m.batch || m.student?.enrolledCourses?.[0]?.batch || null;
+      if (typeof batchId === 'object' && batchId !== null) batchId = batchId._id;
       let batchObj = null;
-      if (batchId) batchObj = batches.find(b => b._id === batchId);
+      if (batchId) batchObj = batches.find(b => String(b._id) === String(batchId));
 
       groupedMarksMap[key] = {
         key,
@@ -462,10 +463,13 @@ const ExamManagement = () => {
     }
     
     // Look up exam config to find pass/fail
-    const examConfig = exams.find(e => 
-      e.subject?._id === m.subject?._id && 
-      e.semester === m.semester
-    );
+    const examConfig = exams.find(e => {
+      const eSubId = (e.subject && e.subject._id) ? e.subject._id : e.subject;
+      const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
+      const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
+      const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
+      return String(eSubId) === String(mSubId) && String(eCourseId) === String(mCourseId) && e.semester === m.semester;
+    });
     
     let isPass = false;
     let totalSecured = (m.theoryMark || 0) + (m.internalMark || 0) + (m.practicalMark || 0);
