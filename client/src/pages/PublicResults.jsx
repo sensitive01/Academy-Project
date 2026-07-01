@@ -18,7 +18,7 @@ const PublicResults = () => {
     
     setLoading(true);
     try {
-      const { data } = await axios.get(`http://localhost:5000/api/public-results/student/${studentId}`);
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/public-results/student/${studentId}`);
       setStudentDetails(data);
       setStep(2);
       toast.success('Student details fetched');
@@ -33,7 +33,7 @@ const PublicResults = () => {
   const handleRequestOtp = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.post('http://localhost:5000/api/public-results/send-otp', { studentId });
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/public-results/send-otp`, { studentId });
       setStep(3);
       toast.success(data.message || 'OTP sent to your email');
     } catch (error) {
@@ -50,7 +50,7 @@ const PublicResults = () => {
     
     setLoading(true);
     try {
-      const { data } = await axios.post('http://localhost:5000/api/public-results/results', { studentId, otp });
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/public-results/results`, { studentId, otp });
       setResults(data);
       setStep(4);
       toast.success('Results fetched successfully');
