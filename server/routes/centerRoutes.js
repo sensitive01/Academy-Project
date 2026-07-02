@@ -27,7 +27,7 @@ router.post("/", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 // GET ALL CENTERS
 //////////////////////////////////////////////////////
-router.get("/", protect, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const centers = await Center.find().lean();
     res.json(centers);
