@@ -282,11 +282,11 @@ const StudentRegistration = () => {
           <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8">
             <CheckCircle size={56} />
           </div>
-          <h1 className="text-4xl font-extrabold text-slate-900 mb-4 uppercase tracking-tight">Application Submitted</h1>
+          <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Application Submitted</h1>
           <p className="text-slate-600 mb-10 text-lg">Thank you for choosing Dr.RG Academy. Your registration has been successfully processed. An academic advisor will contact you shortly to complete the admission formalities.</p>
           <div className="flex flex-col md:flex-row gap-4 justify-center">
-            <button onClick={() => window.close()} className="px-10 py-4 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-black transition-all">Close Window</button>
-            <button onClick={() => navigate("/")} className="px-10 py-4 bg-brand-700 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-brand-800 transition-all flex items-center gap-2 justify-center"> <Home size={16} /> Home Page</button>
+            <button onClick={() => window.close()} className="px-10 py-4 bg-slate-900 text-white rounded-xl font-bold tracking-widest text-xs hover:bg-black transition-all">Close Window</button>
+            <button onClick={() => navigate("/")} className="px-10 py-4 bg-brand-700 text-white rounded-xl font-bold tracking-widest text-xs hover:bg-brand-800 transition-all flex items-center gap-2 justify-center"> <Home size={16} /> Home Page</button>
           </div>
         </div>
       </div>
@@ -300,11 +300,11 @@ const StudentRegistration = () => {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter">Student Admission Portal</h1>
-              <p className="text-brand-100 mt-2 text-sm md:text-base font-medium opacity-80 uppercase tracking-widest">Enrollment for Academic Session 2024-2025</p>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tighter">Student Admission Portal</h1>
+              <p className="text-brand-100 mt-2 text-sm md:text-base font-medium opacity-80 tracking-widest">Enrollment for Academic Session 2024-2025</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 hidden md:block">
-              <p className="text-[10px] font-black uppercase tracking-widest text-brand-200 mb-1">Assistance Need?</p>
+              <p className="text-[10px] font-black tracking-widest text-brand-200 mb-1">Assistance Need?</p>
               <div className="flex items-center gap-4 text-sm font-bold">
                 <span className="flex items-center gap-1"><Phone size={14} /> 1800-123-4567</span>
                 <span className="flex items-center gap-1"><Mail size={14} /> admissions@drrgacademy.in</span>
@@ -329,7 +329,7 @@ const StudentRegistration = () => {
               <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center transition-all duration-500 border-4 ${currentStep === i + 1 ? "bg-white border-brand-700 text-brand-700 shadow-xl" : currentStep > i + 1 ? "bg-brand-700 border-brand-700 text-white" : "bg-white border-slate-100 text-slate-300"}`}>
                 {currentStep > i + 1 ? <CheckCircle size={24} /> : s.icon}
               </div>
-              <span className={`mt-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-center hidden sm:block ${currentStep === i + 1 ? "text-brand-700" : "text-slate-400"}`}>{s.title}</span>
+              <span className={`mt-3 text-[9px] md:text-[10px] font-black tracking-widest text-center hidden sm:block ${currentStep === i + 1 ? "text-brand-700" : "text-slate-400"}`}>{s.title}</span>
             </div>
           ))}
         </div>
@@ -339,9 +339,9 @@ const StudentRegistration = () => {
           <div className="bg-slate-50 border-b border-slate-100 px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-400">
               <Info size={16} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Fields marked with (*) are mandatory</span>
+              <span className="text-[10px] font-bold tracking-widest">Fields marked with (*) are mandatory</span>
             </div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="text-[10px] font-bold text-slate-400 tracking-widest">
               Step {currentStep} of 5
             </div>
           </div>
@@ -416,7 +416,7 @@ const StudentRegistration = () => {
                     <div className="space-y-4">
                       {/* Email Input Wrapper */}
                       <div className="group space-y-2">
-                        <label className="text-xs font-black uppercase tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">
+                        <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">
                           Email Address *
                         </label>
                         <div className="relative flex items-center">
@@ -425,7 +425,7 @@ const StudentRegistration = () => {
                             value={formData.email}
                             onChange={handleChange}
                             disabled={isEmailVerified || (otpSent && !isEmailVerified)}
-                            className={`w-full pl-12 pr-32 py-3 bg-slate-50 border-2 border-transparent rounded-xl outline-none transition-all text-[13px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 
+                            className={`w-full pl-10 pr-24 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 
                               ${isEmailVerified ? "border-green-500/30 bg-green-50/30 text-green-700" : ""} 
                               ${(otpSent && !isEmailVerified) ? "opacity-70 bg-slate-100" : ""}`}
                             placeholder="email@example.com"
@@ -438,7 +438,7 @@ const StudentRegistration = () => {
                                 type="button"
                                 onClick={handleSendOtp}
                                 disabled={sendingOtp}
-                                className="px-5 py-3 rounded-xl bg-brand-700 text-white text-[9px] font-black uppercase tracking-widest hover:bg-brand-800 transition-all shadow-lg shadow-brand-700/20 active:scale-95 disabled:opacity-50"
+                                className="px-5 py-3 rounded-xl bg-brand-700 text-white text-[9px] font-black tracking-widest hover:bg-brand-800 transition-all shadow-lg shadow-brand-700/20 active:scale-95 disabled:opacity-50"
                               >
                                 {sendingOtp ? "Sending..." : "Verify"}
                               </button>
@@ -447,7 +447,7 @@ const StudentRegistration = () => {
                             {isEmailVerified && (
                               <div className="flex items-center gap-1.5 px-4 py-2.5 bg-green-500 text-white rounded-xl shadow-lg shadow-green-500/20 animate-in zoom-in duration-300">
                                 <CheckCircle size={14} />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Verified</span>
+                                <span className="text-[9px] font-black tracking-widest">Verified</span>
                               </div>
                             )}
 
@@ -455,7 +455,7 @@ const StudentRegistration = () => {
                               <button
                                 type="button"
                                 onClick={() => { setOtpSent(false); setOtp(""); }}
-                                className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-brand-700 transition-colors"
+                                className="px-4 py-2.5 text-[9px] font-black tracking-widest text-slate-400 hover:text-brand-700 transition-colors"
                               >
                                 Change
                               </button>
@@ -472,12 +472,12 @@ const StudentRegistration = () => {
                               <div className="w-8 h-8 rounded-lg bg-brand-700/20 flex items-center justify-center">
                                 <ShieldCheck className="text-brand-700 size-4" />
                               </div>
-                              <span className="text-xs font-black uppercase tracking-widest text-slate-700">Enter OTP Code</span>
+                              <span className="text-xs font-black tracking-widest text-slate-700">Enter OTP Code</span>
                             </div>
                             {timer > 0 ? (
-                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Resend in {timer}s</span>
+                              <span className="text-[9px] font-bold text-slate-500 tracking-widest">Resend in {timer}s</span>
                             ) : (
-                              <button onClick={handleSendOtp} className="text-[9px] font-black text-brand-500 uppercase tracking-widest hover:text-brand-400">Resend Code</button>
+                              <button onClick={handleSendOtp} className="text-[9px] font-black text-brand-500 tracking-widest hover:text-brand-400">Resend Code</button>
                             )}
                           </div>
 
@@ -488,7 +488,7 @@ const StudentRegistration = () => {
                               maxLength="6"
                               value={otp}
                               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                              className="col-span-6 w-full bg-white border-2 border-slate-300 rounded-xl py-2 text-center text-xl font-black tracking-[1em] text-slate-900 focus:border-brand-700 outline-none transition-all placeholder:text-slate-300"
+                              className="col-span-6 w-full bg-white border-2 border-slate-300 rounded-lg py-1.5 text-center text-xl font-black tracking-[1em] text-slate-900 focus:border-brand-700 outline-none transition-all placeholder:text-slate-300"
                               placeholder="000000"
                               autoFocus
                             />
@@ -498,7 +498,7 @@ const StudentRegistration = () => {
                             type="button"
                             onClick={handleVerifyOtp}
                             disabled={verifyingOtp || otp.length !== 6}
-                            className="w-full py-4 bg-brand-700 hover:bg-brand-800 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                            className="w-full py-4 bg-brand-700 hover:bg-brand-800 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-[10px] font-black tracking-[0.3em] transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                           >
                             {verifyingOtp ? (
                               <div className="flex items-center gap-2">
@@ -568,7 +568,7 @@ const StudentRegistration = () => {
 
                 <div className="overflow-hidden rounded-2xl border border-slate-200">
                   <table className="w-full text-xs min-w-[700px]">
-                    <thead className="bg-slate-900 text-white uppercase text-[10px] tracking-widest">
+                    <thead className="bg-slate-900 text-white text-[10px] tracking-widest">
                       <tr>
                         <th className="p-4 text-left font-bold">Examination Passed</th>
                         <th className="p-4 text-left font-bold">Institute / School</th>
@@ -581,12 +581,12 @@ const StudentRegistration = () => {
                     <tbody className="divide-y divide-slate-100">
                       {[1, 2, 3].map(i => (
                         <tr key={i}>
-                          <td className="p-2"><input autoComplete="off" name={`exam${i}`} value={formData[`exam${i}`] || ""} onChange={handleChange} className="w-full p-2 bg-slate-50/50 rounded-lg outline-none focus:bg-white transition-all font-bold text-slate-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`school${i}`} value={formData[`school${i}`] || ""} onChange={handleChange} className="w-full p-2 bg-slate-50/50 rounded-lg outline-none focus:bg-white transition-all font-bold text-slate-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`group${i}`} value={formData[`group${i}`] || ""} onChange={handleChange} className="w-full p-2 bg-slate-50/50 rounded-lg outline-none focus:bg-white transition-all font-bold text-slate-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`year${i}`} value={formData[`year${i}`] || ""} onChange={handleChange} className="w-full p-2 bg-slate-50/50 rounded-lg outline-none focus:bg-white transition-all font-bold text-slate-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`percentage${i}`} value={formData[`percentage${i}`] || ""} onChange={handleChange} className="w-full p-2 bg-slate-50/50 rounded-lg outline-none focus:bg-white transition-all font-bold text-slate-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`remarks${i}`} value={formData[`remarks${i}`] || ""} onChange={handleChange} className="w-full p-2 bg-slate-50/50 rounded-lg outline-none focus:bg-white transition-all font-bold text-slate-700" /></td>
+                          <td className="p-2"><input autoComplete="off" name={`exam${i}`} value={formData[`exam${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                          <td className="p-2"><input autoComplete="off" name={`school${i}`} value={formData[`school${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                          <td className="p-2"><input autoComplete="off" name={`group${i}`} value={formData[`group${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                          <td className="p-2"><input autoComplete="off" name={`year${i}`} value={formData[`year${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                          <td className="p-2"><input autoComplete="off" name={`percentage${i}`} value={formData[`percentage${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                          <td className="p-2"><input autoComplete="off" name={`remarks${i}`} value={formData[`remarks${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -623,7 +623,7 @@ const StudentRegistration = () => {
                     <div className="overflow-hidden border border-slate-200 rounded-2xl">
                       <table className="w-full text-sm">
                         <thead className="bg-white border-b border-slate-200">
-                          <tr className="text-slate-600 text-xs uppercase tracking-wider">
+                          <tr className="text-slate-600 text-xs tracking-wider">
                             <th className="p-4 text-center w-16">S.No</th>
                             <th className="p-4 text-left">Subject</th>
                             <th className="p-4 text-center">Total</th>
@@ -641,7 +641,7 @@ const StudentRegistration = () => {
                                   name={`${prefix}Subject${i + 1}`}
                                   value={formData[`${prefix}Subject${i + 1}`] || ""}
                                   onChange={handleChange}
-                                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-brand-700"
+                                  className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700"
                                   placeholder="Subject"
                                 />
                               </td>
@@ -651,7 +651,7 @@ const StudentRegistration = () => {
                                   name={`${prefix}Total${i + 1}`}
                                   value={formData[`${prefix}Total${i + 1}`] || ""}
                                   onChange={handleChange}
-                                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-center focus:outline-none focus:border-brand-700"
+                                  className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 text-center"
                                 />
                               </td>
 
@@ -660,7 +660,7 @@ const StudentRegistration = () => {
                                   name={`${prefix}Mark${i + 1}`}
                                   value={formData[`${prefix}Mark${i + 1}`] || ""}
                                   onChange={handleChange}
-                                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-center focus:outline-none focus:border-brand-700"
+                                  className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 text-center"
                                 />
                               </td>
                             </tr>
@@ -675,7 +675,7 @@ const StudentRegistration = () => {
                                 name={`${prefix}TotalMarks`}
                                 value={formData[`${prefix}TotalMarks`] || ""}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-center"
+                                className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 text-center"
                               />
                             </td>
 
@@ -684,7 +684,7 @@ const StudentRegistration = () => {
                                 name={`${prefix}SecuredMarks`}
                                 value={formData[`${prefix}SecuredMarks`] || ""}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-center"
+                                className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 text-center"
                               />
                             </td>
                           </tr>
@@ -700,7 +700,7 @@ const StudentRegistration = () => {
                                 name={`${prefix}Percentage`}
                                 value={formData[`${prefix}Percentage`] || ""}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-center"
+                                className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 text-center"
                               />
                             </td>
                           </tr>
@@ -730,7 +730,7 @@ const StudentRegistration = () => {
 
                 <div className="overflow-hidden rounded-3xl border border-slate-200">
                   <table className="w-full text-xs min-w-[600px]">
-                    <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
+                    <thead className="bg-slate-900 text-white text-[10px] font-black tracking-widest">
                       <tr>
                         <th className="p-5 text-left border-r border-white/10">Relationship</th>
                         <th className="p-5 text-left border-r border-white/10">Full Name</th>
@@ -742,9 +742,9 @@ const StudentRegistration = () => {
                       {["Father", "Mother", "Brother / Sister", "Brother / Sister", "Brother / Sister"].map((rel, i) => (
                         <tr key={i}>
                           <td className="p-5 font-black text-slate-800 bg-slate-50/50 whitespace-nowrap">{rel}</td>
-                          <td className="p-2 border-r border-slate-100"><input autoComplete="off" name={`familyName${i}`} value={formData[`familyName${i}`] || ""} onChange={handleChange} className="w-full p-2 outline-none font-bold text-slate-600 bg-transparent" placeholder="Full Name..." /></td>
-                          <td className="p-2 border-r border-slate-100"><input autoComplete="off" name={`familyOccupation${i}`} value={formData[`familyOccupation${i}`] || ""} onChange={handleChange} className="w-full p-2 outline-none font-bold text-slate-600 bg-transparent" placeholder="Designation..." /></td>
-                          <td className="p-2"><input autoComplete="off" name={`familyPhone${i}`} value={formData[`familyPhone${i}`] || ""} onChange={handleChange} className="w-full p-2 outline-none font-bold text-slate-600 bg-transparent" placeholder="+91..." /></td>
+                          <td className="p-2 border-r border-slate-100"><input autoComplete="off" name={`familyName${i}`} value={formData[`familyName${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="Full Name..." /></td>
+                          <td className="p-2 border-r border-slate-100"><input autoComplete="off" name={`familyOccupation${i}`} value={formData[`familyOccupation${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="Designation..." /></td>
+                          <td className="p-2"><input autoComplete="off" name={`familyPhone${i}`} value={formData[`familyPhone${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="+91..." /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -821,18 +821,18 @@ const StudentRegistration = () => {
             <div className="flex flex-col md:flex-row justify-between items-center gap-6 mt-12 pt-8 border-t-2 border-slate-50">
               <div className="min-w-[150px]">
                 {currentStep > 1 && (
-                  <button type="button" onClick={prevStep} className="flex items-center gap-2 px-6 py-3 text-slate-400 font-black uppercase tracking-widest hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all group text-[10px]">
+                  <button type="button" onClick={prevStep} className="flex items-center gap-2 px-6 py-3 text-slate-400 font-black tracking-widest hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all group text-[10px]">
                     <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back
                   </button>
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-4 w-full md:w-auto">
                 {currentStep < 5 ? (
-                  <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
+                  <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
                     Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </button>
                 ) : (
-                  <button type="submit" disabled={loading} className="w-full md:w-auto flex items-center justify-center gap-3 bg-brand-700 text-white px-10 py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-brand-800 transition-all shadow-xl shadow-brand-900/30 disabled:opacity-50 hover:shadow-brand-700/40">
+                  <button type="submit" disabled={loading} className="w-full md:w-auto flex items-center justify-center gap-3 bg-brand-700 text-white px-10 py-4 rounded-xl font-black text-[10px] tracking-[0.2em] hover:bg-brand-800 transition-all shadow-xl shadow-brand-900/30 disabled:opacity-50 hover:shadow-brand-700/40">
                     {loading ? "Processing..." : "Complete Application"} <CheckCircle size={20} />
                   </button>
                 )}
@@ -860,8 +860,8 @@ const StepHeader = ({ title, subtitle, icon }) => (
         {icon}
       </div>
       <div>
-        <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 leading-none mb-1">{title}</h2>
-        {subtitle && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{subtitle}</p>}
+        <h2 className="text-2xl font-black tracking-tight text-slate-900 leading-none mb-1">{title}</h2>
+        {subtitle && <p className="text-xs font-bold text-slate-400 tracking-widest">{subtitle}</p>}
       </div>
     </div>
     <div className="h-1 w-20 bg-brand-700 mt-5 rounded-full"></div>
@@ -869,16 +869,16 @@ const StepHeader = ({ title, subtitle, icon }) => (
 );
 
 const FormInput = ({ label, ...props }) => (
-  <div className="group space-y-2">
-    <label className="text-xs font-black uppercase tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <input {...props} className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl outline-none transition-all text-[13px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 focus:shadow-[0_20px_40px_-20px_rgba(185,28,28,0.1)]" />
+  <div className="group space-y-1">
+    <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
+    <input {...props} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 focus:shadow-[0_20px_40px_-20px_rgba(185,28,28,0.1)]" />
   </div>
 );
 
 const SelectBox = ({ label, options, isObjectOptions, ...props }) => (
-  <div className="group space-y-2">
-    <label className="text-xs font-black uppercase tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <select {...props} className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl outline-none transition-all text-[13px] font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 disabled:bg-slate-100 disabled:text-slate-500">
+  <div className="group space-y-1">
+    <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
+    <select {...props} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 disabled:bg-slate-100 disabled:text-slate-500">
       <option value="">Select Option</option>
       {options.map((opt, i) => (
         <option key={i} value={isObjectOptions ? opt.value : opt}>{isObjectOptions ? opt.label : opt}</option>

@@ -49,7 +49,7 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
           <div className="flex items-center">
             <div className="flex-shrink-0">{item.icon}</div>
             <span
-              className={`ml-3 font-medium transition-opacity duration-300 ${isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
+              className={`ml-3 text-sm font-medium transition-opacity duration-300 ${isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
                 }`}
             >
               {item.label}
@@ -108,7 +108,7 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
       >
         <div className="flex-shrink-0">{item.icon}</div>
         <span
-          className={`ml-3 font-medium transition-opacity duration-300 ${isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
+          className={`ml-3 text-sm font-medium transition-opacity duration-300 ${isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
             }`}
         >
           {item.label}
