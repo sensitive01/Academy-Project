@@ -308,7 +308,7 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
                 </p>
                 {selectedLeave.fileUrl && (
                   <a
-                    href={`http://localhost:5000/${selectedLeave.fileUrl}`}
+                    href={`${(import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '')}/${selectedLeave.fileUrl}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-indigo-600 underline"

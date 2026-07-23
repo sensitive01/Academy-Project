@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../services/api";
 import { toast } from "react-hot-toast";
 import Loading from "../../components/Loading";
 import CustomDataTable from "../../components/DataTable";
@@ -16,11 +16,7 @@ const VendorAttendance = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const res = await axios.get("http://localhost:5000/api/vendors/my-interns", {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-            });
+            const res = await api.get("/vendors/my-interns");
             
             // Flatten the nested data to get all attendance records with intern names
             const allAttendance = [];

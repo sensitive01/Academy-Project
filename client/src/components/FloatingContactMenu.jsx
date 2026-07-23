@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { toast } from 'react-hot-toast';
 import { MessageCircle, Phone, ArrowRight, ArrowLeft } from 'lucide-react';
 
@@ -14,7 +14,7 @@ const FloatingContactMenu = () => {
     e.preventDefault();
     try {
       setIsSubmitting(true);
-      const res = await axios.post('http://localhost:5000/api/enquiries', formData);
+      const res = await api.post('/enquiries', formData);
       if (res.data.success) {
         toast.success('Thank you for your enquiry. We will get back to you soon!');
         setFormData({ name: '', phone: '', email: '', message: '' });

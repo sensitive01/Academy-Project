@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../services/api";
 import { toast } from "react-hot-toast";
 import { 
   Mail, 
@@ -41,11 +41,7 @@ const EnquiryManagement = () => {
   const fetchEnquiries = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/enquiries", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const res = await api.get("/enquiries");
       setEnquiries(res.data);
     } catch (error) {
       toast.error("Failed to fetch enquiries");
@@ -57,11 +53,7 @@ const EnquiryManagement = () => {
 
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await axios.put(`http://localhost:5000/api/enquiries/${id}`, { status: newStatus }, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      await api.put(`/enquiries/${id}`, { status: newStatus });
       toast.success(`Enquiry marked as ${newStatus}`);
       fetchEnquiries();
       if (selectedEnquiry && selectedEnquiry._id === id) {
@@ -75,11 +67,7 @@ const EnquiryManagement = () => {
   const handleDeleteEnquiry = async (id) => {
     if (!window.confirm("Are you sure you want to delete this enquiry?")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/enquiries/${id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      await api.delete(`/enquiries/${id}`);
       toast.success("Enquiry deleted successfully");
       fetchEnquiries();
       if (selectedEnquiry && selectedEnquiry._id === id) {
