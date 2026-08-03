@@ -38,19 +38,24 @@ router.get("/identify/:id", async (req, res) => {
 // Mark attendance
 router.post("/mark", async (req, res) => {
     try {
-        const { userId, name, role, loginTime, photo, location } = req.body;
+        const { userId, name, role, loginTime, photo, location, date } = req.body;
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        let d = new Date();
+        if (date) {
+            d = new Date(date);
+        }
+        d.setHours(0, 0, 0, 0);
+        const nextDay = new Date(d);
+        nextDay.setDate(d.getDate() + 1);
 
         const existing = await Attendance.findOne({
             userId,
-            date: { $gte: today },
+            date: { $gte: d, $lt: nextDay },
         });
 
         if (existing) {
             return res.status(400).json({
-                message: "Attendance already marked for today.",
+                message: "Attendance already marked for this date.",
             });
         }
 
@@ -58,6 +63,7 @@ router.post("/mark", async (req, res) => {
             userId,
             name,
             role,
+            date: d,
             loginTime,
             photo,
             location

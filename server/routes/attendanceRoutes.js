@@ -3,8 +3,70 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const Attendance = require("../models/Attendance");
 const Leave = require("../models/Leave");
+const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
 
+// ============================
+// POST - Admin Manual Add
+// ============================
+router.post("/admin-add", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.role !== "hr" && req.user.role !== "center") {
+      return res.status(403).json({ message: "Not authorized to manually add attendance" });
+    }
+
+    const { targetUserId, date, loginTime, logoutTime } = req.body;
+
+    if (!targetUserId || !date || !loginTime) {
+      return res.status(400).json({ message: "User, Date, and Login Time are required" });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Ensure we don't duplicate attendance for this date
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const nextDay = new Date(d);
+    nextDay.setDate(d.getDate() + 1);
+
+    const existing = await Attendance.findOne({
+      userId: targetUserId,
+      date: { $gte: d, $lt: nextDay }
+    });
+
+    if (existing) {
+      return res.status(400).json({ message: "Attendance already exists for this user on this date." });
+    }
+
+    let workingHours = undefined;
+    if (loginTime && logoutTime) {
+      const login = new Date(`1970-01-01T${loginTime}`);
+      const logout = new Date(`1970-01-01T${logoutTime}`);
+      const diffMs = logout - login;
+      if (diffMs > 0) {
+        workingHours = (diffMs / (1000 * 60 * 60)).toFixed(2);
+      }
+    }
+
+    const attendance = await Attendance.create({
+      userId: targetUserId,
+      name: targetUser.name,
+      role: targetUser.role,
+      date: d,
+      loginTime,
+      logoutTime,
+      workingHours,
+      photo: "manual_entry"
+    });
+
+    res.status(201).json(attendance);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // ============================
 // POST - Mark login
@@ -347,6 +409,109 @@ router.get("/payroll-summary/:userId", protect, async (req, res) => {
       lateTime
     });
 
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ============================
+// POST - Bulk Upload Attendance
+// ============================
+router.post("/bulk", protect, async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.role !== "hr" && req.user.role !== "center") {
+      return res.status(403).json({ message: "Not authorized to bulk add attendance" });
+    }
+
+    const records = req.body; // Expecting an array of records
+    if (!Array.isArray(records)) {
+      return res.status(400).json({ message: "Expected an array of attendance records." });
+    }
+
+    const results = {
+      added: 0,
+      updated: 0,
+      deleted: 0,
+      failed: 0,
+      errors: []
+    };
+
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      const { userId, date, loginTime, logoutTime } = record;
+
+      if (!userId || !date) {
+        results.failed++;
+        results.errors.push(`Row ${i + 1}: Missing userId or date`);
+        continue;
+      }
+
+      try {
+        const targetUser = await User.findById(userId);
+        if (!targetUser) {
+          results.failed++;
+          results.errors.push(`Row ${i + 1}: User not found (${userId})`);
+          continue;
+        }
+
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        const nextDay = new Date(d);
+        nextDay.setDate(d.getDate() + 1);
+
+        const existing = await Attendance.findOne({
+          userId,
+          date: { $gte: d, $lt: nextDay }
+        });
+
+        let workingHours = undefined;
+        if (loginTime && logoutTime) {
+          const login = new Date(`1970-01-01T${loginTime}`);
+          const logout = new Date(`1970-01-01T${logoutTime}`);
+          const diffMs = logout - login;
+          if (diffMs > 0) {
+            workingHours = (diffMs / (1000 * 60 * 60)).toFixed(2);
+          }
+        }
+
+        if (existing) {
+          if (record.isDelete) {
+            await existing.deleteOne();
+            results.deleted++;
+          } else {
+            // Update existing
+            if (loginTime !== undefined) existing.loginTime = loginTime;
+            if (logoutTime !== undefined) existing.logoutTime = logoutTime;
+            existing.workingHours = workingHours;
+            await existing.save();
+            results.updated++;
+          }
+        } else if (!record.isDelete) {
+          // Create new
+          if (!loginTime) {
+            results.failed++;
+            results.errors.push(`Row ${i + 1}: Missing login time for new record`);
+            continue;
+          }
+          await Attendance.create({
+            userId,
+            name: targetUser.name,
+            role: targetUser.role,
+            date: d,
+            loginTime,
+            logoutTime,
+            workingHours,
+            photo: "bulk_entry"
+          });
+          results.added++;
+        }
+      } catch (err) {
+        results.failed++;
+        results.errors.push(`Row ${i + 1}: ${err.message}`);
+      }
+    }
+
+    res.status(200).json({ message: "Bulk upload processed", results });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

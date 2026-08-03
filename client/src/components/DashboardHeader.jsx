@@ -153,7 +153,13 @@ const DashboardHeader = ({ toggleMobileSidebar }) => {
 
         {/* 🔍 Search */}
         <button
-          className="p-2 text-slate-600 hover:text-slate-800 transition-colors"
+          onClick={() => {
+            if (['admin', 'sub-admin'].includes(user?.role?.toLowerCase())) {
+              navigate("/dashboard/admin/search");
+            }
+          }}
+          className={`p-2 transition-colors ${['admin', 'sub-admin'].includes(user?.role?.toLowerCase()) ? 'text-slate-600 hover:text-brand-600' : 'text-slate-400 cursor-not-allowed opacity-50'}`}
+          title={['admin', 'sub-admin'].includes(user?.role?.toLowerCase()) ? "Global Search" : "Search unavailable"}
         >
           <Search size={20} />
         </button>

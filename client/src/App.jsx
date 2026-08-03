@@ -31,11 +31,13 @@ import EnrollClass from "./pages/lms/EnrollClass";
 import CourseManagement from "./pages/admin/CourseManagement";
 import ExamManagement from "./pages/dashboard/ExamManagement";
 import CenterManagement from "./pages/admin/CenterManagement";
+import GlobalSearch from "./pages/admin/GlobalSearch";
 import HR from "./pages/dashboard/HR";
 import Settings from "./pages/dashboard/Settings";
 import Students from "./pages/dashboard/Students";
 import VendorManagement from "./pages/admin/VendorManagement";
 import EnquiryManagement from "./pages/admin/EnquiryManagement";
+import Reminders from "./pages/dashboard/Reminders";
 import VendorDashboard from "./pages/dashboard/VendorDashboard";
 import ParentManagement from "./pages/admin/ParentManagement";
 import AdminLogins from "./pages/admin/AdminLogins";
@@ -44,6 +46,7 @@ import ChildAttendance from "./pages/parent/ChildAttendance";
 import ChildLeave from "./pages/parent/ChildLeave";
 import RegisterChild from "./pages/parent/RegisterChild";
 import Attendance from "./pages/attendance/Attendance";
+import BulkAttendance from "./pages/attendance/BulkAttendance";
 import Profile from "./pages/profile/Profile";
 import Finance from "./pages/Finance";
 import Announcement from "./pages/dashboard/Announcement";
@@ -293,6 +296,7 @@ function App() {
             <Route path="payments/*" element={<PaymentsHub />} />
 
             {/* Admin */}
+            <Route path="admin/search" element={<GlobalSearch />} />
             <Route path="admin/courses" element={<CourseManagement />} />
             <Route path="admin/centers" element={<CenterManagement />} />
             <Route path="admin/logins" element={<AdminLogins />} />
@@ -310,6 +314,7 @@ function App() {
 
             {/* Students */}
             <Route path="students" element={<Students />} />
+            <Route path="students/bulk-attendance" element={<BulkAttendance />} />
 
             {/* Coach */}
             <Route path="coach/my-courses" element={<MyCourses />} />
@@ -322,6 +327,9 @@ function App() {
 
             {/* Notifications */}
             <Route path="notifications" element={<Notifications />} />
+            
+            {/* Reminders */}
+            <Route path="reminders" element={<Reminders />} />
 
             {/* Leave */}
             <Route path="leave-request" element={<LeaveRequestOrForm />} />

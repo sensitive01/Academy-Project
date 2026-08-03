@@ -17,7 +17,7 @@ import AddExpenseModal from "./AddExpenseModel";
 import CustomDataTable from "../../components/DataTable";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
-const Expenses = ({ hideHeader = false }) => {
+const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -144,11 +144,12 @@ const Expenses = ({ hideHeader = false }) => {
     }
   ];
 
-  /* ================= FILTER ================= */
-  const filteredExpenses = expenses.filter(e => 
-    e.category?.toLowerCase().includes(searchExpense.toLowerCase()) || 
-    e.submittedBy?.name?.toLowerCase().includes(searchExpense.toLowerCase())
-  );
+  /* ================= FILTER EXPENSES ================= */
+  const displayedExpenses = expenses.filter((e) => {
+    if (categoryFilter && e.category !== categoryFilter) return false;
+    if (searchExpense && !e.category?.toLowerCase().includes(searchExpense.toLowerCase()) && !e.submittedBy?.name?.toLowerCase().includes(searchExpense.toLowerCase())) return false;
+    return true;
+  });
 
   /* ================= STATS ================= */
   const totalAmount = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -183,6 +184,7 @@ const Expenses = ({ hideHeader = false }) => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAdded={fetchExpenses}
+        defaultCategory={categoryFilter || ""}
       />
 
       {/* Stats */}
@@ -196,7 +198,7 @@ const Expenses = ({ hideHeader = false }) => {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-visible pb-4">
         <CustomDataTable 
           columns={columns}
-          data={filteredExpenses}
+          data={displayedExpenses}
           progressPending={loading}
           search={searchExpense}
           setSearch={setSearchExpense}

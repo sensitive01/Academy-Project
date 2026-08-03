@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { BookOpen, MapPin, Layers, FileText, CheckSquare, DollarSign, BookType } from "lucide-react";
+import { BookOpen, MapPin, Layers, FileText, CheckSquare, DollarSign, BookType, LayoutDashboard } from "lucide-react";
 import CoursesTab from "../../components/course-management/CoursesTab";
 import BatchesTab from "../../components/course-management/BatchesTab";
 import ExamsTab from "../../components/course-management/ExamsTab";
 import ResultsTab from "../../components/course-management/ResultsTab";
 import FeesTab from "../../components/course-management/FeesTab";
 import SubjectsTab from "../../components/course-management/SubjectsTab";
+import CourseDashboardTab from "../../components/course-management/CourseDashboardTab";
 
 const CourseManagement = () => {
-  const [activeTab, setActiveTab] = useState("online_courses");
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   const tabs = [
+    { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "online_courses", label: "Online Courses", icon: <BookOpen size={18} /> },
     { id: "center_courses", label: "Center Courses", icon: <MapPin size={18} /> },
     { id: "batch", label: "Batches", icon: <Layers size={18} /> },
@@ -52,6 +54,7 @@ const CourseManagement = () => {
 
       {/* Tab Content */}
       <div className="mt-6">
+        {activeTab === "dashboard" && <CourseDashboardTab />}
         {activeTab === "online_courses" && <CoursesTab courseType="Online Courses" />}
         {activeTab === "center_courses" && <CoursesTab courseType="Center Courses" />}
         {activeTab === "batch" && <BatchesTab />}

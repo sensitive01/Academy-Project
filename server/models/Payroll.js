@@ -12,6 +12,9 @@ const payrollSchema = new mongoose.Schema(
     employee: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
     month: { type: Number, required: true },
     year: { type: Number, required: true },
+    
+    internshipId: { type: mongoose.Schema.Types.ObjectId, default: null }, // Link to specific internship period
+    vendorName: { type: String, default: "" }, // For display purpose when multiple internships exist
 
     basicSalary: { type: Number, required: true, default: 0 },
 
@@ -31,11 +34,13 @@ const payrollSchema = new mongoose.Schema(
 
     // Store multiple adjustments
     adjustments: [adjustmentSchema],
+
+    status: { type: String, enum: ["processing", "hold"], default: "processing" },
   },
   { timestamps: true }
 );
 
-// Ensure unique payroll per employee/month/year
-payrollSchema.index({ employee: 1, month: 1, year: 1 }, { unique: true });
+// Ensure unique payroll per employee/month/year/internship
+payrollSchema.index({ employee: 1, month: 1, year: 1, internshipId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Payroll", payrollSchema);

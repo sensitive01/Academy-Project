@@ -124,10 +124,46 @@ const StudentFeesList = ({ feeType }) => {
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
     { 
-      name: "Amount", width:"110px",
+      name: "Fee Details", width:"260px",
       selector: row => row.amount, 
       sortable: true, 
-      cell: row => <span className="font-bold text-brand-600">₹ {row.amount?.toLocaleString("en-IN")}</span> 
+      cell: row => {
+        const totalDue = row.amount + 
+          (row.isPenaltyApplied ? row.penaltyAmount : 0) + 
+          (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
+          
+        return (
+          <div className="flex flex-col gap-1.5 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-slate-800">₹{totalDue?.toLocaleString("en-IN")}</span>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200 text-[9px] font-bold tracking-wider uppercase">
+                Base: ₹{row.amount?.toLocaleString("en-IN")}
+              </span>
+              {(row.penaltyAmount > 0 || row.finalPenaltyAmount > 0) && (
+                <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded border border-red-100 text-[9px] font-bold tracking-wider uppercase">
+                  Penalties: ₹{((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+
+            {row.dueDate && (
+              <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1.5">
+                <span className="text-[10px] text-slate-500 font-medium flex items-center justify-between">
+                  <span><span className="text-orange-500 font-bold">Due:</span> {new Date(row.dueDate).toLocaleDateString("en-GB")}</span>
+                </span>
+                {row.finalDueDate && (
+                  <span className="text-[10px] text-slate-500 font-medium flex items-center justify-between">
+                    <span><span className="text-red-500 font-bold">Final:</span> {new Date(row.finalDueDate).toLocaleDateString("en-GB")}</span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     { 
       name: "Status", width:"150px",

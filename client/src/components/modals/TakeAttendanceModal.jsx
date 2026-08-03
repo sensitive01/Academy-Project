@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Camera, Upload, CheckCircle } from "lucide-react";
+import ReactDOM from "react-dom";
+import { X, Camera, CheckCircle, Search, ChevronDown } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 
-const TakeAttendanceModal = ({ isOpen, onClose }) => {
+const TakeAttendanceModal = ({ isOpen, onClose, onSuccess }) => {
   const [type, setType] = useState("employee"); // employee | student | intern
   const [employees, setEmployees] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [photo, setPhoto] = useState(null);
   
   const fileInputRef = useRef(null);
@@ -18,6 +22,9 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
       fetchData();
       setType("employee");
       setSelectedUser("");
+      setSearchQuery("");
+      setIsDropdownOpen(false);
+      setDate(new Date().toISOString().slice(0, 10));
       setPhoto(null);
     }
   }, [isOpen]);
@@ -49,7 +56,6 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedUser) return toast.error("Please select a name");
-    if (!photo) return toast.error("Please provide a photo");
 
     setLoading(true);
     try {
@@ -77,10 +83,12 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
         name: userData.name,
         role: role,
         loginTime,
+        date,
         photo
       });
 
       toast.success("Attendance marked successfully");
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to mark attendance");
@@ -96,26 +104,37 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
     ? students.filter(s => s.internships && s.internships.length > 0)
     : students.filter(s => !s.internships || s.internships.length === 0);
 
-  const getOptions = () => {
+  const getOptionsData = () => {
+    let data = [];
     if (type === "employee") {
-      return employees.map(emp => (
-        <option key={emp._id} value={emp._id}>
-          {emp.firstName} {emp.lastName} ({emp.employeeId})
-        </option>
-      ));
+      data = employees.map(emp => ({ id: emp._id, label: `${emp.firstName} ${emp.lastName} (${emp.employeeId})` }));
     } else {
-      return filteredStudents.map(stu => (
-        <option key={stu._id} value={stu._id}>
-          {stu.user?.name} ({stu.studentId})
-        </option>
-      ));
+      data = filteredStudents.map(stu => ({ id: stu._id, label: `${stu.user?.name} (${stu.studentId})` }));
     }
+
+    if (searchQuery) {
+      data = data.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return data;
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden my-8">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+  const getSelectedLabel = () => {
+    let data = [];
+    if (type === "employee") {
+      data = employees.map(emp => ({ id: emp._id, label: `${emp.firstName} ${emp.lastName} (${emp.employeeId})` }));
+    } else {
+      data = filteredStudents.map(stu => ({ id: stu._id, label: `${stu.user?.name} (${stu.studentId})` }));
+    }
+    const found = data.find(item => item.id === selectedUser);
+    return found ? found.label : "";
+  };
+
+  if (!isOpen) return null;
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black/60 z-[9990] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Mark Attendance</h2>
             <p className="text-sm text-gray-500 mt-1">Select type and user to mark attendance</p>
@@ -125,40 +144,82 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto scrollbar-thin">
           <div className="space-y-3">
             <label className="block text-sm font-semibold text-gray-700">Select Type</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="type" value="employee" checked={type === "employee"} onChange={() => { setType("employee"); setSelectedUser(""); }} className="text-brand-600 focus:ring-brand-500" />
-                <span className="text-sm font-medium">Employee</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="type" value="student" checked={type === "student"} onChange={() => { setType("student"); setSelectedUser(""); }} className="text-brand-600 focus:ring-brand-500" />
-                <span className="text-sm font-medium">Student</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="type" value="intern" checked={type === "intern"} onChange={() => { setType("intern"); setSelectedUser(""); }} className="text-brand-600 focus:ring-brand-500" />
-                <span className="text-sm font-medium">Intern</span>
-              </label>
+            <select
+              value={type}
+              onChange={(e) => { setType(e.target.value); setSelectedUser(""); }}
+              className="w-full border border-gray-200 rounded-xl focus:border-brand-500 focus:ring-brand-500 bg-gray-50/50 px-4 py-2.5 text-sm outline-none"
+            >
+              <option value="employee">Employee</option>
+              <option value="student">Student</option>
+              <option value="intern">Intern</option>
+            </select>
+          </div>
+
+          <div className="space-y-3 relative">
+            <label className="block text-sm font-semibold text-gray-700">Select Name</label>
+            <div className="relative">
+              <div 
+                className="w-full border border-gray-200 rounded-xl focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 bg-gray-50/50 flex items-center px-4 py-2.5 cursor-text"
+                onClick={() => setIsDropdownOpen(true)}
+              >
+                <Search size={16} className="text-gray-400 mr-2 shrink-0" />
+                <input
+                  type="text"
+                  placeholder={selectedUser && !isDropdownOpen ? getSelectedLabel() : "Search user by name or ID..."}
+                  value={isDropdownOpen ? searchQuery : (selectedUser ? getSelectedLabel() : "")}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setIsDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+                  className="w-full bg-transparent outline-none text-sm text-gray-700 placeholder:text-gray-400"
+                />
+                <ChevronDown size={16} className="text-gray-400 ml-2 shrink-0" />
+              </div>
+
+              {isDropdownOpen && (
+                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto scrollbar-thin">
+                  {getOptionsData().map(opt => (
+                    <div 
+                      key={opt.id} 
+                      className={`px-4 py-3 hover:bg-brand-50 cursor-pointer text-sm transition-colors ${selectedUser === opt.id ? 'bg-brand-50 text-brand-700 font-medium' : 'text-gray-700'}`}
+                      onClick={() => {
+                        setSelectedUser(opt.id);
+                        setSearchQuery("");
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+                  ))}
+                  {getOptionsData().length === 0 && (
+                    <div className="px-4 py-4 text-sm text-gray-500 text-center flex flex-col items-center">
+                      <Search size={20} className="text-gray-300 mb-2" />
+                      No users found
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="block text-sm font-semibold text-gray-700">Select Name</label>
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full border-gray-200 rounded-xl focus:border-brand-500 focus:ring-brand-500 bg-gray-50/50 px-4 py-2.5 text-sm"
+            <label className="block text-sm font-semibold text-gray-700">Select Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl focus:border-brand-500 focus:ring-brand-500 bg-gray-50/50 px-4 py-2.5 text-sm outline-none"
               required
-            >
-              <option value="">Select User</option>
-              {getOptions()}
-            </select>
+            />
           </div>
 
           <div className="space-y-3">
-            <label className="block text-sm font-semibold text-gray-700">Photo</label>
+            <label className="block text-sm font-semibold text-gray-700">Photo (Optional)</label>
             <div className="flex items-center justify-center w-full">
               {photo ? (
                 <div className="relative w-full h-48 rounded-xl overflow-hidden group">
@@ -181,7 +242,7 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+          <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 shrink-0">
             <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">
               Cancel
             </button>
@@ -200,7 +261,8 @@ const TakeAttendanceModal = ({ isOpen, onClose }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

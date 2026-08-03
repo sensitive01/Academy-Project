@@ -4,9 +4,9 @@ import api from "../../services/api";
 import toast from "react-hot-toast";
 import ReactDOM from "react-dom";
 
-const AddExpenseModal = ({ isOpen, onClose, onAdded }) => {
+const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(defaultCategory);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(
@@ -18,7 +18,7 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded }) => {
   /* ================= RESET ================= */
   const resetForm = () => {
     setTitle("");
-    setCategory("");
+    setCategory(defaultCategory);
     setAmount("");
     setDescription("");
     setDate(new Date().toISOString().split("T")[0]);
@@ -137,6 +137,7 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded }) => {
             <option value="Travel">Travel</option>
             <option value="Food">Food</option>
             <option value="Accommodation">Accommodation</option>
+            <option value="Rent">Rent</option>
             <option value="Office Supplies">Office Supplies</option>
             <option value="Medical">Medical</option>
             <option value="Other">Other</option>

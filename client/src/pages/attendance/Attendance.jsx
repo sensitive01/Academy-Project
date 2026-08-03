@@ -5,8 +5,9 @@ import Payroll from "../../pages/payroll/Payroll";
 import CustomDataTable from "../../components/DataTable";
 import Loading from "../../components/Loading";
 import { Search } from "lucide-react";
+import toast from "react-hot-toast";
 
-const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = false, hideHeader = false }) => {
+const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = false, hideHeader = false, refreshTrigger = 0 }) => {
   const { user, token } = useAuth();
   const [photo, setPhoto] = useState(null);
   const [attendanceList, setAttendanceList] = useState([]);
@@ -23,6 +24,28 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
   const [filterTo, setFilterTo] = useState("");
   const [activeTab, setActiveTab] = useState("attendance");
   const [logoutModal, setLogoutModal] = useState(null);
+
+  // New Filter States for Student Attendance
+  const [filterType, setFilterType] = useState("");
+  const [filterVendor, setFilterVendor] = useState("");
+  const [filterCenter, setFilterCenter] = useState("");
+  const [filterCourse, setFilterCourse] = useState("");
+  const [filterBatch, setFilterBatch] = useState("");
+  const [filterSemester, setFilterSemester] = useState("");
+
+  const [studentsMap, setStudentsMap] = useState({});
+  const [centers, setCenters] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  
+  const [adminForm, setAdminForm] = useState({
+    targetUserId: "",
+    date: new Date().toISOString().slice(0, 10),
+    loginTime: "",
+    logoutTime: ""
+  });
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -69,6 +92,53 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
         params,
       });
       setAttendanceList(res.data);
+
+      if (studentOnly) {
+        const [studentsRes, centersRes, coursesRes, batchesRes, vendorsRes] = await Promise.all([
+          api.get("/students", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/centers", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/courses", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/batches", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/vendors", { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        
+        const sMap = {};
+        if (studentsRes.data && studentsRes.data.students) {
+           studentsRes.data.students.forEach(s => {
+             if (s.user && s.user._id) sMap[s.user._id] = s;
+             if (s.user && typeof s.user === 'string') sMap[s.user] = s;
+           });
+        }
+        setStudentsMap(sMap);
+        setCenters(centersRes.data || []);
+        setCourses(coursesRes.data || []);
+        setBatches(batchesRes.data || []);
+        setVendors(vendorsRes.data || []);
+      } else if (employeeOnly) {
+        const empRes = await api.get("/employees", { headers: { Authorization: `Bearer ${token}` } });
+        let result = empRes.data || [];
+        result = result.filter(emp => emp.role !== "student" && emp.role !== "admin");
+        setEmployees(result);
+      } else {
+        // Fetch both students and employees for the general Admin attendance tab
+        const [studentsRes, empRes] = await Promise.all([
+          api.get("/students", { headers: { Authorization: `Bearer ${token}` } }),
+          api.get("/employees", { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        
+        const sMap = {};
+        if (studentsRes.data && studentsRes.data.students) {
+           studentsRes.data.students.forEach(s => {
+             if (s.user && s.user._id) sMap[s.user._id] = s;
+             if (s.user && typeof s.user === 'string') sMap[s.user] = s;
+           });
+        }
+        setStudentsMap(sMap);
+
+        let result = empRes.data || [];
+        result = result.filter(emp => emp.role !== "student" && emp.role !== "admin");
+        setEmployees(result);
+      }
     } catch {
       setAttendanceList([]);
     } finally {
@@ -76,7 +146,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
     }
   };
 
-  useEffect(() => { fetchAttendance(); }, [user]);
+  useEffect(() => { fetchAttendance(); }, [user, studentOnly, refreshTrigger]);
   useEffect(() => { if (showForm) startCamera(); }, [showForm]);
 
   useEffect(() => {
@@ -116,6 +186,26 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
     }
 
     setLoading(false);
+  };
+
+  const handleAdminSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await api.post(
+        `${API_URL}/attendance/admin-add`,
+        adminForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setAttendanceList([res.data, ...attendanceList]);
+      setShowForm(false);
+      setAdminForm({ targetUserId: "", date: new Date().toISOString().slice(0, 10), loginTime: "", logoutTime: "" });
+      toast.success("Attendance added successfully!");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to add attendance");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSetLogout = async (record) => {
@@ -178,14 +268,39 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
         if (employeeOnly) {
           matchRole = ["admin", "hr", "sub-admin", "coach", "employee", "finance", "center", "vendor"].includes(a.role?.toLowerCase());
         } else if (studentOnly) {
-          matchRole = a.role?.toLowerCase() === "student" && !(a.internships?.length > 0);
+          matchRole = ["student", "intern"].includes(a.role?.toLowerCase());
         } else if (internOnly) {
-          matchRole = a.role?.toLowerCase() === "student" && a.internships?.length > 0;
+          matchRole = ["intern"].includes(a.role?.toLowerCase()) || (a.role?.toLowerCase() === "student" && a.internships?.length > 0);
         }
 
-        return matchSearch && matchFrom && matchTo && matchUser && matchRole;
+        // NEW STUDENT FILTERS
+        let matchStudentFilters = true;
+        if (studentOnly) {
+          const sProfile = studentsMap[a.userId];
+          if (!sProfile) {
+            // If student profile not found, they fail strict filters
+            if (filterType || filterVendor || filterCenter || filterCourse || filterBatch || filterSemester) {
+              matchStudentFilters = false;
+            }
+          } else {
+            const isIntern = sProfile.internships && sProfile.internships.length > 0;
+            if (filterType === "intern" && !isIntern) matchStudentFilters = false;
+            if (filterType === "inhouse" && isIntern) matchStudentFilters = false;
+            if (filterType === "intern" && filterVendor && isIntern) {
+              const latest = sProfile.internships[sProfile.internships.length - 1];
+              const vendorId = latest.vendor?._id || latest.vendor;
+              if (vendorId !== filterVendor) matchStudentFilters = false;
+            }
+            if (filterCenter && (sProfile.center?._id || sProfile.center) !== filterCenter) matchStudentFilters = false;
+            if (filterCourse && sProfile.department !== filterCourse) matchStudentFilters = false;
+            if (filterBatch && sProfile.year !== filterBatch) matchStudentFilters = false;
+            if (filterSemester && String(sProfile.semester) !== String(filterSemester)) matchStudentFilters = false;
+          }
+        }
+
+        return matchSearch && matchFrom && matchTo && matchUser && matchRole && matchStudentFilters;
       });
-  }, [attendanceList, searchTerm, filterFrom, filterTo, user, employeeOnly, studentOnly, internOnly]);
+  }, [attendanceList, searchTerm, filterFrom, filterTo, user, employeeOnly, studentOnly, internOnly, filterType, filterVendor, filterCenter, filterCourse, filterBatch, filterSemester, studentsMap]);
 
   // COLUMNS
   const calculateWorkingHours = (loginTime, logoutTime) => {
@@ -220,7 +335,23 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
 
   const columns = [
     { name: 'S.no', selector: (row, i) => i + 1, width: '70px', center: true },
-    { name: 'Employee', selector: row => row.name, sortable: true, cell: row => <span className="font-medium text-slate-800">{row.name}</span> },
+    { 
+      name: employeeOnly ? 'Employee' : 'Student', 
+      selector: row => row.name, 
+      sortable: true, 
+      cell: row => {
+        let subText = row.role || "N/A";
+        if (row.role?.toLowerCase() === "student") {
+           subText = (row.internships && row.internships.length > 0) ? "Intern" : "Student";
+        }
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium text-slate-800">{row.name}</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{subText}</span>
+          </div>
+        );
+      } 
+    },
     { name: 'Date', selector: row => row.date, sortable: true, cell: row => new Date(row.date).toISOString().slice(0, 10) },
     { name: 'Login', selector: row => row.loginTime, sortable: true, cell: row => formatTime12Hour(row.loginTime) },
     { name: 'Logout', selector: row => row.logoutTime, sortable: true, cell: row => formatTime12Hour(row.logoutTime) },
@@ -340,21 +471,92 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
                   {!showForm && (
                     <button
                       onClick={() => setShowForm(true)}
-                      disabled={hasMarkedToday}
-                      className={`bg-indigo-600 hover:bg-indigo-700 transition text-white px-6 py-2.5 rounded-xl shadow-md w-full md:w-auto ${hasMarkedToday ? "opacity-50 cursor-not-allowed" : ""
+                      disabled={hasMarkedToday && !["admin", "hr", "center"].includes(user.role)}
+                      className={`bg-indigo-600 hover:bg-indigo-700 transition text-white px-6 py-2.5 rounded-xl shadow-md w-full md:w-auto ${(hasMarkedToday && !["admin", "hr", "center"].includes(user.role)) ? "opacity-50 cursor-not-allowed" : ""
                         }`}
                     >
-                      {hasMarkedToday ? "Already Marked" : "+ Add Attendance"}
+                      {(hasMarkedToday && !["admin", "hr", "center"].includes(user.role)) ? "Already Marked" : "+ Add Attendance"}
                     </button>
                   )}
                 </div>
               )}
 
               {/* FORM */}
-              {user.role !== "admin" && showForm && (
-                <div className="bg-white rounded-2xl shadow-lg border p-6 w-full max-w-md mx-auto">
-                  <form onSubmit={handleSubmit} className="flex flex-col items-center gap-5">
-                    <div className="w-full aspect-video rounded-2xl overflow-hidden border bg-black flex items-center justify-center shadow">
+              {showForm && (
+                <div className="bg-white rounded-2xl shadow-lg border p-6 w-full max-w-md mx-auto mb-6">
+                  {["admin", "hr", "center"].includes(user.role) ? (
+                    <form onSubmit={handleAdminSubmit} className="flex flex-col gap-4">
+                      <h2 className="text-xl font-bold text-slate-800">Manual Attendance Entry</h2>
+                      
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-semibold text-slate-700">User</label>
+                        <select 
+                          required
+                          value={adminForm.targetUserId} 
+                          onChange={e => setAdminForm({...adminForm, targetUserId: e.target.value})}
+                          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                        >
+                          <option value="">Select User</option>
+                          {studentOnly ? (
+                            Object.values(studentsMap).map(s => <option key={s.user?._id} value={s.user?._id}>{s.user?.name} (Student)</option>)
+                          ) : employeeOnly ? (
+                            employees.map(e => <option key={e._id} value={e._id}>{e.name} (Employee)</option>)
+                          ) : (
+                            <>
+                              <optgroup label="Students">
+                                {Object.values(studentsMap).map(s => <option key={s.user?._id} value={s.user?._id}>{s.user?.name}</option>)}
+                              </optgroup>
+                              <optgroup label="Employees">
+                                {employees.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}
+                              </optgroup>
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-semibold text-slate-700">Select Date</label>
+                        <input 
+                          type="date" 
+                          required
+                          value={adminForm.date} 
+                          onChange={e => setAdminForm({...adminForm, date: e.target.value})}
+                          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                        />
+                      </div>
+
+                      <div className="flex gap-4">
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-sm font-semibold text-slate-700">Login Time</label>
+                          <input 
+                            type="time" 
+                            required
+                            value={adminForm.loginTime} 
+                            onChange={e => setAdminForm({...adminForm, loginTime: e.target.value})}
+                            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-sm font-semibold text-slate-700">Logout Time</label>
+                          <input 
+                            type="time" 
+                            value={adminForm.logoutTime} 
+                            onChange={e => setAdminForm({...adminForm, logoutTime: e.target.value})}
+                            className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 mt-2">
+                        <button type="button" onClick={() => setShowForm(false)} className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-semibold hover:bg-slate-200 transition">Cancel</button>
+                        <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition flex justify-center items-center">
+                          {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Save Record"}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="flex flex-col items-center gap-5">
+                      <div className="w-full aspect-video rounded-2xl overflow-hidden border bg-black flex items-center justify-center shadow">
                       {cameraActive ? (
                         <video ref={videoRef} autoPlay className="w-full h-full object-cover" />
                       ) : photo ? (
@@ -402,6 +604,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
 
                     <canvas ref={canvasRef} className="hidden" />
                   </form>
+                  )}
                 </div>
               )}
 
@@ -450,6 +653,41 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
                       </div>
                     </div>
                   </div>
+
+                  {studentOnly && (
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterType} onChange={e => { setFilterType(e.target.value); setFilterVendor(""); }}>
+                        <option value="">All Types</option>
+                        <option value="intern">Intern</option>
+                        <option value="inhouse">In-house</option>
+                      </select>
+                      
+                      <select disabled={filterType !== "intern"} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full disabled:opacity-50" value={filterVendor} onChange={e => setFilterVendor(e.target.value)}>
+                        <option value="">All Vendors</option>
+                        {vendors.map(v => <option key={v._id} value={v._id}>{v.companyName}</option>)}
+                      </select>
+
+                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
+                        <option value="">All Batches</option>
+                        {batches.map(b => <option key={b._id} value={b.name}>{b.name}</option>)}
+                      </select>
+
+                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterCenter} onChange={e => setFilterCenter(e.target.value)}>
+                        <option value="">All Centers</option>
+                        {centers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                      </select>
+
+                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
+                        <option value="">All Courses</option>
+                        {courses.map(c => <option key={c._id} value={c.title}>{c.title}</option>)}
+                      </select>
+
+                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
+                        <option value="">All Semesters</option>
+                        {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden pb-4">
                     <CustomDataTable

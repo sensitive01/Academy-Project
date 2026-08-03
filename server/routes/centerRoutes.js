@@ -86,8 +86,8 @@ const User = require("../models/User");
 //////////////////////////////////////////////////////
 router.get("/:id/login", protect, async (req, res) => {
   try {
-    const user = await User.findOne({ center: req.params.id, role: "center" }).select("-password");
-    res.json(user);
+    const users = await User.find({ center: req.params.id, role: { $in: ["center", "center-hr", "center-finance"] } }).select("-password");
+    res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -98,10 +98,14 @@ router.get("/:id/login", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.post("/:id/login", protect, async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role = "center" } = req.body;
     const centerId = req.params.id;
 
-    let user = await User.findOne({ center: centerId, role: "center" });
+    if (!["center", "center-hr", "center-finance"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role specified" });
+    }
+
+    let user = await User.findOne({ center: centerId, role });
 
     if (user) {
       // Update existing login
@@ -120,7 +124,7 @@ router.post("/:id/login", protect, async (req, res) => {
         name,
         email,
         password: password || "Center@123",
-        role: "center",
+        role,
         center: centerId,
       });
     }

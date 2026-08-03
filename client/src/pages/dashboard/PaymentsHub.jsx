@@ -12,6 +12,8 @@ import {
   WalletCards,
   Search,
   Filter,
+  Coins,
+  Home,
 } from "lucide-react";
 import Expenses from "../expenses/Expenses";
 import Payroll from "../payroll/Payroll";
@@ -44,10 +46,10 @@ const PlaceholderTable = ({ title, description }) => {
 const PaymentsHub = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Initialize mainTab from URL if present
   const initialMainTab = location.pathname.includes("outward") ? "outward" : "inward";
-  const [mainTab, setMainTab] = useState(initialMainTab); 
+  const [mainTab, setMainTab] = useState(initialMainTab);
   const [inwardTab, setInwardTab] = useState("online_course");
   const [outwardTab, setOutwardTab] = useState("expense");
 
@@ -70,6 +72,7 @@ const PaymentsHub = () => {
     online_course: { label: "Online Course", icon: <MonitorPlay size={18} /> },
     exam_fees: { label: "Exam Fees", icon: <FileText size={18} /> },
     term_fees: { label: "Term Fees", icon: <CalendarDays size={18} /> },
+    monthly_fees: { label: "Monthly Fees", icon: <CalendarDays size={18} /> },
     vendor_payments: { label: "Vendor Payments", icon: <Building size={18} /> },
     others: { label: "Others", icon: <MoreHorizontal size={18} /> },
   };
@@ -77,6 +80,8 @@ const PaymentsHub = () => {
   const outwardTabs = {
     expense: { label: "Expense", icon: <Receipt size={18} /> },
     salary: { label: "Salary", icon: <WalletCards size={18} /> },
+    stipend: { label: "Stipend", icon: <Coins size={18} /> },
+    rent: { label: "Rent", icon: <Home size={18} /> },
   };
 
   return (
@@ -92,22 +97,20 @@ const PaymentsHub = () => {
         <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
           <button
             onClick={() => handleMainTabChange("inward")}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 ${
-              mainTab === "inward"
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 ${mainTab === "inward"
                 ? "bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200/50"
                 : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
-            }`}
+              }`}
           >
             <ArrowDownCircle size={18} className={mainTab === "inward" ? "text-emerald-500" : ""} />
             Inward
           </button>
           <button
             onClick={() => handleMainTabChange("outward")}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 ${
-              mainTab === "outward"
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 ${mainTab === "outward"
                 ? "bg-white text-rose-600 shadow-sm ring-1 ring-slate-200/50"
                 : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
-            }`}
+              }`}
           >
             <ArrowUpCircle size={18} className={mainTab === "outward" ? "text-rose-500" : ""} />
             Outward
@@ -119,39 +122,35 @@ const PaymentsHub = () => {
       <div className="flex overflow-x-auto scrollbar-hide border-b border-gray-200 gap-8 px-2">
         {mainTab === "inward"
           ? Object.keys(inwardTabs).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setInwardTab(tab)}
-                className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-                  inwardTab === tab
-                    ? "text-brand-600"
-                    : "text-slate-400 hover:text-brand-600"
+            <button
+              key={tab}
+              onClick={() => setInwardTab(tab)}
+              className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${inwardTab === tab
+                  ? "text-brand-600"
+                  : "text-slate-400 hover:text-brand-600"
                 }`}
-              >
-                {inwardTabs[tab].icon}
-                {inwardTabs[tab].label}
-                <div className={`absolute bottom-0 left-0 w-full h-1 rounded-t-full transition-colors ${
-                  inwardTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+            >
+              {inwardTabs[tab].icon}
+              {inwardTabs[tab].label}
+              <div className={`absolute bottom-0 left-0 w-full h-1 rounded-t-full transition-colors ${inwardTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
                 }`} />
-              </button>
-            ))
+            </button>
+          ))
           : Object.keys(outwardTabs).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setOutwardTab(tab)}
-                className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-                  outwardTab === tab
-                    ? "text-brand-600"
-                    : "text-slate-400 hover:text-brand-600"
+            <button
+              key={tab}
+              onClick={() => setOutwardTab(tab)}
+              className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${outwardTab === tab
+                  ? "text-brand-600"
+                  : "text-slate-400 hover:text-brand-600"
                 }`}
-              >
-                {outwardTabs[tab].icon}
-                {outwardTabs[tab].label}
-                <div className={`absolute bottom-0 left-0 w-full h-1 rounded-t-full transition-colors ${
-                  outwardTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+            >
+              {outwardTabs[tab].icon}
+              {outwardTabs[tab].label}
+              <div className={`absolute bottom-0 left-0 w-full h-1 rounded-t-full transition-colors ${outwardTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
                 }`} />
-              </button>
-            ))}
+            </button>
+          ))}
       </div>
 
       {/* CONTENT AREA */}
@@ -161,6 +160,7 @@ const PaymentsHub = () => {
             {inwardTab === "online_course" && <OnlineCoursePayments />}
             {inwardTab === "exam_fees" && <StudentFeesList feeType="Exam" />}
             {inwardTab === "term_fees" && <StudentFeesList feeType="Term" />}
+            {inwardTab === "monthly_fees" && <StudentFeesList feeType="Monthly" />}
             {inwardTab === "vendor_payments" && (
               <VendorPaymentsList />
             )}
@@ -176,6 +176,16 @@ const PaymentsHub = () => {
             {outwardTab === "salary" && (
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
                 <Payroll />
+              </div>
+            )}
+            {outwardTab === "stipend" && (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
+                <Payroll internOnly={true} />
+              </div>
+            )}
+            {outwardTab === "rent" && (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
+                <Expenses categoryFilter="Rent" />
               </div>
             )}
           </>

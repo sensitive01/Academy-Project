@@ -12,7 +12,11 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
     otherFeeType: "",
     terms: [],
     amount: 0,
-    status: "pending"
+    status: "pending",
+    dueDate: "",
+    penaltyAmount: 0,
+    finalDueDate: "",
+    finalPenaltyAmount: 0
   });
 
   const handleSubmit = (e) => {
@@ -22,7 +26,7 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
 
   return createPortal(
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 mt-10 md:mt-0">
+      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-red-50 text-red-600 rounded-xl">
@@ -69,7 +73,9 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
               <label className="block text-sm font-bold text-slate-700 mb-1">Fee Type</label>
               <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.feeType} onChange={e => setFormData({...formData, feeType: e.target.value})}>
                 <option value="Term">Term Fee</option>
+                <option value="Monthly">Monthly Fee</option>
                 <option value="Exam">Exam Fee</option>
+                <option value="Other">Other</option>
               </select>
             </div>
             {formData.feeType === 'Other' && (
@@ -78,7 +84,7 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
                 <input type="text" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.otherFeeType} onChange={e => setFormData({...formData, otherFeeType: e.target.value})} />
               </div>
             )}
-            {formData.feeType !== 'Other' && (
+            {formData.feeType === 'Term' && (
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Term / Installment</label>
                 <select className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.terms[0] || ""} onChange={e => setFormData({...formData, terms: e.target.value ? [Number(e.target.value)] : []})}>
@@ -87,20 +93,41 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
                 </select>
               </div>
             )}
+            {formData.feeType === 'Monthly' && (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Month</label>
+                <input type="month" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" onChange={e => setFormData({...formData, terms: [new Date(e.target.value).getMonth() + 1]})} />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Amount (₹)</label>
               <input type="number" required min="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
             </div>
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Initial Status</label>
-              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                <option value="pending">Pending / Unpaid</option>
-                <option value="paid">Paid</option>
-              </select>
-            </div>
+          </div>
+          
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-6">
+             <h3 className="text-sm font-bold text-slate-800 mb-4 pb-2 border-b border-slate-200">Penalty Tracking Configuration</h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Due Date</label>
+                  <input type="date" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
+               </div>
+               <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Penalty Amount (₹)</label>
+                  <input type="number" min="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.penaltyAmount} onChange={e => setFormData({...formData, penaltyAmount: Number(e.target.value)})} />
+               </div>
+               <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Final Due Date</label>
+                  <input type="date" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.finalDueDate} onChange={e => setFormData({...formData, finalDueDate: e.target.value})} />
+               </div>
+               <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Final Penalty Amount (₹)</label>
+                  <input type="number" min="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.finalPenaltyAmount} onChange={e => setFormData({...formData, finalPenaltyAmount: Number(e.target.value)})} />
+               </div>
+             </div>
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-100">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
             <button type="submit" className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2">
               <Save size={18} /> Save Payment

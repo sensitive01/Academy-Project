@@ -23,7 +23,9 @@ import {
   Briefcase,
   Key,
   ShieldAlert,
-  FileText
+  FileText,
+  Newspaper,
+  ListTodo
 } from "lucide-react";
 import logo from "../assets/logo-2.jpeg";
 import { useAuth } from "../context/AuthContext";
@@ -63,9 +65,8 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
           )}
         </button>
         <div
-          className={`grid transition-all duration-300 ease-in-out ${
-            isOpen && !isCollapsed ? "grid-rows-[1fr] opacity-100 mt-1 mb-2" : "grid-rows-[0fr] opacity-0 mt-0 mb-0"
-          }`}
+          className={`grid transition-all duration-300 ease-in-out ${isOpen && !isCollapsed ? "grid-rows-[1fr] opacity-100 mt-1 mb-2" : "grid-rows-[0fr] opacity-0 mt-0 mb-0"
+            }`}
         >
           <div className="overflow-hidden">
             <ul className="pl-10 space-y-1">
@@ -141,7 +142,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
-    { icon: <Users size={22} />, label: "Parent Mgmt", path: "/dashboard/admin/parents" },
     { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
     {
       icon: <CreditCard size={22} />,
@@ -156,6 +156,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
     { icon: <MessageSquare size={22} />, label: "Enquiries", path: "/dashboard/admin/enquiries" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   // ================= COACH MENU =================
@@ -168,6 +169,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <UserCheck size={22} />, label: "Leave Request", path: "/dashboard/leave-request" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   // ================= PARENT MENU =================
@@ -179,6 +181,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <FileText size={22} />, label: "Exam Management", path: "/dashboard/exams" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   const employeeItems = [
@@ -187,6 +190,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <UserCheck size={22} />, label: "Leave Request", path: "/dashboard/leave-request" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   const financeItems = [
@@ -195,6 +199,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <UserCheck size={22} />, label: "Leave Request", path: "/dashboard/leave-request" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   const centerItems = [
@@ -204,12 +209,30 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <CalendarCheck size={22} />, label: "Attendance", path: "/dashboard/attendance" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
+  ];
+
+  const centerHrItems = [
+    { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
+    { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
+    { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
+    { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
+  ];
+
+  const centerFinanceItems = [
+    { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
+    { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
+    { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   const vendorItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard/vendor" },
     { icon: <CalendarCheck size={22} />, label: "Attendance", path: "/dashboard/vendor/attendance" },
     { icon: <UserCheck size={22} />, label: "Leave Requests", path: "/dashboard/vendor/leaves" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   const subAdminItems = [
@@ -226,6 +249,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
       ]
     },
     { icon: <Briefcase size={22} />, label: "Vendor Management", path: "/dashboard/admin/vendors" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   // ================= ROLE BASED NAVIGATION =================
@@ -247,6 +271,10 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     currentNavItems = financeItems;
   } else if (role === "center") {
     currentNavItems = centerItems;
+  } else if (role === "center-hr") {
+    currentNavItems = centerHrItems;
+  } else if (role === "center-finance") {
+    currentNavItems = centerFinanceItems;
   } else if (role === "vendor") {
     currentNavItems = vendorItems;
   }

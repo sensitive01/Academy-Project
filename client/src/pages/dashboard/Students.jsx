@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
-import { 
-  Eye, 
-  Trash2, 
-  Edit2, 
-  Briefcase, 
-  Users, 
-  CheckCircle, 
-  Clock, 
-  UserPlus, 
-  Search, 
-  Filter, 
+import {
+  Eye,
+  Trash2,
+  Edit2,
+  Briefcase,
+  Users,
+  CheckCircle,
+  Clock,
+  UserPlus,
+  Search,
+  Filter,
   MoreVertical,
   Mail,
+  Bell,
   Phone,
   Calendar,
   Ban,
@@ -30,7 +31,9 @@ import {
   UserCircle,
   Wallet,
   CalendarRange,
-  Plus
+  Plus,
+  LayoutDashboard,
+  UploadCloud
 } from "lucide-react";
 import CustomDataTable from "../../components/DataTable";
 import Attendance from "../../pages/attendance/Attendance";
@@ -42,8 +45,11 @@ import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import TakeAttendanceModal from "../../components/modals/TakeAttendanceModal";
 import ReactDOM from "react-dom";
 import toast from "react-hot-toast";
+import ParentManagement from "../admin/ParentManagement";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate, useLocation } from "react-router-dom";
 
-const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onView, onPromote, search, setSearch }) => {
+const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onView, onPromote, onSendReminder, search, setSearch }) => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
@@ -53,10 +59,10 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
     } else {
       const rect = event.currentTarget.getBoundingClientRect();
       const menuWidth = 224;
-      const menuHeight = 250; 
+      const menuHeight = 250;
       const screenWidth = window.innerWidth;
       const screenHeight = window.innerHeight;
-      
+
       let left = rect.right - menuWidth;
       // Ensure menu doesn't go off screen for mobile/sidebar
       if (left < 10) left = 10;
@@ -77,15 +83,15 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
   };
 
   const columns = [
-    { 
-      name: "S.No", 
-      selector: (row, index) => index + 1, 
-      width: "80px" 
+    {
+      name: "S.No",
+      selector: (row, index) => index + 1,
+      width: "80px"
     },
-    { 
-      name: "Student Profile", 
-      selector: row => row.user?.name, 
-      sortable: true, 
+    {
+      name: "Student Profile",
+      selector: row => row.user?.name,
+      sortable: true,
       cell: row => (
         <div className="flex items-center gap-3 py-1">
           <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 shadow-sm ring-2 ring-white">
@@ -105,24 +111,43 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
       ),
       width: "200px"
     },
-    { 
-      name: "Contact info", 
+    {
+      name: "Type",
+      selector: row => row.internships?.length > 0 ? "Intern" : (row.center ? "Center Student" : "Online Student"),
+      sortable: true,
+      cell: row => {
+        const isIntern = row.internships && row.internships.length > 0;
+        const type = isIntern ? "Intern" : (row.center ? "Center Student" : "Online Student");
+        return (
+          <div className="flex items-center gap-1.5">
+            <div className={`p-0.5 px-2 rounded-md text-[10px] font-black uppercase tracking-widest border truncate ${isIntern ? "text-amber-700 border-amber-200 bg-amber-50" :
+                (row.center ? "text-brand-700 border-brand-200 bg-brand-50" : "text-emerald-700 border-emerald-200 bg-emerald-50")
+              }`}>
+              {type}
+            </div>
+          </div>
+        );
+      },
+      width: "150px"
+    },
+    {
+      name: "Contact info",
       cell: row => (
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium truncate max-w-[150px]">
-            <Mail size={12} className="text-slate-400 shrink-0"/> {row.user?.email || row.email}
+            <Mail size={12} className="text-slate-400 shrink-0" /> {row.user?.email || row.email}
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
-            <Phone size={12} className="text-slate-400 shrink-0"/> {row.whatsapp || row.phone || "N/A"}
+            <Phone size={12} className="text-slate-400 shrink-0" /> {row.whatsapp || row.phone || "N/A"}
           </div>
         </div>
-      ), 
+      ),
       width: "250px"
     },
-    { 
-      name: "Center", 
-      selector: row => row.center?.name, 
-      sortable: true, 
+    {
+      name: "Center",
+      selector: row => row.center?.name,
+      sortable: true,
       cell: row => (
         <div className="flex items-center gap-1.5">
           <MapPin size={11} className="text-indigo-400 shrink-0" />
@@ -130,27 +155,26 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
             {row.center?.name || "N/A"}
           </div>
         </div>
-      ), 
+      ),
       width: "200px"
     },
-    { 
-      name: "Status", 
-      selector: row => row.status, 
-      sortable: true, 
+    {
+      name: "Status",
+      selector: row => row.status,
+      sortable: true,
       cell: row => (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-          row.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
-        }`}>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${row.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
+          }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${row.status === "active" ? "bg-green-500" : "bg-red-500"}`}></span>
           {row.status}
         </span>
       ),
       width: "150px"
     },
-    { 
-      name: "Registered", 
-      selector: row => row.createdAt, 
-      sortable: true, 
+    {
+      name: "Registered",
+      selector: row => row.createdAt,
+      sortable: true,
       cell: row => (
         <span className="text-slate-500 text-[11px] font-bold whitespace-nowrap">
           {row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
@@ -158,8 +182,8 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
       ),
       width: "150px"
     },
-    { 
-      name: "Action", 
+    {
+      name: "Action",
       cell: row => (
         <div className="relative">
           <button
@@ -168,7 +192,7 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
           >
             <MoreVertical size={18} />
           </button>
-          
+
           {openMenuId === row._id &&
             ReactDOM.createPortal(
               <>
@@ -177,16 +201,26 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
                   className="fixed w-56 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] border border-slate-100 z-[9999] py-2 animate-in fade-in zoom-in duration-100"
                   style={{ top: menuPosition.top, left: menuPosition.left }}
                 >
-                  <button onClick={() => { onView(row); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                    <Eye size={16} className="text-blue-500" /> View Full Profile
+                  {(!row.internships || row.internships.length === 0) ? (
+                    <button onClick={() => { onPromote(row, false); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                      <Briefcase size={16} className="text-indigo-600" /> Promote to Intern
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={() => { onPromote(row, false); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                        <Edit2 size={16} className="text-amber-500" /> Edit Current Internship
+                      </button>
+                      <button onClick={() => { onPromote(row, true); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                        <Briefcase size={16} className="text-green-500" /> New Internship Period
+                      </button>
+                    </>
+                  )}
+                  <div className="h-px bg-slate-100 my-1 mx-2"></div>
+                  
+                  <button onClick={() => { onSendReminder(row); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                    <Bell size={16} className="text-blue-500" /> Send Reminder
                   </button>
-                  <button onClick={() => { onEdit(row); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                    <Edit2 size={16} className="text-amber-500" /> Edit Details
-                  </button>
-                  <button onClick={() => { onPromote(row); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                    <Briefcase size={16} className="text-indigo-600" /> 
-                    {row.internships && row.internships.length > 0 ? "Edit Intern Details" : "Promote to Intern"}
-                  </button>
+
                   <div className="h-px bg-slate-100 my-1 mx-2"></div>
                   <button onClick={() => { onToggleStatus(row._id); setOpenMenuId(null); }} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold transition-colors ${row.status === "active" ? "text-orange-600 hover:bg-orange-50" : "text-green-600 hover:bg-green-50"}`}>
                     {row.status === "active" ? <><Ban size={16} /> Block Student</> : <><Unlock size={16} /> Unblock Student</>}
@@ -200,41 +234,45 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
             )
           }
         </div>
-      ), 
+      ),
       width: "100px"
     }
   ];
 
   return (
     <div className="w-full overflow-x-auto scrollbar-hide">
-      <CustomDataTable 
+      <CustomDataTable
         columns={columns}
         data={students}
         progressPending={loading}
         search={search}
         setSearch={setSearch}
         searchPlaceholder="Search by ID, name, email..."
-        exportButton={
-          <div className="flex gap-2 shrink-0">
-             <button className="flex items-center gap-2 px-4 py-2 text-xs font-black text-slate-600 uppercase tracking-widest bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all">
-               <Filter size={14} /> Filter
-             </button>
-          </div>
-        }
       />
     </div>
   );
 };
 
 const Students = () => {
-  const [activeTab, setActiveTab] = useState("online_students");
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || sessionStorage.getItem("studentsActiveTab") || "dashboard");
   const [students, setStudents] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [attendanceRefresh, setAttendanceRefresh] = useState(0);
+  // New Filter States
+  const [filterType, setFilterType] = useState("");
+  const [filterCenter, setFilterCenter] = useState("");
+  const [filterCourse, setFilterCourse] = useState("");
+  const [filterBatch, setFilterBatch] = useState("");
+  const [filterSemester, setFilterSemester] = useState("");
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, id: null });
   const [promoteConfig, setPromoteConfig] = useState({ isOpen: false, student: null });
+  const [reminderConfig, setReminderConfig] = useState({ isOpen: false, student: null });
   const [vendors, setVendors] = useState([]);
   const [promoteForm, setPromoteForm] = useState({
     vendorId: "",
@@ -242,12 +280,41 @@ const Students = () => {
     startDate: "",
     endDate: "",
     paymentBy: "",
-    salary: ""
+    vendorPayment: "",
+    salary: "",
+    referralCharge: "",
+    isNewPeriod: false
   });
+
+  useEffect(() => {
+    sessionStorage.setItem("studentsActiveTab", activeTab);
+  }, [activeTab]);
 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editStudent, setEditStudent] = useState(null);
   const [centers, setCenters] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [batches, setBatches] = useState([]);
+
+  const handleSendReminder = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const payload = {
+      targetUserId: reminderConfig.student.user._id,
+      title: formData.get("title"),
+      description: formData.get("description"),
+      type: formData.get("type")
+    };
+    if (formData.get("dueDate")) payload.dueDate = formData.get("dueDate");
+
+    try {
+      await api.post("/reminders/assign", payload);
+      toast.success("Reminder sent successfully!");
+      setReminderConfig({ isOpen: false, student: null });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to send reminder");
+    }
+  };
 
   const fetchCenters = async () => {
     try {
@@ -276,10 +343,26 @@ const Students = () => {
     }
   };
 
+  const fetchCourses = async () => {
+    try {
+      const { data } = await api.get("/courses");
+      setCourses(data.courses || data || []);
+    } catch { /* Fail silently */ }
+  };
+
+  const fetchBatches = async () => {
+    try {
+      const { data } = await api.get("/batches");
+      setBatches(data.batches || data || []);
+    } catch { /* Fail silently */ }
+  };
+
   useEffect(() => {
     fetchCenters();
     fetchVendors();
     fetchStudents();
+    fetchCourses();
+    fetchBatches();
   }, []);
 
   useEffect(() => {
@@ -289,8 +372,29 @@ const Students = () => {
       result = result.filter(s => !s.center);
     } else if (activeTab === "center_students") {
       result = result.filter(s => !!s.center);
-    } else if (activeTab === "internship") {
-      result = result.filter(s => s.internships && s.internships.length > 0);
+
+      if (filterType === "intern") {
+        result = result.filter(s => s.internships && s.internships.length > 0);
+      } else if (filterType === "inhouse") {
+        result = result.filter(s => !(s.internships && s.internships.length > 0));
+      }
+      if (filterCenter) {
+        result = result.filter(s => s.center === filterCenter || s.center?._id === filterCenter);
+      }
+      if (filterCourse) {
+        result = result.filter(s => s.enrolledCourses?.some(ec => ec.course?._id === filterCourse || ec.course === filterCourse));
+      }
+      if (filterBatch) {
+        const selectedBatch = batches.find(b => b._id === filterBatch);
+        if (selectedBatch) {
+          result = result.filter(s => selectedBatch.students?.some(bs => bs === s._id || bs?._id === s._id));
+        } else {
+          result = [];
+        }
+      }
+      if (filterSemester) {
+        result = result.filter(s => s.semester === filterSemester);
+      }
     }
 
     if (search) {
@@ -304,7 +408,7 @@ const Students = () => {
       );
     }
     setFiltered(result);
-  }, [search, students, activeTab]);
+  }, [search, students, activeTab, filterType, filterCenter, filterCourse, filterBatch, filterSemester]);
 
   const handleDelete = (id) => {
     setConfirmConfig({ isOpen: true, id });
@@ -365,13 +469,13 @@ const Students = () => {
   };
 
   const tabs = {
+    dashboard: { label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     online_students: { label: "Online Students", icon: <Laptop size={20} /> },
     center_students: { label: "Center Students", icon: <Building2 size={20} /> },
-    internship: { label: "Internship", icon: <UserCircle size={20} /> },
     student_attendance: { label: "Student Attendance", icon: <CheckCircle size={20} /> },
-    intern_attendance: { label: "Intern Attendance", icon: <Clock size={20} /> },
     intern_payroll: { label: "Intern Payroll", icon: <Wallet size={20} /> },
     leaves: { label: "Leaves", icon: <CalendarRange size={20} /> },
+    parent_mgmt: { label: "Parent Mgmt", icon: <Users size={20} /> },
   };
 
   return (
@@ -380,23 +484,24 @@ const Students = () => {
       <TakeAttendanceModal
         isOpen={isAttendanceModalOpen}
         onClose={() => setIsAttendanceModalOpen(false)}
+        onSuccess={() => setAttendanceRefresh(prev => prev + 1)}
       />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative z-10">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Student Directory</h1>
           <p className="text-slate-500 text-sm font-medium">Manage student profiles, enrollments, and internship status.</p>
         </div>
-        
+
         <div className="flex gap-3">
-          {["online_students", "center_students", "internship"].includes(activeTab) && (
+          {["online_students", "center_students"].includes(activeTab) && (
             <>
-              <button 
+              <button
                 onClick={exportToExcel}
                 className="flex items-center gap-2 px-5 py-2.5 font-bold text-brand-700 bg-brand-50 rounded-2xl hover:bg-brand-100 transition-all active:scale-95"
               >
                 Export XL
               </button>
-              <button 
+              <button
                 onClick={() => window.open("/student-registration", "_blank")}
                 className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
               >
@@ -405,13 +510,23 @@ const Students = () => {
             </>
           )}
 
-          {(activeTab === "student_attendance" || activeTab === "intern_attendance") && (
-            <button 
-              onClick={() => setIsAttendanceModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
-            >
-              <Plus size={18} /> Add Attendance
-            </button>
+          {(activeTab === "student_attendance") && (
+            <>
+              {["admin", "hr", "center"].includes(user?.role) && (
+                <button
+                  onClick={() => navigate("/dashboard/students/bulk-attendance")}
+                  className="flex items-center gap-2 px-6 py-2.5 font-bold text-slate-700 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+                >
+                  <UploadCloud size={18} /> Bulk Upload
+                </button>
+              )}
+              <button
+                onClick={() => setIsAttendanceModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
+              >
+                <Plus size={18} /> Add Attendance
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -429,15 +544,100 @@ const Students = () => {
           >
             {tabs[tab].icon}
             {tabs[tab].label}
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === tab ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
         ))}
       </div>
 
       {/* Content Area */}
-      {["online_students", "center_students", "internship"].includes(activeTab) ? (
+      {activeTab === "dashboard" ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Total Students</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">{students.length}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-blue-50 text-blue-600 group-hover:rotate-12 transition-all shrink-0">
+                <Users size={26} strokeWidth={2.5} />
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Online Students</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">{students.filter(s => !s.center).length}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:rotate-12 transition-all shrink-0">
+                <Laptop size={26} strokeWidth={2.5} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Center Students</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">{students.filter(s => !!s.center).length}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:rotate-12 transition-all shrink-0">
+                <Building2 size={26} strokeWidth={2.5} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Active Interns</p>
+                <p className="text-3xl font-black text-slate-900 mt-2">{students.filter(s => s.internships?.length > 0).length}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-amber-50 text-amber-600 group-hover:rotate-12 transition-all shrink-0">
+                <Briefcase size={26} strokeWidth={2.5} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Status Overview</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="text-emerald-500" size={20} />
+                    <span className="font-bold text-slate-700">Active Students</span>
+                  </div>
+                  <span className="text-lg font-black text-slate-900">{students.filter(s => s.status === 'active').length}</span>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <Ban className="text-red-500" size={20} />
+                    <span className="font-bold text-slate-700">Blocked / Inactive</span>
+                  </div>
+                  <span className="text-lg font-black text-slate-900">{students.filter(s => s.status !== 'active').length}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Academic Distribution</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <GraduationCap className="text-brand-500" size={20} />
+                    <span className="font-bold text-slate-700">Unique Departments</span>
+                  </div>
+                  <span className="text-lg font-black text-slate-900">{[...new Set(students.map(s => s.department).filter(Boolean))].length}</span>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="text-indigo-500" size={20} />
+                    <span className="font-bold text-slate-700">Active Centers</span>
+                  </div>
+                  <span className="text-lg font-black text-slate-900">{centers.length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : ["online_students", "center_students"].includes(activeTab) ? (
         <>
           {/* Stats Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -453,61 +653,92 @@ const Students = () => {
                   <p className="text-3xl font-black text-slate-900 mt-2">{stat.value}</p>
                 </div>
                 <div className={`p-4 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600 group-hover:rotate-12 transition-all shrink-0`}>
-                  <stat.icon size={26} strokeWidth={2.5}/>
+                  <stat.icon size={26} strokeWidth={2.5} />
                 </div>
               </div>
             ))}
           </div>
 
+          {/* Filters Section for Center Students */}
+          {activeTab === "center_students" && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+              <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterType} onChange={e => setFilterType(e.target.value)}>
+                <option value="">All Types (Intern/In-house)</option>
+                <option value="intern">Intern</option>
+                <option value="inhouse">In-house</option>
+              </select>
+              <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterCenter} onChange={e => setFilterCenter(e.target.value)}>
+                <option value="">All Centers</option>
+                {centers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+              <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
+                <option value="">All Courses</option>
+                {courses.map(c => <option key={c._id} value={c._id}>{c.title || c.name}</option>)}
+              </select>
+              <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
+                <option value="">All Batches</option>
+                {batches.map(b => <option key={b._id} value={b._id}>{b.name || b.batchId}</option>)}
+              </select>
+              <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
+                <option value="">All Semesters</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => <option key={sem} value={sem}>Semester {sem}</option>)}
+              </select>
+            </div>
+          )}
+
           {/* Table Section */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <StudentList 
+            <StudentList
               students={filtered}
               loading={loading}
               onEdit={(s) => {
-                 const clone = JSON.parse(JSON.stringify(s));
-                 setEditStudent({...clone, email: s.user?.email || s.email || ""});
+                const clone = JSON.parse(JSON.stringify(s));
+                setEditStudent({ ...clone, email: s.user?.email || s.email || "" });
               }}
               onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}
               onView={(s) => setSelectedStudent(s)}
-              onPromote={(row) => {
+              onPromote={(row, isNewPeriod) => {
                 if (row.internships && row.internships.length > 0) {
                   const latest = row.internships[row.internships.length - 1];
                   setPromoteForm({
                     vendorId: latest.vendor?._id || latest.vendor || "",
                     location: latest.location || "",
-                    startDate: latest.startDate ? latest.startDate.split('T')[0] : "",
-                    endDate: latest.endDate ? latest.endDate.split('T')[0] : "",
+                    startDate: isNewPeriod ? "" : (latest.startDate ? latest.startDate.split('T')[0] : ""),
+                    endDate: isNewPeriod ? "" : (latest.endDate ? latest.endDate.split('T')[0] : ""),
                     paymentBy: latest.paymentBy || "",
-                    salary: latest.salary || ""
+                    vendorPayment: isNewPeriod ? "" : (latest.vendorPayment || ""),
+                    salary: isNewPeriod ? "" : (latest.salary || ""),
+                    referralCharge: isNewPeriod ? "" : (latest.referralCharge || ""),
+                    isNewPeriod: isNewPeriod
                   });
                 } else {
-                  setPromoteForm({ vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", salary: "" });
+                  setPromoteForm({ vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false });
                 }
                 setPromoteConfig({ isOpen: true, student: row });
               }}
+              onSendReminder={(student) => setReminderConfig({ isOpen: true, student })}
               search={search}
               setSearch={setSearch}
             />
           </div>
         </>
       ) : activeTab === "student_attendance" ? (
-         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
-             <Attendance studentOnly={true} hideHeader={true} />
-         </div>
-      ) : activeTab === "intern_attendance" ? (
-         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
-             <Attendance internOnly={true} hideHeader={true} />
-         </div>
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
+          <Attendance studentOnly={true} hideHeader={true} refreshTrigger={attendanceRefresh} />
+        </div>
       ) : activeTab === "intern_payroll" ? (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
-             <Payroll internOnly={true} hideHeader={false} />
+          <Payroll internOnly={true} hideHeader={false} />
         </div>
       ) : activeTab === "leaves" ? (
-         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
-             <LeaveRequestList />
-         </div>
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
+          <LeaveRequestList />
+        </div>
+      ) : activeTab === "parent_mgmt" ? (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
+          <ParentManagement />
+        </div>
       ) : null}
 
       {/* PROMOTE INTERN MODAL (PORTAL) */}
@@ -517,62 +748,85 @@ const Students = () => {
           <div className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl relative z-10 animate-in zoom-in duration-300">
             <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
               <div>
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">Internship Portal</h2>
+                <h2 className="text-xl font-black text-slate-800 tracking-tight">
+                  {promoteForm.isNewPeriod ? "Add New Internship Period" : "Internship Portal"}
+                </h2>
                 <p className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">{promoteConfig.student?.user?.name}</p>
               </div>
               <button onClick={() => setPromoteConfig({ isOpen: false, student: null })} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">✕</button>
             </div>
-            
+
             <form onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  const { data } = await api.post(`/students/${promoteConfig.student._id}/promote-intern`, promoteForm);
-                  setStudents(prev => prev.map(s => s._id === data.student._id ? data.student : s));
-                  setPromoteConfig({ isOpen: false, student: null });
-                  toast.success("Student updated as intern!");
-                } catch (err) {
-                  toast.error(err.response?.data?.message || "Failed to update");
-                }
+              e.preventDefault();
+              try {
+                const { data } = await api.post(`/students/${promoteConfig.student._id}/promote-intern`, promoteForm);
+                setStudents(prev => prev.map(s => s._id === data.student._id ? data.student : s));
+                setPromoteConfig({ isOpen: false, student: null });
+                toast.success("Student updated as intern!");
+              } catch (err) {
+                toast.error(err.response?.data?.message || "Failed to update");
+              }
             }} className="p-8 space-y-5">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Hiring Vendor</label>
+                <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.vendorId} onChange={(e) => setPromoteForm({ ...promoteForm, vendorId: e.target.value })}>
+                  <option value="">-- Choose Vendor --</option>
+                  {vendors.map(v => <option key={v._id} value={v._id}>{v.companyName}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Location</label>
+                <input type="text" placeholder="City / Branch" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.location} onChange={(e) => setPromoteForm({ ...promoteForm, location: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Hiring Vendor</label>
-                    <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.vendorId} onChange={(e) => setPromoteForm({...promoteForm, vendorId: e.target.value})}>
-                        <option value="">-- Choose Vendor --</option>
-                        {vendors.map(v => <option key={v._id} value={v._id}>{v.companyName}</option>)}
-                    </select>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Start Date</label>
+                  <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.startDate} onChange={(e) => setPromoteForm({ ...promoteForm, startDate: e.target.value })} />
                 </div>
                 <div>
-                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Location</label>
-                    <input type="text" placeholder="City / Branch" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.location} onChange={(e) => setPromoteForm({...promoteForm, location: e.target.value})} />
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">End Date</label>
+                  <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.endDate} onChange={(e) => setPromoteForm({ ...promoteForm, endDate: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Start Date</label>
-                        <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.startDate} onChange={(e) => setPromoteForm({...promoteForm, startDate: e.target.value})} />
-                    </div>
-                    <div>
-                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">End Date</label>
-                        <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.endDate} onChange={(e) => setPromoteForm({...promoteForm, endDate: e.target.value})} />
-                    </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Payout Method</label>
+                  <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.paymentBy} onChange={(e) => setPromoteForm({ ...promoteForm, paymentBy: e.target.value })}>
+                    <option value="">Select</option>
+                    <option value="Vendor Payment">Vendor Payment</option>
+                    <option value="Academy Stipend">Academy Stipend</option>
+                  </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Salary</label>
-                      <input type="number" required placeholder="00.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.salary} onChange={(e) => setPromoteForm({...promoteForm, salary: e.target.value})} />
-                  </div>
-                  <div>
-                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Payout Method</label>
-                      <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.paymentBy} onChange={(e) => setPromoteForm({...promoteForm, paymentBy: e.target.value})}>
-                          <option value="">Select</option>
-                          <option value="Vendor Payment">Vendor Payment</option>
-                          <option value="Academy Stipend">Academy Stipend</option>
-                      </select>
-                  </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Vendor Payment</label>
+                  <input type="number" required placeholder="00.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.vendorPayment} onChange={(e) => {
+                    const val = e.target.value;
+                    const vp = Number(val) || 0;
+                    const sal = Number(promoteForm.salary) || 0;
+                    setPromoteForm({ ...promoteForm, vendorPayment: val, referralCharge: (vp - sal).toString() });
+                  }} />
                 </div>
-                <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-50">
-                    <button type="button" onClick={() => setPromoteConfig({ isOpen: false, student: null })} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
-                    <button type="submit" className="px-10 py-3 bg-brand-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">Save Details</button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Student Salary</label>
+                  <input type="number" required placeholder="00.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.salary} onChange={(e) => {
+                    const val = e.target.value;
+                    const vp = Number(promoteForm.vendorPayment) || 0;
+                    const sal = Number(val) || 0;
+                    setPromoteForm({ ...promoteForm, salary: val, referralCharge: (vp - sal).toString() });
+                  }} />
                 </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Referral Charge</label>
+                  <input type="number" readOnly placeholder="00.00" className="w-full px-4 py-3 bg-slate-100 border border-slate-200 text-slate-500 rounded-2xl text-sm font-bold outline-none cursor-not-allowed" value={promoteForm.referralCharge} />
+                </div>
+              </div>
+              <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-50">
+                <button type="button" onClick={() => setPromoteConfig({ isOpen: false, student: null })} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
+                <button type="submit" className="px-10 py-3 bg-brand-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">Save Details</button>
+              </div>
             </form>
           </div>
         </div>,
@@ -583,7 +837,7 @@ const Students = () => {
       {selectedStudent && ReactDOM.createPortal(
         <div className="fixed inset-0 z-[10000] flex justify-center items-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setSelectedStudent(null)}></div>
-          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl max-h-[92vh] overflow-hidden relative z-10 shadow-2xl animate-in slide-in-from-bottom-5 duration-500 flex flex-col" onClick={(e)=>e.stopPropagation()}>
+          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl max-h-[92vh] overflow-hidden relative z-10 shadow-2xl animate-in slide-in-from-bottom-5 duration-500 flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white/80 backdrop-blur-xl z-20 border-b border-slate-100 px-10 py-6 flex justify-between items-center shrink-0">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">Academic Member Profile</h2>
@@ -650,7 +904,7 @@ const Students = () => {
                   </div>
                 </section>
               </div>
- 
+
               <section>
                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
                   <BookOpen size={16} className="text-brand-600" /> 4. Academic History
@@ -753,24 +1007,24 @@ const Students = () => {
                 ].map((item, i) => (
                   <div key={i}>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 ml-1.5">{item.l}</label>
-                    <input 
+                    <input
                       type={item.t || "text"}
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none transition-all placeholder:text-slate-300" 
-                      value={item.t === 'date' ? (editStudent[item.f]?.split("T")[0] || "") : (editStudent[item.f] || "")} 
-                      onChange={(e) => setEditStudent({...editStudent, [item.f]: e.target.value})}
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none transition-all placeholder:text-slate-300"
+                      value={item.t === 'date' ? (editStudent[item.f]?.split("T")[0] || "") : (editStudent[item.f] || "")}
+                      onChange={(e) => setEditStudent({ ...editStudent, [item.f]: e.target.value })}
                     />
                   </div>
                 ))}
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 ml-1.5">Academic Center</label>
-                  <select 
-                     className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none transition-all cursor-pointer"
-                     value={editStudent.center?._id || editStudent.center || ""}
-                     onChange={(e) => setEditStudent({...editStudent, center: e.target.value})}
-                   >
-                     <option value="">Select Center</option>
-                     {centers.map(c => <option key={c._id} value={c._id}>{c.name} - {c.location}</option>)}
-                   </select>
+                  <select
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none transition-all cursor-pointer"
+                    value={editStudent.center?._id || editStudent.center || ""}
+                    onChange={(e) => setEditStudent({ ...editStudent, center: e.target.value })}
+                  >
+                    <option value="">Select Center</option>
+                    {centers.map(c => <option key={c._id} value={c._id}>{c.name} - {c.location}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -779,6 +1033,83 @@ const Students = () => {
                 <button onClick={handleUpdate} className="px-12 py-3.5 bg-brand-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">Verify & Sync</button>
               </div>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* Send Reminder Modal */}
+      {reminderConfig.isOpen && reminderConfig.student && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Bell size={20} className="text-blue-500" /> Send Reminder to {reminderConfig.student.user?.name}
+              </h2>
+              <button onClick={() => setReminderConfig({ isOpen: false, student: null })} className="text-slate-400 hover:text-slate-600">
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSendReminder} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Reminder Type</label>
+                <select 
+                  name="type" 
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  required
+                >
+                  <option value="fee_reminder">Fee Reminder</option>
+                  <option value="admin_notice">Administrative Notice</option>
+                  <option value="personal">General Task</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Title</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  placeholder="e.g. Please pay pending Term 1 Fees"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Description (Optional)</label>
+                <textarea
+                  name="description"
+                  rows={2}
+                  placeholder="Additional details..."
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Due Date (Optional)</label>
+                <input
+                  type="date"
+                  name="dueDate"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setReminderConfig({ isOpen: false, student: null })}
+                  className="px-5 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm"
+                >
+                  Send Reminder
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

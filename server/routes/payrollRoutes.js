@@ -27,19 +27,50 @@ router.get("/salary/all", protect, async (req, res) => {
     if (internOnly === "true") {
       const Student = require("../models/Student");
       const students = await Student.find({ status: "active", "internships.0": { $exists: true } }).populate("user");
-      targetUsers = students.map(s => {
-        const latestInternship = s.internships[s.internships.length - 1];
-        const salary = latestInternship?.salary ? Number(latestInternship.salary) : 0;
-        return {
-          _id: s._id,
-          user: s.user?._id,
-          firstName: s.user?.name || s.studentNameEnglish,
-          lastName: "",
-          department: "Intern",
-          salary: salary,
-          shift: { start: "09:30" },
-          isIntern: true
-        };
+      
+      students.forEach(s => {
+        const activeInternships = (s.internships || []).filter(internship => {
+          if (internship.status !== 'active' && internship.status !== 'completed') return false;
+          
+          const iStart = new Date(internship.startDate);
+          iStart.setHours(0, 0, 0, 0);
+          
+          const iEnd = internship.endDate ? new Date(internship.endDate) : null;
+          if (iEnd) iEnd.setHours(23, 59, 59, 999);
+          
+          // Check overlap with current month (startDate to endDate)
+          if (iStart > endDate) return false;
+          if (iEnd && iEnd < startDate) return false;
+          
+          return true;
+        });
+        
+        activeInternships.forEach(internship => {
+          const salary = internship.salary ? Number(internship.salary) : 0;
+          let overlapStart = new Date(Math.max(startDate.getTime(), new Date(internship.startDate).getTime()));
+          overlapStart.setHours(0, 0, 0, 0);
+          
+          let overlapEnd = new Date(endDate);
+          if (internship.endDate) {
+            overlapEnd = new Date(Math.min(endDate.getTime(), new Date(internship.endDate).getTime()));
+            overlapEnd.setHours(23, 59, 59, 999);
+          }
+          
+          targetUsers.push({
+            _id: s._id,
+            user: s.user?._id,
+            firstName: s.user?.name || s.studentNameEnglish,
+            lastName: "",
+            department: "Intern",
+            salary: salary,
+            shift: { start: "09:30" },
+            isIntern: true,
+            internshipId: internship._id,
+            vendorName: internship.vendorName,
+            overlapStart,
+            overlapEnd
+          });
+        });
       });
     } else {
       targetUsers = await Employee.find({ status: "active" });
@@ -53,7 +84,9 @@ router.get("/salary/all", protect, async (req, res) => {
           return {
             sNo: index + 1,
             employeeId: emp._id,
-            name: `${emp.firstName} ${emp.lastName}`,
+            internshipId: emp.internshipId,
+            vendorName: emp.vendorName,
+            name: `${emp.firstName} ${emp.lastName}` + (emp.vendorName ? ` (${emp.vendorName})` : ""),
             department: emp.department,
             basic: emp.salary,
             allowances: 0,
@@ -70,16 +103,26 @@ router.get("/salary/all", protect, async (req, res) => {
         }
 
         // 1. Fetch Payroll Record (for adjustments)
-        const payroll = await Payroll.findOne({
+        const payrollQuery = {
           employee: emp._id,
           month: m,
           year: y
-        });
+        };
+        if (emp.internshipId) {
+          payrollQuery.internshipId = emp.internshipId;
+        } else {
+          payrollQuery.internshipId = { $in: [null, undefined] };
+        }
+        
+        const payroll = await Payroll.findOne(payrollQuery);
 
         // 2. Fetch Attendance Records
+        const attStart = emp.overlapStart || startDate;
+        const attEnd = emp.overlapEnd || endDate;
+        
         const attendance = await Attendance.find({
           userId,
-          date: { $gte: startDate, $lte: endDate }
+          date: { $gte: attStart, $lte: attEnd }
         });
 
         const present = attendance.length;
@@ -88,8 +131,8 @@ router.get("/salary/all", protect, async (req, res) => {
         const leaves = await Leave.find({
           userId: userId.toString(),
           status: "approved",
-          startDate: { $lte: endDate },
-          endDate: { $gte: startDate }
+          startDate: { $lte: attEnd },
+          endDate: { $gte: attStart }
         });
 
         const absent = leaves.length;
@@ -132,10 +175,11 @@ router.get("/salary/all", protect, async (req, res) => {
         return {
           sNo: index + 1,
           employeeId: emp._id,
-          userId: userId,
-          name: `${emp.firstName} ${emp.lastName}`,
+          internshipId: emp.internshipId,
+          vendorName: emp.vendorName,
+          name: `${emp.firstName} ${emp.lastName}`.trim() + (emp.vendorName ? ` (${emp.vendorName})` : ""),
           department: emp.department,
-          basic,
+          basic: emp.salary,
           allowances,
           deductions,
           advance,
@@ -152,6 +196,7 @@ router.get("/salary/all", protect, async (req, res) => {
           lateDays,
           lateTime: lateTimeDisplay,
           netSalary,
+          status: payroll ? payroll.status : "processing",
           _id: payroll ? payroll._id : null
         };
       })
@@ -166,43 +211,126 @@ router.get("/salary/all", protect, async (req, res) => {
 });
 
 
+// BULK UPDATE STATUS
+router.post("/bulk-status", protect, async (req, res) => {
+  try {
+    const { records, month, year, status } = req.body;
+    if (!records || !Array.isArray(records) || !month || !year || !status) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (!["processing", "hold"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const { Student } = require("../models/Student"); // Need to fetch base salaries for missing payrolls
+
+    for (const record of records) {
+      const { employeeId, internshipId } = record;
+      const query = { employee: employeeId, month: Number(month), year: Number(year) };
+      if (internshipId) query.internshipId = internshipId;
+      else query.internshipId = { $in: [null, undefined] };
+      
+      let payroll = await Payroll.findOne(query);
+      
+      if (!payroll) {
+        // We need to create a default payroll record so we can persist the status
+        let salary = 0;
+        let employee = await Employee.findById(employeeId);
+        
+        if (employee) {
+          salary = employee.salary;
+        } else {
+          const StudentModel = require("../models/Student");
+          employee = await StudentModel.findById(employeeId);
+          if (employee && employee.internships) {
+             const internship = employee.internships.find(i => i._id.toString() === internshipId);
+             if (internship) salary = internship.salary ? Number(internship.salary) : 0;
+          } else if (employee) {
+             const latestInternship = employee.internships?.[employee.internships.length - 1];
+             salary = latestInternship?.salary ? Number(latestInternship.salary) : 0;
+          }
+        }
+
+        if (employee) {
+          payroll = new Payroll({
+            employee: employeeId,
+            month: Number(month),
+            year: Number(year),
+            internshipId: internshipId || null,
+            basicSalary: salary,
+            totalAllowances: 0,
+            totalDeductions: 0,
+            advance: 0,
+            adjustments: [],
+            status: status
+          });
+          // Note: we don't calculate netSalary, let it default or remain 0 since basic is salary
+          payroll.netSalary = salary; 
+          await payroll.save();
+        }
+      } else {
+        payroll.status = status;
+        await payroll.save();
+      }
+    }
+
+    res.status(200).json({ message: `Successfully updated ${records.length} records to ${status}` });
+  } catch (err) {
+    console.error("Bulk status update error:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
 // CREATE / UPDATE PAYROLL ADJUSTMENT
 router.post("/adjustment", protect, async (req, res) => {
   try {
 
-    const { employeeId, month, year, type, amount, note } = req.body;
+    const { employeeId, month, year, type, amount, note, internshipId } = req.body;
 
     if (!employeeId || !month || !year || !type || !amount) {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    let payroll = await Payroll.findOne({
+    const query = {
       employee: employeeId,
       month: Number(month),
       year: Number(year)
-    });
+    };
+    if (internshipId) query.internshipId = internshipId;
+    else query.internshipId = { $in: [null, undefined] };
+
+    let payroll = await Payroll.findOne(query);
 
     if (!payroll) {
       let salary = 0;
-      let employee = await Employee.findById(employeeId);
+      let emp = await Employee.findById(employeeId);
       
-      if (employee) {
-        salary = employee.salary;
+      if (emp) {
+        salary = emp.salary;
       } else {
         const Student = require("../models/Student");
-        employee = await Student.findById(employeeId);
-        if (employee) {
-          const latestInternship = employee.internships?.[employee.internships.length - 1];
-          salary = latestInternship?.salary ? Number(latestInternship.salary) : 0;
-        } else {
-          return res.status(404).json({ message: "Employee/Intern not found" });
+        emp = await Student.findById(employeeId);
+        if (emp && emp.internships) {
+          const internship = emp.internships.find(i => i._id.toString() === internshipId);
+          if (internship) salary = internship.salary ? Number(internship.salary) : 0;
+          else {
+            const latestInternship = emp.internships?.[emp.internships.length - 1];
+            salary = latestInternship?.salary ? Number(latestInternship.salary) : 0;
+          }
         }
+      }
+
+      if (!emp) {
+        return res.status(404).json({ message: "Employee/Intern not found" });
       }
 
       payroll = new Payroll({
         employee: employeeId,
         month: Number(month),
         year: Number(year),
+        internshipId: internshipId || null,
         basicSalary: salary,
         totalAllowances: 0,
         totalDeductions: 0,
@@ -256,13 +384,22 @@ router.get('/payslip/:id', protect, async (req, res) => {
       const Student = require("../models/Student");
       const student = await Student.findById(payrollRaw.employee).populate('user');
       if (student) {
+        let internDept = "Intern";
+        if (student.internships && payrollRaw.internshipId) {
+          const internship = student.internships.find(i => i._id.toString() === payrollRaw.internshipId.toString());
+          if (internship && internship.vendorName) {
+            internDept = `Intern (${internship.vendorName})`;
+          }
+        }
+        
         emp = {
           _id: student._id,
           user: student.user?._id,
           firstName: student.user?.name || student.studentNameEnglish,
           lastName: "",
-          department: "Intern",
-          shift: { start: "09:30" }
+          department: internDept,
+          shift: { start: "09:30" },
+          internshipId: payrollRaw.internshipId
         };
       } else {
         return res.status(404).json({ message: "Employee/Intern not found for this payroll" });
@@ -274,9 +411,33 @@ router.get('/payslip/:id', protect, async (req, res) => {
     // Recalculate Attendance precisely since it is not saved to Payroll model continuously
     const m = payroll.month;
     const y = payroll.year;
-    const startDate = new Date(y, m - 1, 1);
-    const endDate = new Date(y, m, 0, 23, 59, 59, 999);
-    const totalDaysInMonth = endDate.getDate();
+    
+    let startDate = new Date(y, m - 1, 1);
+    let endDate = new Date(y, m, 0, 23, 59, 59, 999);
+    let totalDaysInMonth = endDate.getDate();
+    
+    if (emp.internshipId) {
+       const Student = require("../models/Student");
+       const s = await Student.findById(payrollRaw.employee);
+       if (s && s.internships) {
+          const internship = s.internships.find(i => i._id.toString() === emp.internshipId.toString());
+          if (internship) {
+            const iStart = new Date(internship.startDate);
+            iStart.setHours(0,0,0,0);
+            if (iStart > startDate) startDate = iStart;
+            
+            if (internship.endDate) {
+               const iEnd = new Date(internship.endDate);
+               iEnd.setHours(23,59,59,999);
+               if (iEnd < endDate) endDate = iEnd;
+            }
+            
+            // Calculate days for the internship portion of the month
+            const diffTime = Math.abs(endDate - startDate);
+            totalDaysInMonth = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          }
+       }
+    }
 
     let present = 0;
     let absent = 0;
@@ -353,9 +514,18 @@ router.get('/payslip/:id', protect, async (req, res) => {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthName = monthNames[m - 1];
 
+    let payslipPeriod = `Payslip for ${monthName} ${y}`;
+    if (emp.internshipId) {
+      const sDateStr = startDate.getDate().toString().padStart(2, '0') + '-' + monthNames[startDate.getMonth()].substring(0,3);
+      const eDateStr = endDate.getDate().toString().padStart(2, '0') + '-' + monthNames[endDate.getMonth()].substring(0,3);
+      if (startDate.getDate() !== 1 || endDate.getDate() !== new Date(y, m, 0).getDate()) {
+         payslipPeriod = `${monthName} ${y} (${sDateStr} to ${eDateStr})`;
+      }
+    }
+
     doc.fillColor('#ffffff')
        .fontSize(14).font('Helvetica-Bold')
-       .text(`Payslip for ${monthName} ${y}`, doc.page.width - 250, 45, { align: 'right' });
+       .text(payslipPeriod, doc.page.width - 250, 45, { align: 'right' });
 
     // ===============================
     // EMPLOYEE DETAILS SECTION

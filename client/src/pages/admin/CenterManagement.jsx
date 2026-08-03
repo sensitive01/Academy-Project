@@ -81,9 +81,10 @@ const CenterManagement = () => {
     name: "",
     email: "",
     password: "",
+    role: "center"
   });
   const [isSavingLogin, setIsSavingLogin] = useState(false);
-  const [loginExists, setLoginExists] = useState(false);
+  const [centerUsers, setCenterUsers] = useState([]);
 
   // Assign Subjects State
   const [showAssignSubjectModal, setShowAssignSubjectModal] = useState(false);
@@ -264,17 +265,12 @@ const CenterManagement = () => {
 
   const openLoginModal = async (center) => {
     setCurrentId(center._id);
-    setLoginData({ name: center.name, email: "", password: "" });
-    setLoginExists(false);
+    setLoginData({ name: center.name, email: "", password: "", role: "center" });
+    setCenterUsers([]);
     try {
       const { data } = await api.get(`/centers/${center._id}/login`);
-      if (data) {
-        setLoginData({
-          name: data.name || center.name,
-          email: data.email || "",
-          password: "", // Don't show password
-        });
-        setLoginExists(true);
+      if (data && data.length > 0) {
+        setCenterUsers(data);
       }
     } catch (error) {
       console.error("Error fetching login:", error);
@@ -288,7 +284,10 @@ const CenterManagement = () => {
     try {
       await api.post(`/centers/${currentId}/login`, loginData);
       toast.success("Center login saved successfully");
-      setShowLoginModal(false);
+      // refresh users
+      const { data } = await api.get(`/centers/${currentId}/login`);
+      setCenterUsers(data);
+      setLoginData({ ...loginData, email: "", password: "" });
     } catch (error) {
       toast.error(error.response?.data?.message || "Error saving login");
     } finally {
@@ -857,71 +856,101 @@ const CenterManagement = () => {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl scale-in-center">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                <Key size={20} />
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-start justify-center p-4 py-10">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl scale-in-center">
+            <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <Key size={20} />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Manage Center Logins</h2>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Manage Center Login</h2>
+              <button onClick={() => setShowLoginModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Display Name</label>
-                <input
-                  type="text"
-                  required
-                  readOnly={loginExists}
-                  className={`w-full rounded-xl border border-gray-200 p-3 ${loginExists ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
-                  value={loginData.name}
-                  onChange={(e) => setLoginData({ ...loginData, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  readOnly={loginExists}
-                  className={`w-full rounded-xl border border-gray-200 p-3 ${loginExists ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
-                  value={loginData.email}
-                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  {loginExists ? "Update Password" : "Password"}
-                </label>
-                <input
-                  type="password"
-                  className="w-full rounded-xl border border-gray-200 p-3"
-                  placeholder={loginExists ? "••••••••" : "Enter new password..."}
-                  value={loginData.password}
-                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                />
-                {loginExists && (
-                  <p className="mt-1 text-xs text-brand-600 font-medium">
-                    * Password is already set. Enter a new one only if you wish to change it.
-                  </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Existing Users List */}
+              <div className="border-r border-slate-100 pr-6">
+                <h3 className="text-sm font-bold text-slate-700 mb-4">Existing Accounts</h3>
+                {centerUsers.length === 0 ? (
+                  <p className="text-sm text-slate-500">No accounts created for this center yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {centerUsers.map(u => (
+                      <div key={u._id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+                        <div className="overflow-hidden">
+                          <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                        </div>
+                        <div className="px-2 py-1 bg-brand-50 text-brand-700 text-[10px] font-bold rounded capitalize whitespace-nowrap">
+                          {u.role.replace('-', ' ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="flex justify-end gap-3 mt-8">
-                <button
-                  type="button"
-                  onClick={() => setShowLoginModal(false)}
-                  className="px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingLogin}
-                  className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 shadow-md transition-all disabled:opacity-50"
-                >
-                  {isSavingLogin ? "Saving..." : "Save Login Details"}
-                </button>
+
+              {/* Create/Update Form */}
+              <div>
+                <h3 className="text-sm font-bold text-slate-700 mb-4">Create or Update Account</h3>
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+                    <select
+                      required
+                      className="w-full rounded-xl border border-gray-200 p-2.5 bg-white text-sm"
+                      value={loginData.role}
+                      onChange={(e) => setLoginData({ ...loginData, role: e.target.value })}
+                    >
+                      <option value="center">Center Admin</option>
+                      <option value="center-hr">Center HR</option>
+                      <option value="center-finance">Center Finance</option>
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1">* Creating an account for an existing role will update it.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Display Name</label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm"
+                      value={loginData.name}
+                      onChange={(e) => setLoginData({ ...loginData, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm"
+                      placeholder="Enter password..."
+                      value={loginData.password}
+                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingLogin}
+                      className="w-full py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 shadow-md transition-all disabled:opacity-50"
+                    >
+                      {isSavingLogin ? "Saving..." : "Save Account"}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

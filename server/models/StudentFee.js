@@ -24,7 +24,7 @@ const studentFeeSchema = new mongoose.Schema({
   feeType: {
     type: String,
     required: true,
-    enum: ['Term', 'Exam', 'Other']
+    enum: ['Term', 'Exam', 'Other', 'Monthly']
   },
   otherFeeType: {
     type: String
@@ -40,6 +40,30 @@ const studentFeeSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'paid'],
     default: 'pending'
+  },
+  
+  // Penalty Tracking Fields
+  dueDate: {
+    type: Date
+  },
+  penaltyAmount: {
+    type: Number,
+    default: 0
+  },
+  finalDueDate: {
+    type: Date
+  },
+  finalPenaltyAmount: {
+    type: Number,
+    default: 0
+  },
+  isPenaltyApplied: {
+    type: Boolean,
+    default: false
+  },
+  isFinalPenaltyApplied: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 

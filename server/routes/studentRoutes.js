@@ -564,7 +564,7 @@ router.patch('/:id/status', protect, admin, async (req, res) => {
 //////////////////////////////////////////////////////
 router.post("/:id/promote-intern", protect, async (req, res) => {
   try {
-    const { vendorId, location, startDate, endDate, paymentBy, salary } = req.body;
+    const { vendorId, location, startDate, endDate, paymentBy, salary, vendorPayment, referralCharge, isNewPeriod } = req.body;
 
     if (req.user.role !== 'admin' && req.user.role !== 'hr') {
       return res.status(403).json({ message: "Only admin or HR can promote a student" });
@@ -588,14 +588,17 @@ router.post("/:id/promote-intern", protect, async (req, res) => {
       endDate,
       paymentBy,
       salary,
+      vendorPayment,
+      referralCharge,
       status: 'active'
     };
 
-    if (student.internships && student.internships.length > 0) {
+    if (student.internships && student.internships.length > 0 && !isNewPeriod) {
       // Update the last internship
       const lastIndex = student.internships.length - 1;
       student.internships.set(lastIndex, internshipData);
     } else {
+      // Add as new internship period
       student.internships.push(internshipData);
     }
 

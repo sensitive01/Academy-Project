@@ -42,6 +42,42 @@ const [selectedAdjustmentData, setSelectedAdjustmentData] = useState([]);
 const [selectedAdjustmentType, setSelectedAdjustmentType] = useState("");
 const [selectedAdjustmentEmployee, setSelectedAdjustmentEmployee] = useState(null);
 
+const [payslipModalOpen, setPayslipModalOpen] = useState(false);
+const [currentPayslipUrl, setCurrentPayslipUrl] = useState(null);
+const [currentPayslipName, setCurrentPayslipName] = useState("");
+
+const [selectedTableRows, setSelectedTableRows] = useState([]);
+const [toggleClearRows, setToggleClearRows] = useState(false);
+
+const handleRowSelected = React.useCallback(state => {
+  setSelectedTableRows(state.selectedRows);
+}, []);
+
+const handleStatusUpdate = async (records, status) => {
+  if (!records || records.length === 0) return;
+  if (!selectedMonth) return;
+  const [year, month] = selectedMonth.split("-");
+  
+  try {
+    const payload = {
+      records,
+      month: Number(month),
+      year: Number(year),
+      status
+    };
+    await api.post("/payroll/bulk-status", payload, {
+      headers: { Authorization: `Bearer ${user.token || localStorage.getItem('token')}` }
+    });
+    toast.success(`Successfully set ${records.length} records to ${status}`);
+    setToggleClearRows(!toggleClearRows);
+    setSelectedTableRows([]);
+    await fetchPayrolls();
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to update status");
+  }
+};
+
 const viewAdjustments = (employee, type) => {
   const data = (employee.adjustments || []).filter(a => a.type === type);
   setSelectedAdjustmentData(data);
@@ -155,12 +191,13 @@ if (!salaryData.adjustmentAmount) return toast.error("Enter amount");
 try {
 const [year, month] = salaryData.adjustmentMonth.split("-");
 const payload = {
-employeeId: selectedEmployee._id,
+employeeId: selectedEmployee.employeeId || selectedEmployee._id,
 type: salaryData.adjustmentType,
 month: Number(month),
 year: Number(year),
 amount: salaryData.adjustmentAmount,
-note: salaryData.adjustmentNote || ""
+note: salaryData.adjustmentNote || "",
+internshipId: selectedEmployee.internshipId || undefined
 };
 
 await api.post("/payroll/adjustment", payload);
@@ -227,22 +264,21 @@ const calculateHours = (login, logout) => {
 
 const generatePayslip = async (payrollId, employeeName) => {
   console.log("Generating payslip for:", payrollId, employeeName);
+  const toastId = toast.loading("Generating Payslip...");
   try {
     const res = await api.get(`/payroll/payslip/${payrollId}`, {
       responseType: "blob"
     });
     console.log("Response received:", res);
 
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `payslip_${employeeName || payrollId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+    setCurrentPayslipUrl(url);
+    setCurrentPayslipName(`payslip_${employeeName || payrollId}.pdf`);
+    setPayslipModalOpen(true);
+    toast.success("Payslip generated successfully", { id: toastId });
   } catch (err) {
     console.error("generatePayslip error:", err.response || err);
-    toast.error("Failed to download payslip");
+    toast.error("Failed to generate payslip", { id: toastId });
   }
 };
 
@@ -278,8 +314,12 @@ const generatePayslip = async (payrollId, employeeName) => {
       name: 'Action', center: true, width: '110px',
       cell: row => (
         <div className="flex flex-col gap-1.5 w-full items-center">
-          <select className="bg-white border border-gray-300 text-slate-700 px-2 py-1 rounded text-[11px] font-bold w-full outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer shadow-sm text-center">
-            <option value="process">Process</option>
+          <select 
+            value={row.status || "processing"}
+            onChange={(e) => handleStatusUpdate([{employeeId: row.employeeId, internshipId: row.internshipId}], e.target.value)}
+            className={`border px-2 py-1 rounded text-[11px] font-bold w-full outline-none focus:ring-1 cursor-pointer shadow-sm text-center ${row.status === 'hold' ? 'bg-orange-100 border-orange-300 text-orange-700 focus:border-orange-500 focus:ring-orange-500' : 'bg-white border-gray-300 text-slate-700 focus:border-brand-500 focus:ring-brand-500'}`}
+          >
+            <option value="processing">Process</option>
             <option value="hold">Hold</option>
           </select>
           {row._id && (
@@ -365,13 +405,35 @@ const generatePayslip = async (payrollId, employeeName) => {
           </div>
         </div>
 
-        <button
-          onClick={openPayrollForm}
-          className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2.5 rounded-lg hover:from-red-600 hover:to-red-700 transition shadow-md shadow-red-200 font-medium"
-        >
-          <Plus size={18} />
-          Add Adjustment
-        </button>
+        <div className="flex items-center gap-3">
+          {selectedTableRows.length > 0 && (
+            <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 px-3 py-2 rounded-lg">
+              <span className="text-sm font-semibold text-orange-700 mr-2">
+                {selectedTableRows.length} selected
+              </span>
+              <button
+                onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId, internshipId: r.internshipId})), "hold")}
+                className="bg-orange-500 text-white text-xs px-3 py-1.5 rounded hover:bg-orange-600 transition shadow-sm font-bold"
+              >
+                Hold Selected
+              </button>
+              <button
+                onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId, internshipId: r.internshipId})), "processing")}
+                className="bg-brand-600 text-white text-xs px-3 py-1.5 rounded hover:bg-brand-700 transition shadow-sm font-bold"
+              >
+                Process Selected
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={openPayrollForm}
+            className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2.5 rounded-lg hover:from-red-600 hover:to-red-700 transition shadow-md shadow-red-200 font-medium"
+          >
+            <Plus size={18} />
+            Add Adjustment
+          </button>
+        </div>
       </div>
       )}
 
@@ -389,6 +451,9 @@ const generatePayslip = async (payrollId, employeeName) => {
               progressPending={loading}
               pointerOnHover={false}
               paginationPerPage={15}
+              selectableRows={true}
+              onSelectedRowsChange={handleRowSelected}
+              clearSelectedRows={toggleClearRows} // resets selection after bulk action
             />
       </div>
 
@@ -568,6 +633,52 @@ const generatePayslip = async (payrollId, employeeName) => {
               >
                 Save Adjustment
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* PAYSLIP PREVIEW MODAL */}
+      {payslipModalOpen && currentPayslipUrl && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[10000] p-4 sm:p-6">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">
+                  Payslip Preview
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {currentPayslipName}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <a
+                  href={currentPayslipUrl}
+                  download={currentPayslipName}
+                  className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-brand-700 transition"
+                >
+                  Download PDF
+                </a>
+                <button
+                  onClick={() => {
+                    setPayslipModalOpen(false);
+                    // Revoke object URL after a delay to ensure the modal closes properly
+                    setTimeout(() => URL.revokeObjectURL(currentPayslipUrl), 100);
+                  }}
+                  className="bg-white rounded-full p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition shadow-sm border"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 w-full bg-gray-100 overflow-hidden relative">
+              <iframe 
+                src={currentPayslipUrl} 
+                className="w-full h-full border-none"
+                title="Payslip PDF"
+              />
             </div>
           </div>
         </div>,

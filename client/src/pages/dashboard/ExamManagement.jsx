@@ -350,6 +350,8 @@ const ExamManagement = () => {
   };
 
   const filteredStudentFees = studentFees.filter(f => {
+    if (f.feeType !== 'Exam') return false;
+    
     if (searchQuery) {
       return f.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) || 
              f.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase());

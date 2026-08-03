@@ -160,6 +160,8 @@ const studentSchema = new mongoose.Schema(
         endDate: Date,
         paymentBy: String,
         salary: String,
+        vendorPayment: String,
+        referralCharge: String,
         status: { type: String, enum: ['active', 'completed', 'terminated'], default: 'active' }
       }
     ],
