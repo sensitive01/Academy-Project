@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -20,6 +22,8 @@ import Payroll from "../payroll/Payroll";
 import OnlineCoursePayments from "../../components/payments/OnlineCoursePayments";
 import StudentFeesList from "../../components/payments/StudentFeesList";
 import VendorPaymentsList from "../../components/payments/VendorPaymentsList";
+import PendingApprovalsList from "../../components/payments/PendingApprovalsList";
+import { CheckSquare } from "lucide-react";
 
 const PlaceholderTable = ({ title, description }) => {
   return (
@@ -46,12 +50,33 @@ const PlaceholderTable = ({ title, description }) => {
 const PaymentsHub = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [cashBalance, setCashBalance] = useState(null);
 
   // Initialize mainTab from URL if present
   const initialMainTab = location.pathname.includes("outward") ? "outward" : "inward";
   const [mainTab, setMainTab] = useState(initialMainTab);
   const [inwardTab, setInwardTab] = useState("online_course");
   const [outwardTab, setOutwardTab] = useState("expense");
+
+  // Fetch cash balance if center
+  useEffect(() => {
+    if (user?.role === 'center' || user?.role === 'center-finance') {
+      const fetchCenterBalance = async () => {
+        try {
+          const res = await api.get('/centers');
+          const centerId = typeof user.center === 'object' ? user.center?._id : user.center;
+          const myCenter = res.data.find(c => c._id === centerId);
+          if (myCenter) {
+            setCashBalance(myCenter.cashBalance || 0);
+          }
+        } catch (err) {
+          console.error("Failed to fetch cash balance", err);
+        }
+      };
+      fetchCenterBalance();
+    }
+  }, [user, mainTab, inwardTab]); // Re-fetch on tab change to get fresh balance
 
   // Sync state when URL changes externally (e.g. clicking sidebar)
   useEffect(() => {
@@ -74,6 +99,7 @@ const PaymentsHub = () => {
     term_fees: { label: "Term Fees", icon: <CalendarDays size={18} /> },
     monthly_fees: { label: "Monthly Fees", icon: <CalendarDays size={18} /> },
     vendor_payments: { label: "Vendor Payments", icon: <Building size={18} /> },
+    approvals: { label: "Pending Approvals", icon: <CheckSquare size={18} /> },
     others: { label: "Others", icon: <MoreHorizontal size={18} /> },
   };
 
@@ -92,6 +118,13 @@ const PaymentsHub = () => {
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Payments Hub</h1>
           <p className="text-slate-500 text-sm font-medium mt-1">Manage all inward revenue and outward expenditures.</p>
         </div>
+
+        {cashBalance !== null && (
+          <div className="bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 shadow-sm text-center">
+            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Center Cash Balance</p>
+            <p className="text-xl font-black text-emerald-800 tracking-tight">₹{cashBalance.toLocaleString('en-IN')}</p>
+          </div>
+        )}
 
         {/* Main Inward/Outward Toggle */}
         <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
@@ -164,6 +197,7 @@ const PaymentsHub = () => {
             {inwardTab === "vendor_payments" && (
               <VendorPaymentsList />
             )}
+            {inwardTab === "approvals" && <PendingApprovalsList />}
             {inwardTab === "others" && <StudentFeesList feeType="Other" />}
           </>
         ) : (

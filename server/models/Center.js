@@ -13,6 +13,17 @@ const centerSchema = new mongoose.Schema(
     },
     location: String,
     description: String,
+    cashBalance: {
+      type: Number,
+      default: 0,
+    },
+    bankDetails: {
+      accountName: String,
+      accountNumber: String,
+      ifscCode: String,
+      bankName: String,
+      upiId: String,
+    },
   },
   { timestamps: true }
 );

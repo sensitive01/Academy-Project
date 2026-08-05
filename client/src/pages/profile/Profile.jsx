@@ -27,6 +27,7 @@ const Profile = () => {
   // Role Specific Profiles
   const [studentProfile, setStudentProfile] = useState(null);
   const [employeeProfile, setEmployeeProfile] = useState(null);
+  const [centerProfile, setCenterProfile] = useState(null);
 
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
 
@@ -95,6 +96,17 @@ const Profile = () => {
             }
         } catch (error) {
             console.log("No employee profile found");
+        }
+      } else if (userData.role === "center") {
+        try {
+          const cRes = await api.get("/centers");
+          const targetCenterId = typeof userData.center === 'object' ? userData.center._id : userData.center;
+          const matchedCenter = cRes.data.find(c => c._id === targetCenterId);
+          if (matchedCenter) {
+            setCenterProfile(matchedCenter);
+          }
+        } catch (error) {
+          console.log("Error fetching center profile");
         }
       }
 
@@ -170,6 +182,13 @@ const Profile = () => {
 
   const updateEmployeeField = (field, value) => {
       setEmployeeProfile(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateCenterBank = (field, value) => {
+      setCenterProfile(prev => ({
+          ...prev,
+          bankDetails: { ...(prev.bankDetails || {}), [field]: value }
+      }));
   };
 
   const updateStudentArray = (parentField, index, field, value) => {
@@ -276,6 +295,10 @@ const Profile = () => {
              headers: { "Content-Type": "multipart/form-data" }
           });
       } else {
+          // If role is center, also update the center model
+          if (authUser?.role === "center" && centerProfile) {
+            await api.put(`/centers/${centerProfile._id}`, { bankDetails: centerProfile.bankDetails });
+          }
           res = await api.put("/auth/profile", data, {
              headers: { "Content-Type": "multipart/form-data" }
           });
@@ -570,6 +593,20 @@ const Profile = () => {
                                     </div>
                                 )}
                             </div>
+                          </div>
+                        </SectionCard>
+                      </div>
+                    )}
+
+                    {centerProfile && authUser?.role === "center" && (
+                      <div className="space-y-8 mt-6">
+                        <SectionCard title="Center Bank Details (For Online Fee Collection)" icon={<CreditCard size={20} />}>
+                          <div className="grid md:grid-cols-2 gap-5">
+                            <InputCard label="Account Name" value={centerProfile.bankDetails?.accountName} onChange={(e)=>updateCenterBank("accountName", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="Account Number" value={centerProfile.bankDetails?.accountNumber} onChange={(e)=>updateCenterBank("accountNumber", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="Bank Name" value={centerProfile.bankDetails?.bankName} onChange={(e)=>updateCenterBank("bankName", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="IFSC Code" value={centerProfile.bankDetails?.ifscCode} onChange={(e)=>updateCenterBank("ifscCode", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="UPI ID (Important for QR)" value={centerProfile.bankDetails?.upiId} onChange={(e)=>updateCenterBank("upiId", e.target.value)} isEditing={isEditingPersonal} />
                           </div>
                         </SectionCard>
                       </div>

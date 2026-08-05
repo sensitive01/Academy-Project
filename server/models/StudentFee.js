@@ -38,8 +38,25 @@ const studentFeeSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'paid'],
+    enum: ['pending', 'paid', 'pending_approval'],
     default: 'pending'
+  },
+  paymentMode: {
+    type: String,
+    enum: ['Cash', 'Online', 'Bank']
+  },
+  proofOfPayment: {
+    type: String
+  },
+  bankReference: {
+    type: String
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['Pending', 'Approved', 'Rejected']
+  },
+  paidAt: {
+    type: Date
   },
   
   // Penalty Tracking Fields

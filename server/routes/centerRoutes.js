@@ -51,6 +51,7 @@ router.put("/:id", protect, async (req, res) => {
     if (name) center.name = name;
     if (location) center.location = location;
     if (description) center.description = description;
+    if (req.body.bankDetails) center.bankDetails = req.body.bankDetails;
 
     await center.save();
 

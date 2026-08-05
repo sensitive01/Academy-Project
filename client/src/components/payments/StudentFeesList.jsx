@@ -3,6 +3,7 @@ import api from "../../services/api";
 import CustomDataTable from "../DataTable";
 import toast from "react-hot-toast";
 import AddStudentFeeModal from "../AddStudentFeeModal";
+import CollectPaymentModal from "./CollectPaymentModal";
 
 const StudentFeesList = ({ feeType }) => {
   const [fees, setFees] = useState([]);
@@ -11,6 +12,8 @@ const StudentFeesList = ({ feeType }) => {
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showCollectModal, setShowCollectModal] = useState(false);
+  const [selectedFee, setSelectedFee] = useState(null);
   
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -68,6 +71,18 @@ const StudentFeesList = ({ feeType }) => {
       toast.success("Status updated");
     } catch (err) {
       toast.error("Failed to update status");
+    }
+  };
+
+  const handleCollectPayment = async (id, data) => {
+    try {
+      const res = await api.post(`/student-fees/${id}/collect`, data);
+      setFees(fees.map(f => f._id === id ? res.data : f));
+      setShowCollectModal(false);
+      setSelectedFee(null);
+      toast.success("Payment processed successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to process payment");
     }
   };
 
@@ -170,17 +185,33 @@ const StudentFeesList = ({ feeType }) => {
       selector: row => row.status, 
       sortable: true, 
       center: true,
-      cell: row => (
-        <button 
-          onClick={() => handleToggleStatus(row._id)}
-          className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors ${
-            row.status === "paid" ? "bg-green-100 text-green-700 hover:bg-green-200" :
-            "bg-orange-100 text-orange-700 hover:bg-orange-200"
-          }`}
-        >
-          {row.status}
-        </button>
-      )
+      cell: row => {
+        if (row.status === 'paid') {
+          return (
+            <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-green-100 text-green-700">
+              PAID {row.paymentMode ? `(${row.paymentMode})` : ''}
+            </span>
+          );
+        } else if (row.status === 'pending_approval') {
+          return (
+            <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700">
+              Pending Approval
+            </span>
+          );
+        } else {
+          return (
+            <button 
+              onClick={() => {
+                setSelectedFee(row);
+                setShowCollectModal(true);
+              }}
+              className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors bg-orange-100 text-orange-700 hover:bg-orange-200"
+            >
+              Collect
+            </button>
+          );
+        }
+      }
     },
     { 
       name: "Date", width:"110px",
@@ -229,6 +260,16 @@ const StudentFeesList = ({ feeType }) => {
           centers={centers}
           courses={courses}
           batches={batches}
+        />
+      )}
+      {showCollectModal && selectedFee && (
+        <CollectPaymentModal
+          fee={selectedFee}
+          onClose={() => {
+            setShowCollectModal(false);
+            setSelectedFee(null);
+          }}
+          onSave={handleCollectPayment}
         />
       )}
     </div>

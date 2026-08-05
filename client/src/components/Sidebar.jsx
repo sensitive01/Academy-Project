@@ -207,6 +207,14 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
     { icon: <CalendarCheck size={22} />, label: "Attendance", path: "/dashboard/attendance" },
+    {
+      icon: <CreditCard size={22} />,
+      label: "Payments",
+      subItems: [
+        { label: "Inward", path: "/dashboard/payments/inward" },
+        { label: "Outward", path: "/dashboard/payments/outward" }
+      ]
+    },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
     { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
@@ -223,6 +231,14 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const centerFinanceItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    {
+      icon: <CreditCard size={22} />,
+      label: "Payments",
+      subItems: [
+        { label: "Inward", path: "/dashboard/payments/inward" },
+        { label: "Outward", path: "/dashboard/payments/outward" }
+      ]
+    },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
     { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
