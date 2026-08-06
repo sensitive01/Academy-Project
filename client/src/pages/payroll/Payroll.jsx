@@ -598,7 +598,7 @@ const generatePayslip = async (payrollId, employeeName) => {
                   <span className="absolute left-4 top-3 text-gray-500 font-medium">₹</span>
                   <input
                     type="number"
-                    placeholder="0"
+                    placeholder="0.00"
                     className="w-full border border-gray-300 pl-8 p-2.5 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-gray-50 font-medium text-gray-800"
                     value={salaryData.adjustmentAmount || ""}
                     onChange={(e) =>

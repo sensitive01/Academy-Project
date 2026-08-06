@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
 import CustomDataTable from "../DataTable";
+import { downloadReceipt } from "../../utils/downloadReceipt";
+import { Download } from "lucide-react";
 
 const OnlineCoursePayments = () => {
   const [payments, setPayments] = useState([]);
@@ -83,6 +85,22 @@ const OnlineCoursePayments = () => {
       selector: row => row.createdAt, 
       sortable: true, 
       cell: row => <span className="text-gray-600 font-medium">{new Date(row.createdAt).toLocaleDateString("en-GB")}</span> 
+    },
+    {
+      name: "Action",
+      center: true,
+      width: "100px",
+      cell: row => (
+        (row.status === "success" || row.status === "paid") && (
+          <button 
+            onClick={() => downloadReceipt(`/payment/invoice/${row._id}`, `Receipt_${row._id}.pdf`)}
+            className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
+            title="Download Receipt"
+          >
+            <Download size={16} />
+          </button>
+        )
+      )
     }
   ];
 

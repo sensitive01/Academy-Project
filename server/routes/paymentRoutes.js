@@ -323,9 +323,7 @@ router.get("/my-subscriptions", protect, async (req, res) => {
   }
 });
 
-/////////////////////////////////////////////////////////////
-// GENERATE INVOICE PDF
-/////////////////////////////////////////////////////////////
+const { generateReceiptPDF } = require("../utils/receiptGenerator");
 
 router.get("/invoice/:id", protect, async (req, res) => {
   try {
@@ -337,109 +335,35 @@ router.get("/invoice/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Payment record not found" });
     }
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const data = {
+      documentTitle: "TAX INVOICE",
+      receiptNo: payment._id.toString().substring(0, 8).toUpperCase(),
+      date: payment.createdAt,
+      transactionId: payment.razorpayPaymentId || "MANUAL",
+      billedTo: {
+        name: payment.student?.studentNameEnglish || "Student",
+        id: payment.student?._id.toString().substring(0, 8).toUpperCase(),
+        email: payment.student?.email || "",
+        phone: payment.student?.phone || ""
+      },
+      items: [
+        {
+          description: payment.course?.title || "Course Enrollment",
+          qty: 1,
+          amount: payment.amount
+        }
+      ],
+      totalAmount: payment.amount,
+      status: payment.status
+    };
 
-    const filename = `Invoice_${payment.razorpayPaymentId || payment._id}.pdf`;
-    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-    res.setHeader('Content-Type', 'application/pdf');
-
-    doc.pipe(res);
-
-    // Colors & Fonts
-    const primaryColor = '#0f172a'; // Slate-900
-    const accentColor = '#3b82f6';  // Blue-500
-    const textDark = '#1e293b';
-    const textLight = '#64748b';
-    const borderColor = '#e2e8f0';
-
-    // Header / Logo area
-    doc.fillColor(primaryColor)
-      .fontSize(24).font('Helvetica-Bold')
-      .text("DR ACADEMY", 50, 50);
-
-    doc.fontSize(10).font('Helvetica')
-      .fillColor(textLight)
-      .text("Empowering Excellence in Education", 50, 80);
-
-    // Invoice Header
-    doc.fillColor(primaryColor)
-      .fontSize(20).font('Helvetica-Bold')
-      .text("TAX INVOICE", doc.page.width - 250, 50, { align: 'right' });
-
-    doc.fontSize(10).font('Helvetica')
-      .fillColor(textLight)
-      .text(`Invoice No: INV-${payment._id.toString().substring(0, 8).toUpperCase()}`, doc.page.width - 250, 75, { align: 'right' })
-      .text(`Date: ${new Date(payment.createdAt).toLocaleDateString('en-IN')}`, doc.page.width - 250, 90, { align: 'right' })
-      .text(`Transaction ID: ${payment.razorpayPaymentId || 'MANUAL'}`, doc.page.width - 250, 105, { align: 'right' });
-
-    doc.moveDown(3);
-
-    // Bill To & Company Info
-    const startY = 150;
-
-    // Left: Bill To
-    doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold').text("BILL TO:", 50, startY);
-    doc.fontSize(10).font('Helvetica').fillColor(textDark);
-    doc.text(payment.student?.studentNameEnglish || "Student", 50, startY + 20)
-      .text(`ID: ${payment.student?._id.toString().substring(0, 8).toUpperCase()}`, 50, startY + 35)
-      .text(payment.student?.email || "", 50, startY + 50)
-      .text(payment.student?.phone || "", 50, startY + 65);
-
-    // Right: Center/Company Info
-    doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold').text("ISSUED BY:", 300, startY);
-    doc.fontSize(10).font('Helvetica').fillColor(textDark);
-    doc.text("DR Academy HQ", 300, startY + 20)
-      .text("123 Education Lane, Knowledge Park", 300, startY + 35)
-      .text("Chennai, Tamil Nadu - 600001", 300, startY + 50)
-      .text("Contact: +91 98765 43210", 300, startY + 65);
-
-    doc.moveDown(4);
-
-    // Table Header
-    const tableTop = 260;
-    doc.rect(50, tableTop, doc.page.width - 100, 25).fill(primaryColor);
-    doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold');
-    doc.text("Item Description", 60, tableTop + 7);
-    doc.text("Qty", 350, tableTop + 7, { width: 50, align: 'center' });
-    doc.text("Amount", 450, tableTop + 7, { width: 80, align: 'right' });
-
-    // Table Row
-    const rowY = tableTop + 35;
-    doc.fillColor(textDark).font('Helvetica').fontSize(10);
-    doc.text(`${payment.course?.title || 'Course Enrollment'}`, 60, rowY, { width: 280 });
-    doc.text("1", 350, rowY, { width: 50, align: 'center' });
-    doc.text(`INR ${payment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, rowY, { width: 80, align: 'right' });
-
-    // Summary Lines
-    const summaryY = rowY + 50;
-    doc.moveTo(300, summaryY).lineTo(530, summaryY).lineWidth(0.5).strokeColor(borderColor).stroke();
-
-    doc.fillColor(textLight).fontSize(10).text("Total Amount:", 300, summaryY + 20);
-    doc.fillColor(primaryColor).font('Helvetica-Bold').text(`INR ${payment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 450, summaryY + 20, { width: 80, align: 'right' });
-
-    // Amount in Words
-    try {
-      const words = toWords.toWords(payment.amount).replace(/-/g, ' ');
-      doc.moveDown(3);
-      doc.fillColor(textLight).fontSize(9).font('Helvetica-Oblique')
-        .text(`Amount in words: Rupees ${words} only.`, 50, summaryY + 60);
-    } catch (e) { }
-
-    // Status Stamp
-    if (payment.status === 'success') {
-      doc.rect(50, summaryY + 100, 100, 40).lineWidth(2).strokeColor('#22c55e').stroke();
-      doc.fillColor('#22c55e').fontSize(16).font('Helvetica-Bold').text("PAID", 50, summaryY + 112, { width: 100, align: 'center' });
-    }
-
-    // Footer
-    doc.fontSize(8).fillColor(textLight)
-      .text("This is an electronically generated invoice and does not require a physical signature.", 0, doc.page.height - 50, { align: 'center' });
-
-    doc.end();
+    generateReceiptPDF(res, data);
 
   } catch (error) {
     console.error("Invoice generation error:", error);
-    res.status(500).json({ message: "Failed to generate invoice" });
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Failed to generate invoice" });
+    }
   }
 });
 

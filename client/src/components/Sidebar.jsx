@@ -135,6 +135,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <FileText size={22} />, label: "Exam Management", path: "/dashboard/exams" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },
   ];
 
   // ================= ADMIN / HR MENU =================
@@ -151,6 +152,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
         { label: "Outward", path: "/dashboard/payments/outward" }
       ]
     },
+    { icon: <FileText size={22} />, label: "Examination", path: "/dashboard/exams" },
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
     { icon: <Briefcase size={22} />, label: "Vendor Mgmt", path: "/dashboard/admin/vendors" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
@@ -215,6 +217,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
         { label: "Outward", path: "/dashboard/payments/outward" }
       ]
     },
+    { icon: <FileText size={22} />, label: "Examination", path: "/dashboard/exams" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
     { icon: <ListTodo size={22} />, label: "Reminders", path: "/dashboard/reminders" },

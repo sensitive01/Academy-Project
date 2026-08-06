@@ -38,69 +38,74 @@ const CourseDashboardTab = () => {
   if (loading) return <Loading />;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Online Courses</p>
-            <p className="text-3xl font-black text-slate-900 mt-2">{courses.filter(c => c.courseType === 'Online Courses').length}</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-blue-50 text-blue-600 group-hover:rotate-12 transition-all shrink-0">
-            <BookOpen size={26} strokeWidth={2.5} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Center Courses</p>
-            <p className="text-3xl font-black text-slate-900 mt-2">{courses.filter(c => c.courseType === 'Center Courses').length}</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:rotate-12 transition-all shrink-0">
-            <BookOpen size={26} strokeWidth={2.5} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Total Batches</p>
-            <p className="text-3xl font-black text-slate-900 mt-2">{batches.length}</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:rotate-12 transition-all shrink-0">
-            <Layers size={26} strokeWidth={2.5} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Total Subjects</p>
-            <p className="text-3xl font-black text-slate-900 mt-2">{subjects.length}</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-amber-50 text-amber-600 group-hover:rotate-12 transition-all shrink-0">
-            <BookType size={26} strokeWidth={2.5} />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-          <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Course Quick Stats</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="flex items-center gap-3">
-                <BookOpen className="text-brand-500" size={20} />
-                <span className="font-bold text-slate-700">Total Unique Courses</span>
-              </div>
-              <span className="text-lg font-black text-slate-900">{courses.length}</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="flex items-center gap-3">
-                <MapPin className="text-indigo-500" size={20} />
-                <span className="font-bold text-slate-700">Active Centers</span>
-              </div>
-              <span className="text-lg font-black text-slate-900">{centers.length}</span>
+        
+        {/* Minimalist Card 1 */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-slate-500">Total Courses</span>
+            <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center">
+              <BookOpen size={16} className="text-brand-600" />
             </div>
           </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-slate-900">{courses.length}</span>
+          </div>
+          <div className="mt-4 flex gap-4 text-xs font-medium text-slate-400">
+            <span>Online: <span className="text-slate-700">{courses.filter(c => c.type === 'Online Courses').length}</span></span>
+            <span>Center: <span className="text-slate-700">{courses.filter(c => c.type === 'Center Courses').length}</span></span>
+          </div>
         </div>
+
+        {/* Minimalist Card 2 */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-slate-500">Total Batches</span>
+            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+              <Layers size={16} className="text-emerald-600" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-slate-900">{batches.length}</span>
+          </div>
+          <div className="mt-4 text-xs font-medium text-slate-400">
+            Active training groups
+          </div>
+        </div>
+
+        {/* Minimalist Card 3 */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-slate-500">Total Subjects</span>
+            <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
+              <BookType size={16} className="text-amber-600" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-slate-900">{subjects.length}</span>
+          </div>
+          <div className="mt-4 text-xs font-medium text-slate-400">
+            Curriculum modules
+          </div>
+        </div>
+
+        {/* Minimalist Card 4 */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-slate-500">Active Centers</span>
+            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
+              <MapPin size={16} className="text-indigo-600" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold text-slate-900">{centers.length}</span>
+          </div>
+          <div className="mt-4 text-xs font-medium text-slate-400">
+            Operational branches
+          </div>
+        </div>
+
       </div>
     </div>
   );

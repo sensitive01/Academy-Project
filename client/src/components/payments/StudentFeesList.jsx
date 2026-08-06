@@ -4,6 +4,8 @@ import CustomDataTable from "../DataTable";
 import toast from "react-hot-toast";
 import AddStudentFeeModal from "../AddStudentFeeModal";
 import CollectPaymentModal from "./CollectPaymentModal";
+import { downloadReceipt } from "../../utils/downloadReceipt";
+import { Download } from "lucide-react";
 
 const StudentFeesList = ({ feeType }) => {
   const [fees, setFees] = useState([]);
@@ -33,7 +35,7 @@ const StudentFeesList = ({ feeType }) => {
       ]);
       setStudents(studentsRes.data.students || studentsRes.data || []);
       setCenters(centersRes.data || []);
-      setCourses(coursesRes.data || []);
+      setCourses(coursesRes.data?.filter(c => c.type === "Center Courses") || []);
       setBatches(batchesRes.data || []);
     } catch (err) {
       console.error(err);
@@ -224,9 +226,20 @@ const StudentFeesList = ({ feeType }) => {
       center: true,
       width: "100px",
       cell: row => (
-        <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-        </button>
+        <div className="flex items-center gap-1">
+          {row.status === "paid" && (
+            <button 
+              onClick={() => downloadReceipt(`/student-fees/${row._id}/receipt`, `FeeReceipt_${row._id}.pdf`)}
+              className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
+              title="Download Receipt"
+            >
+              <Download size={16} />
+            </button>
+          )}
+          <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+          </button>
+        </div>
       )
     }
   ];

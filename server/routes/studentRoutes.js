@@ -599,6 +599,21 @@ router.post("/:id/promote-intern", protect, async (req, res) => {
       student.internships.set(lastIndex, internshipData);
     } else {
       // Add as new internship period
+      if (student.internships && student.internships.length > 0) {
+        // Safely close out the old period
+        const lastIndex = student.internships.length - 1;
+        const prevInternship = student.internships[lastIndex];
+        prevInternship.status = 'completed';
+        
+        // If it didn't have an end date, set it to the day before the new one starts
+        if (!prevInternship.endDate && startDate) {
+          const newStart = new Date(startDate);
+          const prevEnd = new Date(newStart);
+          prevEnd.setDate(newStart.getDate() - 1);
+          prevInternship.endDate = prevEnd;
+        }
+        student.internships.set(lastIndex, prevInternship);
+      }
       student.internships.push(internshipData);
     }
 

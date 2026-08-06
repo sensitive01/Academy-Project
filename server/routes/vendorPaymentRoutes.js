@@ -67,4 +67,48 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// Generate receipt/voucher PDF
+router.get('/:id/receipt', async (req, res) => {
+  try {
+    const payment = await VendorPayment.findById(req.params.id)
+      .populate("vendor", "companyName contactPerson email phone");
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment record not found' });
+    }
+
+    const { generateReceiptPDF } = require('../utils/receiptGenerator');
+
+    const data = {
+      documentTitle: "PAYMENT VOUCHER",
+      receiptNo: payment._id.toString().substring(0, 8).toUpperCase(),
+      date: payment.date || payment.createdAt,
+      transactionId: "N/A",
+      billedTo: {
+        name: payment.vendor?.companyName || "Vendor",
+        id: "VENDOR",
+        email: payment.vendor?.email || "",
+        phone: payment.vendor?.contactPerson || payment.vendor?.phone || ""
+      },
+      items: [
+        {
+          description: payment.title || "Vendor Payment",
+          qty: 1,
+          amount: payment.amount
+        }
+      ],
+      totalAmount: payment.amount,
+      status: payment.status
+    };
+
+    generateReceiptPDF(res, data);
+
+  } catch (error) {
+    console.error("Receipt generation error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  }
+});
+
 module.exports = router;

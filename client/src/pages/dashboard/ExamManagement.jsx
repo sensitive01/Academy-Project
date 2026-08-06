@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import MarksheetModal from "../../components/MarksheetModal";
 import BulkEditMarksModal from "../../components/BulkEditMarksModal";
 import AddStudentFeeModal from "../../components/AddStudentFeeModal";
+import StudentFeesList from "../../components/payments/StudentFeesList";
 
 const ExamManagement = () => {
   const { user } = useAuth();
@@ -78,7 +79,7 @@ const ExamManagement = () => {
         isAdmin ? api.get("/student-fees") : Promise.resolve({ data: [] })
       ]);
       setExams(examsRes.data);
-      setCourses(coursesRes.data);
+      setCourses(coursesRes.data.filter(c => c.type === "Center Courses"));
       setCenters(centersRes.data);
       setBatches(batchesRes.data);
       setSubjects(subjectsRes.data);
@@ -652,7 +653,7 @@ const ExamManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Examination Management</h1>
-          <p className="text-sm text-slate-500">Manage academy examinations, schedules, and student marks</p>
+          <p className="text-sm text-slate-500">Manage academy examinations, schedules, and student results</p>
         </div>
         <div className="flex gap-2">
         {isAdmin && activeTab === "exams" && (
@@ -675,11 +676,6 @@ const ExamManagement = () => {
           </>
         )}
 
-        {isAdmin && activeTab === "payments" && (
-          <button onClick={() => setShowPaymentModal(true)} className="bg-brand-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 shadow-md shadow-brand-600/20 transition-all hover:scale-[1.02]">
-            <Plus size={20} /> Add Fees
-          </button>
-        )}
         </div>
       </div>
 
@@ -699,17 +695,20 @@ const ExamManagement = () => {
           }`}
           onClick={() => setActiveTab("marks")}
         >
-          <CheckSquare size={18} /> Marks
+          <CheckSquare size={18} /> Results
         </button>
         {isAdmin && (
-          <button
-            className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === "payments" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-            }`}
-            onClick={() => setActiveTab("payments")}
-          >
-            <DollarSign size={18} /> Fees
-          </button>
+          <>
+
+            <button
+              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
+                activeTab === "payments_list" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+              }`}
+              onClick={() => setActiveTab("payments_list")}
+            >
+              <DollarSign size={18} /> Payments
+            </button>
+          </>
         )}
       </div>
 
@@ -724,15 +723,8 @@ const ExamManagement = () => {
             setSearch={setSearchQuery}
             searchPlaceholder="Search exams by name or course..."
           />
-        ) : activeTab === "payments" ? (
-          <CustomDataTable
-            columns={paymentColumns}
-            data={filteredStudentFees}
-            progressPending={loading}
-            search={searchQuery}
-            setSearch={setSearchQuery}
-            searchPlaceholder="Search payments by student name or ID..."
-          />
+        ) : activeTab === "payments_list" ? (
+          <StudentFeesList feeType="Exam" />
         ) : (
           <CustomDataTable
             columns={markColumns}
@@ -934,16 +926,7 @@ const ExamManagement = () => {
         />
       )}
 
-      {showPaymentModal && (
-        <AddStudentFeeModal
-          onClose={() => setShowPaymentModal(false)}
-          onSave={handlePaymentSubmit}
-          students={students}
-          centers={centers}
-          courses={courses}
-          batches={batches}
-        />
-      )}
+
     </div>
   );
 };

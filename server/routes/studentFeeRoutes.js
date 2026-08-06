@@ -207,4 +207,84 @@ router.patch('/:id/approve', protect, async (req, res) => {
   }
 });
 
+// Generate receipt PDF
+router.get('/:id/receipt', protect, async (req, res) => {
+  try {
+    const fee = await StudentFee.findById(req.params.id)
+      .populate('student', 'studentNameEnglish studentId email phone')
+      .populate('center', 'name bankDetails')
+      .populate('course', 'title')
+      .populate('batch', 'name');
+
+    if (!fee) {
+      return res.status(404).json({ message: 'Fee record not found' });
+    }
+
+    const { generateReceiptPDF } = require('../utils/receiptGenerator');
+
+    const totalDue = fee.amount + 
+      (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + 
+      (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+
+    let feeDescription = `${fee.course?.title || 'Course'} - ${fee.feeType} Fee`;
+    if (fee.feeType === 'Term' && fee.terms && fee.terms.length > 0) {
+      feeDescription += ` (Term ${fee.terms.join(', ')})`;
+    }
+    
+    const items = [
+      {
+        description: feeDescription,
+        qty: 1,
+        amount: fee.amount
+      }
+    ];
+
+    if (fee.isPenaltyApplied && fee.penaltyAmount > 0) {
+      items.push({
+        description: "Late Fee Penalty",
+        qty: 1,
+        amount: fee.penaltyAmount
+      });
+    }
+
+    if (fee.isFinalPenaltyApplied && fee.finalPenaltyAmount > 0) {
+      items.push({
+        description: "Final Late Fee Penalty",
+        qty: 1,
+        amount: fee.finalPenaltyAmount
+      });
+    }
+
+    const data = {
+      documentTitle: "FEE RECEIPT",
+      receiptNo: fee._id.toString().substring(0, 8).toUpperCase(),
+      date: fee.paidAt || fee.createdAt,
+      transactionId: fee.bankReference || fee.proofOfPayment || (fee.paymentMode === 'Cash' ? 'CASH' : 'N/A'),
+      billedTo: {
+        name: fee.student?.studentNameEnglish || "Student",
+        id: fee.student?.studentId || fee.student?._id?.toString().substring(0, 8).toUpperCase() || "",
+        email: fee.student?.email || "",
+        phone: fee.student?.phone || ""
+      },
+      issuedBy: {
+        name: fee.center?.name || "DR Academy Center",
+        addressLine1: fee.center?.bankDetails ? `Bank: ${fee.center.bankDetails}` : "",
+        addressLine2: "",
+        contact: ""
+      },
+      items,
+      totalAmount: totalDue,
+      status: fee.status
+    };
+
+    generateReceiptPDF(res, data);
+
+  } catch (error) {
+    console.error("Receipt generation error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  }
+});
+
 module.exports = router;

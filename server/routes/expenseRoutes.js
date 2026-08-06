@@ -403,4 +403,55 @@ router.get("/payments", async (req, res) => {
   }
 });
 
+// =================================================
+// ============== GENERATE RECEIPT PDF =============
+// =================================================
+
+router.get("/:id/receipt", protect, async (req, res) => {
+  try {
+    const expense = await Expense.findById(req.params.id)
+      .populate("submittedBy", "name email");
+
+    if (!expense) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    if (expense.status !== "reimbursed" || expense.reimbursement?.status !== "paid") {
+      return res.status(400).json({ message: "Expense is not fully reimbursed yet" });
+    }
+
+    const { generateReceiptPDF } = require("../utils/receiptGenerator");
+
+    const data = {
+      documentTitle: "REIMBURSEMENT VOUCHER",
+      receiptNo: expense._id.toString().substring(0, 8).toUpperCase(),
+      date: expense.reimbursement?.paidAt || Date.now(),
+      transactionId: expense.reimbursement?.transactionId || "N/A",
+      billedTo: {
+        name: expense.submittedBy?.name || "Employee",
+        id: expense.submittedBy?._id.toString().substring(0, 8).toUpperCase(),
+        email: expense.submittedBy?.email || "",
+        phone: ""
+      },
+      items: [
+        {
+          description: expense.title || "Expense Reimbursement",
+          qty: 1,
+          amount: expense.amount
+        }
+      ],
+      totalAmount: expense.amount,
+      status: "PAID"
+    };
+
+    generateReceiptPDF(res, data);
+
+  } catch (error) {
+    console.error("Receipt generation error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  }
+});
+
 module.exports = router;

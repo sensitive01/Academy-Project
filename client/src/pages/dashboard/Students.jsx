@@ -33,7 +33,8 @@ import {
   CalendarRange,
   Plus,
   LayoutDashboard,
-  UploadCloud
+  UploadCloud,
+  Settings
 } from "lucide-react";
 import CustomDataTable from "../../components/DataTable";
 import Attendance from "../../pages/attendance/Attendance";
@@ -121,7 +122,7 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
         return (
           <div className="flex items-center gap-1.5">
             <div className={`p-0.5 px-2 rounded-md text-[10px] font-black uppercase tracking-widest border truncate ${isIntern ? "text-amber-700 border-amber-200 bg-amber-50" :
-                (row.center ? "text-brand-700 border-brand-200 bg-brand-50" : "text-emerald-700 border-emerald-200 bg-emerald-50")
+              (row.center ? "text-brand-700 border-brand-200 bg-brand-50" : "text-emerald-700 border-emerald-200 bg-emerald-50")
               }`}>
               {type}
             </div>
@@ -211,12 +212,12 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
                         <Edit2 size={16} className="text-amber-500" /> Edit Current Internship
                       </button>
                       <button onClick={() => { onPromote(row, true); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                        <Briefcase size={16} className="text-green-500" /> New Internship Period
+                        <Settings size={16} className="text-blue-500" /> Intern Settings
                       </button>
                     </>
                   )}
                   <div className="h-px bg-slate-100 my-1 mx-2"></div>
-                  
+
                   <button onClick={() => { onSendReminder(row); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                     <Bell size={16} className="text-blue-500" /> Send Reminder
                   </button>
@@ -552,89 +553,74 @@ const Students = () => {
 
       {/* Content Area */}
       {activeTab === "dashboard" ? (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-in fade-in duration-500">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Total Students</p>
-                <p className="text-3xl font-black text-slate-900 mt-2">{students.length}</p>
-              </div>
-              <div className="p-4 rounded-2xl bg-blue-50 text-blue-600 group-hover:rotate-12 transition-all shrink-0">
-                <Users size={26} strokeWidth={2.5} />
-              </div>
-            </div>
             
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Online Students</p>
-                <p className="text-3xl font-black text-slate-900 mt-2">{students.filter(s => !s.center).length}</p>
+            {/* Minimalist Card 1 */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-medium text-slate-500">Total Students</span>
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                  <Users size={16} className="text-blue-600" />
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:rotate-12 transition-all shrink-0">
-                <Laptop size={26} strokeWidth={2.5} />
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-slate-900">{students.length}</span>
+              </div>
+              <div className="mt-4 flex gap-4 text-xs font-medium text-slate-400">
+                <span>Active: <span className="text-slate-700">{students.filter(s => s.status === 'active').length}</span></span>
+                <span>Inactive: <span className="text-slate-700">{students.filter(s => s.status !== 'active').length}</span></span>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Center Students</p>
-                <p className="text-3xl font-black text-slate-900 mt-2">{students.filter(s => !!s.center).length}</p>
+            {/* Minimalist Card 2 */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-medium text-slate-500">Online Students</span>
+                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
+                  <Laptop size={16} className="text-indigo-600" />
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:rotate-12 transition-all shrink-0">
-                <Building2 size={26} strokeWidth={2.5} />
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-slate-900">{students.filter(s => !s.center).length}</span>
+              </div>
+              <div className="mt-4 text-xs font-medium text-slate-400">
+                Remote learners
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none truncate">Active Interns</p>
-                <p className="text-3xl font-black text-slate-900 mt-2">{students.filter(s => s.internships?.length > 0).length}</p>
+            {/* Minimalist Card 3 */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-medium text-slate-500">Center Students</span>
+                <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <Building2 size={16} className="text-emerald-600" />
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-amber-50 text-amber-600 group-hover:rotate-12 transition-all shrink-0">
-                <Briefcase size={26} strokeWidth={2.5} />
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-slate-900">{students.filter(s => !!s.center).length}</span>
+              </div>
+              <div className="mt-4 text-xs font-medium text-slate-400">
+                In-person learners
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Status Overview</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="text-emerald-500" size={20} />
-                    <span className="font-bold text-slate-700">Active Students</span>
-                  </div>
-                  <span className="text-lg font-black text-slate-900">{students.filter(s => s.status === 'active').length}</span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <Ban className="text-red-500" size={20} />
-                    <span className="font-bold text-slate-700">Blocked / Inactive</span>
-                  </div>
-                  <span className="text-lg font-black text-slate-900">{students.filter(s => s.status !== 'active').length}</span>
+            {/* Minimalist Card 4 */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-medium text-slate-500">Active Interns</span>
+                <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
+                  <Briefcase size={16} className="text-amber-600" />
                 </div>
               </div>
-            </div>
-            
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Academic Distribution</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <GraduationCap className="text-brand-500" size={20} />
-                    <span className="font-bold text-slate-700">Unique Departments</span>
-                  </div>
-                  <span className="text-lg font-black text-slate-900">{[...new Set(students.map(s => s.department).filter(Boolean))].length}</span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <MapPin className="text-indigo-500" size={20} />
-                    <span className="font-bold text-slate-700">Active Centers</span>
-                  </div>
-                  <span className="text-lg font-black text-slate-900">{centers.length}</span>
-                </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-slate-900">{students.filter(s => s.internships?.length > 0).length}</span>
+              </div>
+              <div className="mt-4 text-xs font-medium text-slate-400">
+                Currently on internship
               </div>
             </div>
+
           </div>
         </div>
       ) : ["online_students", "center_students"].includes(activeTab) ? (
@@ -673,7 +659,7 @@ const Students = () => {
               </select>
               <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
                 <option value="">All Courses</option>
-                {courses.map(c => <option key={c._id} value={c._id}>{c.title || c.name}</option>)}
+                {courses.filter(c => c.type === "Center Courses").map(c => <option key={c._id} value={c._id}>{c.title || c.name}</option>)}
               </select>
               <select className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
                 <option value="">All Batches</option>
@@ -707,9 +693,9 @@ const Students = () => {
                     startDate: isNewPeriod ? "" : (latest.startDate ? latest.startDate.split('T')[0] : ""),
                     endDate: isNewPeriod ? "" : (latest.endDate ? latest.endDate.split('T')[0] : ""),
                     paymentBy: latest.paymentBy || "",
-                    vendorPayment: isNewPeriod ? "" : (latest.vendorPayment || ""),
-                    salary: isNewPeriod ? "" : (latest.salary || ""),
-                    referralCharge: isNewPeriod ? "" : (latest.referralCharge || ""),
+                    vendorPayment: latest.vendorPayment || "",
+                    salary: latest.salary || "",
+                    referralCharge: latest.referralCharge || "",
                     isNewPeriod: isNewPeriod
                   });
                 } else {
@@ -800,7 +786,7 @@ const Students = () => {
                 </div>
                 <div>
                   <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Vendor Payment</label>
-                  <input type="number" required placeholder="00.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.vendorPayment} onChange={(e) => {
+                  <input type="number" required placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.vendorPayment} onChange={(e) => {
                     const val = e.target.value;
                     const vp = Number(val) || 0;
                     const sal = Number(promoteForm.salary) || 0;
@@ -811,7 +797,7 @@ const Students = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Student Salary</label>
-                  <input type="number" required placeholder="00.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.salary} onChange={(e) => {
+                  <input type="number" required placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all" value={promoteForm.salary} onChange={(e) => {
                     const val = e.target.value;
                     const vp = Number(promoteForm.vendorPayment) || 0;
                     const sal = Number(val) || 0;
@@ -820,7 +806,7 @@ const Students = () => {
                 </div>
                 <div>
                   <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Referral Charge</label>
-                  <input type="number" readOnly placeholder="00.00" className="w-full px-4 py-3 bg-slate-100 border border-slate-200 text-slate-500 rounded-2xl text-sm font-bold outline-none cursor-not-allowed" value={promoteForm.referralCharge} />
+                  <input type="number" readOnly placeholder="0.00" className="w-full px-4 py-3 bg-slate-100 border border-slate-200 text-slate-500 rounded-2xl text-sm font-bold outline-none cursor-not-allowed" value={promoteForm.referralCharge} />
                 </div>
               </div>
               <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-50">
@@ -1049,12 +1035,12 @@ const Students = () => {
                 <XCircle size={24} />
               </button>
             </div>
-            
+
             <form onSubmit={handleSendReminder} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Reminder Type</label>
-                <select 
-                  name="type" 
+                <select
+                  name="type"
                   className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                   required
                 >
@@ -1063,7 +1049,7 @@ const Students = () => {
                   <option value="personal">General Task</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Title</label>
                 <input

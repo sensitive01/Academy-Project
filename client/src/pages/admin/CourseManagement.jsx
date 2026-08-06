@@ -1,10 +1,7 @@
 import React, { useState } from "react";
-import { BookOpen, MapPin, Layers, FileText, CheckSquare, DollarSign, BookType, LayoutDashboard } from "lucide-react";
+import { BookOpen, MapPin, Layers, BookType, LayoutDashboard } from "lucide-react";
 import CoursesTab from "../../components/course-management/CoursesTab";
 import BatchesTab from "../../components/course-management/BatchesTab";
-import ExamsTab from "../../components/course-management/ExamsTab";
-import ResultsTab from "../../components/course-management/ResultsTab";
-import FeesTab from "../../components/course-management/FeesTab";
 import SubjectsTab from "../../components/course-management/SubjectsTab";
 import CourseDashboardTab from "../../components/course-management/CourseDashboardTab";
 
@@ -16,9 +13,6 @@ const CourseManagement = () => {
     { id: "online_courses", label: "Online Courses", icon: <BookOpen size={18} /> },
     { id: "center_courses", label: "Center Courses", icon: <MapPin size={18} /> },
     { id: "batch", label: "Batches", icon: <Layers size={18} /> },
-    { id: "exam", label: "Exams", icon: <FileText size={18} /> },
-    { id: "result", label: "Results", icon: <CheckSquare size={18} /> },
-    { id: "fee", label: "Fees", icon: <DollarSign size={18} /> },
     { id: "subject", label: "Subjects", icon: <BookType size={18} /> },
   ];
 
@@ -27,7 +21,7 @@ const CourseManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Course Management</h1>
-          <p className="text-sm text-gray-500">Manage courses, batches, exams, results, fees, and subjects</p>
+          <p className="text-sm text-gray-500">Manage courses, batches, and subjects</p>
         </div>
       </div>
 
@@ -37,17 +31,15 @@ const CourseManagement = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-4 px-2 text-sm font-bold flex items-center gap-2 transition-colors relative whitespace-nowrap group ${
-              activeTab === tab.id
+            className={`pb-4 px-2 text-sm font-bold flex items-center gap-2 transition-colors relative whitespace-nowrap group ${activeTab === tab.id
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"
-            }`}
+              }`}
           >
             {tab.icon}
             {tab.label}
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === tab.id ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === tab.id ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
         ))}
       </div>
@@ -58,9 +50,6 @@ const CourseManagement = () => {
         {activeTab === "online_courses" && <CoursesTab courseType="Online Courses" />}
         {activeTab === "center_courses" && <CoursesTab courseType="Center Courses" />}
         {activeTab === "batch" && <BatchesTab />}
-        {activeTab === "exam" && <ExamsTab />}
-        {activeTab === "result" && <ResultsTab />}
-        {activeTab === "fee" && <FeesTab />}
         {activeTab === "subject" && <SubjectsTab />}
       </div>
     </div>

@@ -10,12 +10,14 @@ import {
   Edit,
   Trash2,
   Banknote,
+  Download,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import AddExpenseModal from "./AddExpenseModel";
 import CustomDataTable from "../../components/DataTable";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
+import { downloadReceipt } from "../../utils/downloadReceipt";
 
 const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const [expenses, setExpenses] = useState([]);
@@ -135,6 +137,17 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
               )}
               {user.role === "admin" && row.status === "approved" && (
                 <button onClick={() => handleReimburse(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition"><Banknote size={16} /> Reimburse</button>
+              )}
+              {row.status === "reimbursed" && (
+                <button 
+                  onClick={() => {
+                    downloadReceipt(`/expenses/${row._id}/receipt`, `Reimbursement_${row._id}.pdf`);
+                    setOpenMenuId(null);
+                  }} 
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-brand-600 hover:bg-brand-50 transition border-b border-gray-100"
+                >
+                  <Download size={16} /> Download Voucher
+                </button>
               )}
               <button onClick={() => handleDelete(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition border-t border-gray-100"><Trash2 size={16} /> Delete</button>
             </div>

@@ -78,7 +78,7 @@ const ExamsTab = () => {
         isAdmin ? api.get("/student-fees") : Promise.resolve({ data: [] })
       ]);
       setExams(examsRes.data);
-      setCourses(coursesRes.data);
+      setCourses(coursesRes.data.filter(c => c.type === "Center Courses"));
       setCenters(centersRes.data);
       setBatches(batchesRes.data);
       setSubjects(subjectsRes.data);
