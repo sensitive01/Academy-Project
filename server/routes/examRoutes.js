@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const Exam = require('../models/Exam');
+const Student = require('../models/Student');
 const { protect } = require('../middleware/authMiddleware');
+const { createInAppNotification } = require('../utils/notificationUtils');
+
 
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
@@ -61,6 +64,24 @@ router.post('/', protect, isAdmin, async (req, res) => {
       externalMark: Number(externalMark || 0),
       theoryMark: Number(theoryMark || 0)
     });
+
+    // Notify enrolled students in the specific center
+    if (course && center) {
+      const students = await Student.find({ "enrolledCourses.course": course, center: center }).select("user");
+      for (const student of students) {
+        if (student.user) {
+          await createInAppNotification({
+            recipient: student.user,
+            sender: req.user._id,
+            type: "exam_created",
+            title: "New Exam Scheduled",
+            message: `A new exam "${name}" has been scheduled for ${new Date(date).toLocaleDateString()}.`,
+            entityId: exam._id.toString()
+          });
+        }
+      }
+    }
+
     res.status(201).json(exam);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -91,6 +112,24 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
     if (theoryMark !== undefined) exam.theoryMark = Number(theoryMark);
 
     await exam.save();
+
+    // Notify enrolled students in the specific center
+    if (exam.course && exam.center) {
+      const students = await Student.find({ "enrolledCourses.course": exam.course, center: exam.center }).select("user");
+      for (const student of students) {
+        if (student.user) {
+          await createInAppNotification({
+            recipient: student.user,
+            sender: req.user._id,
+            type: "exam_updated",
+            title: "Exam Updated",
+            message: `The details for the exam "${exam.name}" have been updated.`,
+            entityId: exam._id.toString()
+          });
+        }
+      }
+    }
+
     res.json(exam);
   } catch (error) {
     res.status(400).json({ message: error.message });

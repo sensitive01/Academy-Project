@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const StudentFee = require('../models/StudentFee');
 const Center = require('../models/Center');
+const Student = require('../models/Student');
 const { protect } = require('../middleware/authMiddleware');
+const { createInAppNotification } = require('../utils/notificationUtils');
+
 
 // Get all student fees
 router.get('/', protect, async (req, res) => {
@@ -71,10 +74,22 @@ router.post('/', protect, async (req, res) => {
       finalPenaltyAmount: finalPenaltyAmount || 0
     });
 
-    await fee.populate('student', 'studentNameEnglish studentId');
+    await fee.populate('student', 'studentNameEnglish studentId user');
     await fee.populate('center', 'name bankDetails');
     await fee.populate('course', 'title');
     await fee.populate('batch', 'name');
+
+    // Notify student
+    if (fee.student && fee.student.user) {
+      await createInAppNotification({
+        recipient: fee.student.user,
+        sender: req.user._id,
+        type: "fee_assigned",
+        title: "New Fee Assigned",
+        message: `A new fee of ₹${amount} has been assigned to you.`,
+        entityId: fee._id.toString()
+      });
+    }
 
     res.status(201).json(fee);
   } catch (error) {
@@ -93,10 +108,22 @@ router.patch('/:id/toggle-status', protect, async (req, res) => {
     fee.status = fee.status === 'paid' ? 'pending' : 'paid';
     await fee.save();
     
-    await fee.populate('student', 'studentNameEnglish studentId');
+    await fee.populate('student', 'studentNameEnglish studentId user');
     await fee.populate('center', 'name bankDetails');
     await fee.populate('course', 'title');
     await fee.populate('batch', 'name');
+
+    // Notify student if paid
+    if (fee.status === 'paid' && fee.student && fee.student.user) {
+      await createInAppNotification({
+        recipient: fee.student.user,
+        sender: req.user._id,
+        type: "fee_paid",
+        title: "Fee Payment Successful",
+        message: `Your fee payment of ₹${fee.amount} has been successfully recorded.`,
+        entityId: fee._id.toString()
+      });
+    }
 
     res.json(fee);
   } catch (error) {

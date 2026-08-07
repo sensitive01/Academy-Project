@@ -5,6 +5,10 @@ const fs = require("fs");
 const Expense = require("../models/Expenses");
 const Payment = require("../models/Payment");
 const { protect } = require("../middleware/authMiddleware");
+const { validate } = require("../middleware/validationMiddleware");
+const { createExpenseValidation } = require("../validators/expenseValidator");
+const { createInAppNotification } = require("../utils/notificationUtils");
+
 
 // =================================================
 // ================= UPLOAD CONFIG =================
@@ -45,7 +49,7 @@ const upload = multer({
 // ================ CREATE EXPENSE =================
 // =================================================
 
-router.post("/", protect, upload.single("receipt"), async (req, res) => {
+router.post("/", protect, upload.single("receipt"), createExpenseValidation, validate, async (req, res) => {
   try {
     const { title, amount, category, description, date } = req.body;
 
@@ -118,6 +122,16 @@ router.patch("/:id/status", protect, async (req, res) => {
     expense.approvedAt = Date.now();
 
     await expense.save();
+
+    // Send notification to the submitter
+    await createInAppNotification({
+      recipient: expense.submittedBy,
+      sender: req.user._id,
+      type: status === "approved" ? "expense_approved" : "expense_rejected",
+      title: `Expense ${status === "approved" ? "Approved" : "Rejected"}`,
+      message: `Your expense "${expense.title}" of amount ${expense.amount} has been ${status}.`,
+      entityId: expense._id.toString()
+    });
 
     res.json({ success: true, data: expense });
   } catch (error) {

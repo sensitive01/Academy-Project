@@ -10,6 +10,8 @@ const qrcode = require('qrcode');
 const { protect } = require('../middleware/authMiddleware');
 const Otp = require('../models/Otp');
 const nodemailer = require('nodemailer');
+const { validate } = require('../middleware/validationMiddleware');
+const { googleAuthValidation, sendOtpValidation, loginValidation } = require('../validators/authValidator');
 
 const generateToken = (id, role) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, {
@@ -20,7 +22,7 @@ const generateToken = (id, role) => {
 // @desc    Auth with Google
 // @route   POST /api/auth/google
 // @access  Public
-router.post('/google', async (req, res) => {
+router.post('/google', googleAuthValidation, validate, async (req, res) => {
     const { token } = req.body;
 
     try {
@@ -80,7 +82,7 @@ router.post('/google', async (req, res) => {
 // @desc    Send OTP for registration
 // @route   POST /api/auth/send-otp
 // @access  Public
-router.post('/send-otp', async (req, res) => {
+router.post('/send-otp', sendOtpValidation, validate, async (req, res) => {
     const { email } = req.body;
 
     try {
@@ -122,7 +124,7 @@ router.post('/send-otp', async (req, res) => {
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', loginValidation, validate, async (req, res) => {
     const { email, password } = req.body;
 
     try {

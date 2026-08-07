@@ -6,6 +6,8 @@ const Exam = require('../models/Exam');
 const Course = require('../models/Course');
 const Subject = require('../models/Subject');
 const { protect } = require('../middleware/authMiddleware');
+const { createInAppNotification } = require('../utils/notificationUtils');
+
 
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
@@ -68,6 +70,19 @@ router.post('/', protect, isAdmin, async (req, res) => {
 
     const mark = await Mark.create(markData);
     
+    // Notify student
+    const studentDoc = await Student.findById(student).select('user');
+    if (studentDoc && studentDoc.user) {
+      await createInAppNotification({
+        recipient: studentDoc.user,
+        sender: req.user._id,
+        type: "result_published",
+        title: "New Results Published",
+        message: `Your marks for the recent exam have been published.`,
+        entityId: mark._id.toString()
+      });
+    }
+
     res.status(201).json(mark);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -96,6 +111,20 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
 
 
     await mark.save();
+
+    // Notify student
+    const studentDoc = await Student.findById(mark.student).select('user');
+    if (studentDoc && studentDoc.user) {
+      await createInAppNotification({
+        recipient: studentDoc.user,
+        sender: req.user._id,
+        type: "result_published",
+        title: "Results Updated",
+        message: `Your marks for the recent exam have been updated.`,
+        entityId: mark._id.toString()
+      });
+    }
+
     res.json(mark);
   } catch (error) {
     res.status(400).json({ message: error.message });

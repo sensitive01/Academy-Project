@@ -14,6 +14,8 @@ const StudentRegistration = () => {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [centers, setCenters] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [batches, setBatches] = useState([]);
   const { user } = useAuth();
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
@@ -78,6 +80,12 @@ const StudentRegistration = () => {
 
   const [declaration, setDeclaration] = useState(false);
 
+  const [adminEnrollment, setAdminEnrollment] = useState({
+    course: "",
+    batch: "",
+    fees: []
+  });
+
   useEffect(() => {
     const fetchCenters = async () => {
       try {
@@ -87,9 +95,25 @@ const StudentRegistration = () => {
         console.error("Failed to fetch centers:", err);
       }
     };
+    const fetchAdminData = async () => {
+      if (user?.role === 'admin') {
+        try {
+          const [courseRes, batchRes] = await Promise.all([
+            api.get("/courses"),
+            api.get("/batches")
+          ]);
+          setCourses(courseRes.data);
+          setBatches(batchRes.data);
+        } catch (err) {
+          console.error("Failed to fetch admin enrollment data:", err);
+        }
+      }
+    };
+
     fetchCenters();
+    fetchAdminData();
     document.title = "Admission Portal | Dr.RG Academy";
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let interval = null;
@@ -157,7 +181,8 @@ const StudentRegistration = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 5));
+      const maxSteps = user?.role === 'admin' ? 6 : 5;
+      setCurrentStep((prev) => Math.min(prev + 1, maxSteps));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -253,15 +278,21 @@ const StudentRegistration = () => {
           schoolName: formData.hscSchool,
           placeOfSchool: formData.hscPlace,
           boardOfExamination: formData.hscBoard,
-        }
+        },
+        adminEnrollment: user?.role === 'admin' ? adminEnrollment : undefined,
       };
 
-      await api.post("/students/public-registration", payload);
+      const res = await api.post("/students/public-registration", payload);
       toast.success("Application Submitted Successfully!");
       setCurrentStep(6);
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Submission failed. Please check your data.");
+      if (err.response?.data?.errors) {
+        const firstError = Object.values(err.response.data.errors)[0];
+        toast.error(firstError || "Validation failed. Please check your inputs.");
+      } else {
+        toast.error(err.response?.data?.message || "Submission failed. Please check your data.");
+      }
     } finally {
       setLoading(false);
     }
@@ -817,6 +848,86 @@ const StudentRegistration = () => {
               </div>
             )}
 
+            {currentStep === 6 && user?.role === 'admin' && (
+              <div className="space-y-10 animate-fade-in-up">
+                <StepHeader title="Course & Fees" subtitle="Assign a course, batch, and upfront fees (Admin Only)" icon={<CreditCard className="text-brand-700" />} />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
+                  <SelectBox 
+                    label="Assign Course" 
+                    value={adminEnrollment.course} 
+                    onChange={(e) => setAdminEnrollment(prev => ({...prev, course: e.target.value}))} 
+                    options={[{value: '', label: 'Select a Course'}, ...courses.map(c => ({value: c._id, label: c.title}))]} 
+                    isObjectOptions 
+                  />
+                  <SelectBox 
+                    label="Assign Batch" 
+                    value={adminEnrollment.batch} 
+                    onChange={(e) => setAdminEnrollment(prev => ({...prev, batch: e.target.value}))} 
+                    options={[{value: '', label: 'Select a Batch'}, ...batches.map(b => ({value: b._id, label: b.name}))]} 
+                    isObjectOptions 
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-slate-900">Upfront Fees</h3>
+                    <button 
+                      type="button" 
+                      onClick={() => setAdminEnrollment(prev => ({ ...prev, fees: [...prev.fees, { feeType: 'Term', amount: '' }] }))} 
+                      className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-bold hover:bg-slate-300 transition-colors"
+                    >
+                      + Add Fee
+                    </button>
+                  </div>
+                  
+                  {adminEnrollment.fees.map((fee, idx) => (
+                    <div key={idx} className="flex gap-4 items-center bg-white p-4 border border-slate-200 rounded-xl">
+                      <div className="flex-1">
+                        <SelectBox 
+                          label="Fee Type" 
+                          value={fee.feeType} 
+                          onChange={(e) => {
+                            const newFees = [...adminEnrollment.fees];
+                            newFees[idx].feeType = e.target.value;
+                            setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                          }} 
+                          options={[{value: 'Term', label: 'Term'}, {value: 'Exam', label: 'Exam'}, {value: 'Monthly', label: 'Monthly'}, {value: 'Other', label: 'Other'}]} 
+                          isObjectOptions 
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <FormInput 
+                          label="Amount (₹)" 
+                          type="number" 
+                          value={fee.amount} 
+                          onChange={(e) => {
+                            const newFees = [...adminEnrollment.fees];
+                            newFees[idx].amount = e.target.value;
+                            setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                          }} 
+                          placeholder="e.g. 5000" 
+                        />
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const newFees = adminEnrollment.fees.filter((_, i) => i !== idx);
+                          setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                        }}
+                        className="mt-5 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors font-bold text-xs"
+                      >
+                        REMOVE
+                      </button>
+                    </div>
+                  ))}
+                  {adminEnrollment.fees.length === 0 && (
+                    <p className="text-sm text-slate-500 italic">No fees added yet.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Navigation Controls */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-6 mt-12 pt-8 border-t-2 border-slate-50">
               <div className="min-w-[150px]">
@@ -827,7 +938,7 @@ const StudentRegistration = () => {
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-4 w-full md:w-auto">
-                {currentStep < 5 ? (
+                {currentStep < (user?.role === 'admin' ? 6 : 5) ? (
                   <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
                     Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </button>

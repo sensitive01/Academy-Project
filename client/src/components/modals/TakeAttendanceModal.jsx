@@ -91,7 +91,12 @@ const TakeAttendanceModal = ({ isOpen, onClose, onSuccess }) => {
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to mark attendance");
+      if (err.response?.data?.errors) {
+        const firstError = Object.values(err.response.data.errors)[0];
+        toast.error(firstError || "Validation failed");
+      } else {
+        toast.error(err.response?.data?.message || "Failed to mark attendance");
+      }
     } finally {
       setLoading(false);
     }

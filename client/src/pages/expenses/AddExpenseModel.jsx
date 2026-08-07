@@ -80,7 +80,12 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
       resetForm();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to add expense");
+      if (err.response?.data?.errors) {
+        const firstError = Object.values(err.response.data.errors)[0];
+        toast.error(firstError || "Validation failed");
+      } else {
+        toast.error(err.response?.data?.message || "Failed to add expense");
+      }
     } finally {
       setLoading(false);
     }

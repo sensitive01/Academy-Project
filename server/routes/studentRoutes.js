@@ -5,15 +5,17 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const Course = require('../models/Course');
 const Vendor = require('../models/Vendor');
+const StudentFee = require('../models/StudentFee');
 
-// // ======================================================
-// // CREATE STUDENT (Creates User + Student)
-// // ======================================================
 // ======================================================
 // PUBLIC REGISTRATION (Apply Now)
 // ======================================================
 const { protect, optionalProtect } = require("../middleware/authMiddleware");
-router.post('/public-registration', optionalProtect, async (req, res) => {
+const { validate } = require("../middleware/validationMiddleware");
+const { publicRegistrationValidation } = require("../validators/studentValidator");
+const { createInAppNotification, sendEmailNotification } = require("../utils/notificationUtils");
+
+router.post('/public-registration', optionalProtect, publicRegistrationValidation, validate, async (req, res) => {
   try {
     const {
       studentNameEnglish,
@@ -142,13 +144,63 @@ router.post('/public-registration', optionalProtect, async (req, res) => {
       references,
 
       year,
-      department,
       status: 'active'
     });
 
-    // 3️⃣ Link Student to User
+    if (req.user && req.user.role === 'admin' && req.body.adminEnrollment) {
+      const { course, batch, fees } = req.body.adminEnrollment;
+      if (course) {
+        student.enrolledCourses.push({
+          course: course,
+          completed: false,
+          progress: 0
+        });
+      }
+      
+      // Save student here to get _id for fees
+      await student.save();
+
+      if (fees && fees.length > 0 && course && batch) {
+        for (const fee of fees) {
+          if (fee.amount && fee.feeType) {
+            await StudentFee.create({
+              student: student._id,
+              center: student.center,
+              course: course,
+              batch: batch,
+              feeType: fee.feeType,
+              amount: Number(fee.amount),
+              status: 'pending'
+            });
+          }
+        }
+      }
+    } else {
+      await student.save();
+    }
     user.studentProfile = student._id;
     await user.save();
+
+    // 4️⃣ Send Notifications
+    await createInAppNotification({
+      recipient: user._id,
+      type: 'registration_success',
+      title: 'Registration Successful',
+      message: `Welcome to DRRJ Academy! Your registration is successful. Your Student ID is ${student.studentId}.`,
+      entityId: student._id.toString()
+    });
+
+    await sendEmailNotification({
+      to: email,
+      subject: 'Welcome to DRRJ Academy - Registration Successful',
+      html: `
+        <h2>Welcome, ${studentNameEnglish}!</h2>
+        <p>Your registration is complete.</p>
+        <p><strong>Student ID:</strong> ${student.studentId}</p>
+        <p><strong>Default Password:</strong> ${defaultPassword}</p>
+        <p>Please login and change your password.</p>
+      `
+    });
 
     res.status(201).json({
       message: 'Registration successful',
