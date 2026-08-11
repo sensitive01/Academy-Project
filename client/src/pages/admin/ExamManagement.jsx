@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 import { useAuth } from "../../context/AuthContext";
 import * as XLSX from 'xlsx';
-import MarksheetModal from "../../components/MarksheetModal";
-import BulkEditMarksModal from "../../components/BulkEditMarksModal";
-import AddStudentFeeModal from "../../components/AddStudentFeeModal";
+import MarksheetModal from "../../components/modals/MarksheetModal";
+import BulkEditMarksModal from "../../components/modals/BulkEditMarksModal";
+import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
 import StudentFeesList from "../../components/payments/StudentFeesList";
 
 const ExamManagement = () => {

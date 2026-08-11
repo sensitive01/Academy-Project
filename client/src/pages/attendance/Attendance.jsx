@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
-import Payroll from "../../pages/payroll/Payroll";
-import CustomDataTable from "../../components/DataTable";
-import Loading from "../../components/Loading";
-import { Search } from "lucide-react";
+import Payroll from "../../pages/finance/Payroll";
+import CustomDataTable from "../../components/common/DataTable";
+import Loading from "../../components/common/Loading";
+import { Search, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
+import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
+import StudentFilterBar from "../../components/common/StudentFilterBar";
 
 const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = false, hideHeader = false, refreshTrigger = 0 }) => {
   const { user, token } = useAuth();
@@ -26,12 +28,12 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
   const [logoutModal, setLogoutModal] = useState(null);
 
   // New Filter States for Student Attendance
-  const [filterType, setFilterType] = useState("");
-  const [filterVendor, setFilterVendor] = useState("");
-  const [filterCenter, setFilterCenter] = useState("");
-  const [filterCourse, setFilterCourse] = useState("");
-  const [filterBatch, setFilterBatch] = useState("");
-  const [filterSemester, setFilterSemester] = useState("");
+  const [filterType, setFilterType] = useState([]);
+  const [filterVendor, setFilterVendor] = useState([]);
+  const [filterCenter, setFilterCenter] = useState([]);
+  const [filterCourse, setFilterCourse] = useState([]);
+  const [filterBatch, setFilterBatch] = useState([]);
+  const [filterYears, setFilterYears] = useState([]);
 
   const [studentsMap, setStudentsMap] = useState({});
   const [centers, setCenters] = useState([]);
@@ -279,28 +281,30 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
           const sProfile = studentsMap[a.userId];
           if (!sProfile) {
             // If student profile not found, they fail strict filters
-            if (filterType || filterVendor || filterCenter || filterCourse || filterBatch || filterSemester) {
+            if (filterType.length > 0 || filterVendor.length > 0 || filterCenter.length > 0 || filterCourse.length > 0 || filterBatch.length > 0 || filterYears.length > 0) {
               matchStudentFilters = false;
             }
           } else {
             const isIntern = sProfile.internships && sProfile.internships.length > 0;
-            if (filterType === "intern" && !isIntern) matchStudentFilters = false;
-            if (filterType === "inhouse" && isIntern) matchStudentFilters = false;
-            if (filterType === "intern" && filterVendor && isIntern) {
+            if (filterType.length > 0) {
+              const matchType = (filterType.includes("intern") && isIntern) || (filterType.includes("inhouse") && !isIntern);
+              if (!matchType) matchStudentFilters = false;
+            }
+            if (filterType.includes("intern") && filterVendor.length > 0 && isIntern) {
               const latest = sProfile.internships[sProfile.internships.length - 1];
               const vendorId = latest.vendor?._id || latest.vendor;
-              if (vendorId !== filterVendor) matchStudentFilters = false;
+              if (!filterVendor.includes(vendorId)) matchStudentFilters = false;
             }
-            if (filterCenter && (sProfile.center?._id || sProfile.center) !== filterCenter) matchStudentFilters = false;
-            if (filterCourse && sProfile.department !== filterCourse) matchStudentFilters = false;
-            if (filterBatch && sProfile.year !== filterBatch) matchStudentFilters = false;
-            if (filterSemester && String(sProfile.semester) !== String(filterSemester)) matchStudentFilters = false;
+            if (filterCenter.length > 0 && !filterCenter.includes(sProfile.center?._id || sProfile.center)) matchStudentFilters = false;
+            if (filterCourse.length > 0 && !filterCourse.includes(sProfile.department)) matchStudentFilters = false;
+            if (filterBatch.length > 0 && !filterBatch.includes(sProfile.year)) matchStudentFilters = false;
+            if (filterYears.length > 0 && (!sProfile.year || !filterYears.includes(String(sProfile.year)))) matchStudentFilters = false;
           }
         }
 
         return matchSearch && matchFrom && matchTo && matchUser && matchRole && matchStudentFilters;
       });
-  }, [attendanceList, searchTerm, filterFrom, filterTo, user, employeeOnly, studentOnly, internOnly, filterType, filterVendor, filterCenter, filterCourse, filterBatch, filterSemester, studentsMap]);
+  }, [attendanceList, searchTerm, filterFrom, filterTo, user, employeeOnly, studentOnly, internOnly, filterType, filterVendor, filterCenter, filterCourse, filterBatch, filterYears, studentsMap]);
 
   // COLUMNS
   const calculateWorkingHours = (loginTime, logoutTime) => {
@@ -655,38 +659,26 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
                   </div>
 
                   {studentOnly && (
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterType} onChange={e => { setFilterType(e.target.value); setFilterVendor(""); }}>
-                        <option value="">All Types</option>
-                        <option value="intern">Intern</option>
-                        <option value="inhouse">In-house</option>
-                      </select>
-                      
-                      <select disabled={filterType !== "intern"} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full disabled:opacity-50" value={filterVendor} onChange={e => setFilterVendor(e.target.value)}>
-                        <option value="">All Vendors</option>
-                        {vendors.map(v => <option key={v._id} value={v._id}>{v.companyName}</option>)}
-                      </select>
-
-                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
-                        <option value="">All Batches</option>
-                        {batches.map(b => <option key={b._id} value={b.name}>{b.name}</option>)}
-                      </select>
-
-                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterCenter} onChange={e => setFilterCenter(e.target.value)}>
-                        <option value="">All Centers</option>
-                        {centers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                      </select>
-
-                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
-                        <option value="">All Courses</option>
-                        {courses.map(c => <option key={c._id} value={c.title}>{c.title}</option>)}
-                      </select>
-
-                      <select className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none w-full" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
-                        <option value="">All Semesters</option>
-                        {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
-                      </select>
-                    </div>
+                    <StudentFilterBar
+                      filterType={filterType}
+                      setFilterType={setFilterType}
+                      filterCenter={filterCenter}
+                      setFilterCenter={setFilterCenter}
+                      filterCourse={filterCourse}
+                      setFilterCourse={setFilterCourse}
+                      filterBatch={filterBatch}
+                      setFilterBatch={setFilterBatch}
+                      filterYears={filterYears}
+                      setFilterYears={setFilterYears}
+                      filterVendor={filterVendor}
+                      setFilterVendor={setFilterVendor}
+                      centers={centers}
+                      courses={courses}
+                      batches={batches}
+                      vendors={vendors}
+                      showVendor={true}
+                      showType={true}
+                    />
                   )}
 
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden pb-4">

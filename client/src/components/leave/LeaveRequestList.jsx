@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import api from "../services/api";
+import api from "../../services/api";
 import toast from "react-hot-toast";
 import { Eye, Trash2 } from "lucide-react";
 import LeaveApplicationForm from "./LeaveApplicationForm";
-import CustomDataTable from "./DataTable";
+import CustomDataTable from "../common/DataTable";
 import ReactDOM from "react-dom";
 
 const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {

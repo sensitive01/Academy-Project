@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import Webcam from "react-webcam";
 import { Camera, User, CheckCircle, ArrowRight, ShieldCheck, Clock, MapPin, X, RefreshCw, LogIn, MonitorCheck, FileCheck } from "lucide-react";
-import api from "../services/api";
+import api from "../../services/api";
 import toast from "react-hot-toast";
-import logo from "../assets/logo-3.jpeg";
-import attendanceSidebar from "../assets/attendance_sidebar.png";
+import logo from "../../assets/logo-3.jpeg";
+import attendanceSidebar from "../../assets/attendance_sidebar.png";
 
 const PublicAttendance = () => {
     const [identifier, setIdentifier] = useState("");

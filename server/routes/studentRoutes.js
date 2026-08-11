@@ -73,31 +73,37 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       department,
     } = req.body;
 
+    const finalName = (studentNameEnglish && studentNameEnglish.trim()) || "New Student";
+    const finalEmail = (email && email.trim()) ? email.trim() : `student_${Date.now()}@dracademy.internal`;
+    const finalPhone = phone || "";
+
     // Check if email already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User with this email already exists' });
+    if (email && email.trim()) {
+      const existingUser = await User.findOne({ email: email.trim() });
+      if (existingUser) {
+        return res.status(400).json({ message: 'User with this email already exists' });
+      }
     }
 
     const defaultPassword = "Student@123";
 
     // 1️⃣ Create User
     const user = await User.create({
-      name: studentNameEnglish,
-      email,
+      name: finalName,
+      email: finalEmail,
       password: defaultPassword,
       role: 'student',
-      mobile: phone
+      mobile: finalPhone
     });
 
     // 2️⃣ Create Student Profile
     const student = await Student.create({
       user: user._id,
       studentId: `APP-${Date.now()}`,
-      studentNameEnglish,
+      studentNameEnglish: finalName,
       studentNameMotherTongue,
-      email,
-      phone,
+      email: finalEmail,
+      phone: finalPhone,
       whatsapp,
       dob,
       age,
@@ -160,15 +166,17 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       // Save student here to get _id for fees
       await student.save();
 
-      if (fees && fees.length > 0 && course && batch) {
+      if (fees && Array.isArray(fees) && fees.length > 0) {
         for (const fee of fees) {
-          if (fee.amount && fee.feeType) {
+          if (fee.amount && Number(fee.amount) > 0) {
+            const validFeeType = ['Term', 'Sem', 'Exam', 'Other', 'Monthly'].includes(fee.feeType) ? fee.feeType : 'Other';
             await StudentFee.create({
               student: student._id,
               center: student.center,
-              course: course,
-              batch: batch,
-              feeType: fee.feeType,
+              course: course || undefined,
+              batch: batch || undefined,
+              feeType: validFeeType,
+              otherFeeType: fee.otherFeeType || (validFeeType === 'Other' ? (fee.feeType || 'Fee') : undefined),
               amount: Number(fee.amount),
               status: 'pending'
             });
@@ -213,146 +221,6 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
   }
 });
 
-// // ======================================================
-//   '/',
-//   upload.fields([
-//     { name: 'profilePic', maxCount: 1 },
-//     { name: 'idFile', maxCount: 1 },
-//     { name: 'certificateFile', maxCount: 1 },
-//   ]),
-//   async (req, res) => {
-//     try {
-//      const {
-//   studentNameEnglish,
-//   studentNameMotherTongue,
-//   fatherName,
-//   dob,
-//   age,
-//   gender,
-//   nationality,
-//   aadharNo,
-//   kcetRegNo,
-//   neetRegNo,
-//   apaarId,
-//   debId,
-//   abcId,
-//   religion,
-//   community,
-//   maritalStatus,
-//   email,
-//   phone,
-//   whatsapp,
-//   village,
-//   post,
-//   taluk,
-//   district,
-//   pin,
-//   englishFluency,
-//   language1,
-//   language2,
-//   language3,
-//   accountHolderName,
-//   accountNumber,
-//   ifscCode,
-//   bankNameBranch,
-//   role,
-// } = req.body;
-
-//       // Check if email already exists
-//       const existingUser = await User.findOne({ email });
-//       if (existingUser) {
-//         return res.status(400).json({
-//           message: 'User with this email already exists',
-//         });
-//       }
-
-//       const defaultPassword = "Student@123";
-
-//       // 1️⃣ Create User
-//       const user = await User.create({
-//        name: studentNameEnglish,
-//         email,
-//         password: defaultPassword,
-//         role: role || 'student',
-//       });
-
-//       // Helper function for file
-//       const getFileData = (fieldName) => {
-//         if (req.files && req.files[fieldName]) {
-//           const file = req.files[fieldName][0];
-//           return {
-//             url: file.path,
-//             public_id: file.filename,
-//             name: file.originalname,
-//           };
-//         }
-//         return null;
-//       };
-
-//       // 2️⃣ Create Student
-//       const student = await Student.create({
-//   user: user._id,
-
-//   studentNameEnglish,
-//   studentNameMotherTongue,
-//   fatherName,
-//   dob,
-//   age,
-//   gender,
-//   nationality,
-
-//   aadharNo,
-//   kcetRegNo,
-//   neetRegNo,
-//   apaarId,
-//   debId,
-//   abcId,
-
-//   religion,
-//   community,
-//   maritalStatus,
-
-//   email,
-//   phone,
-//   whatsapp,
-
-//   address: {
-//     village,
-//     post,
-//     taluk,
-//     district,
-//     pin,
-//   },
-
-//   englishFluency,
-//   languagesKnown: [language1, language2, language3],
-
-//   bankDetails: {
-//     accountHolderName,
-//     accountNumber,
-//     ifscCode,
-//     bankNameBranch,
-//   },
-// });
-
-//       // 3️⃣ Link Student to User
-//       user.studentProfile = student._id;
-//       await user.save();
-
-//       res.status(201).json({
-//         message: 'Student created successfully',
-//         student,
-//       });
-
-//     } catch (error) {
-//       res.status(500).json({ message: error.message });
-//     }
-//   }
-// );
-
-// ======================================================
-// GET ALL STUDENTS (From Users Collection)
-// ======================================================
 // ======================================================
 // GET ALL STUDENTS (FULL DATA)
 // ======================================================
@@ -503,18 +371,20 @@ router.put(
         const updateData = {};
 
         if (req.body.email && req.body.email !== user.email) {
-          // Verify OTP for email change
-          const { otp } = req.body;
-          if (!otp) {
-            return res.status(400).json({ message: "OTP is required to change email" });
+          if (req.user.role !== 'admin') {
+            // Verify OTP for email change for non-admin
+            const { otp } = req.body;
+            if (!otp) {
+              return res.status(400).json({ message: "OTP is required to change email" });
+            }
+            const Otp = require('../models/Otp');
+            const otpRecord = await Otp.findOne({ email: req.body.email, otp });
+            if (!otpRecord) {
+              return res.status(400).json({ message: "Invalid or expired OTP" });
+            }
+            // Delete OTP after verification
+            await Otp.deleteOne({ _id: otpRecord._id });
           }
-          const Otp = require('../models/Otp');
-          const otpRecord = await Otp.findOne({ email: req.body.email, otp });
-          if (!otpRecord) {
-            return res.status(400).json({ message: "Invalid or expired OTP" });
-          }
-          // Delete OTP after verification
-          await Otp.deleteOne({ _id: otpRecord._id });
 
           updateData.email = req.body.email;
         }

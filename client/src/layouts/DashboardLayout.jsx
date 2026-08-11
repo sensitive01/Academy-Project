@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import Sidebar from "../components/Sidebar";
-import DashboardHeader from "../components/DashboardHeader";
-import Loading from "../components/Loading";
+import Sidebar from "../components/layout/Sidebar";
+import DashboardHeader from "../components/layout/DashboardHeader";
+import Loading from "../components/common/Loading";
 
 const DashboardLayout = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);

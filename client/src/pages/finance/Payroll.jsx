@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Plus, ChevronDown } from "lucide-react";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 import ReactDOM from "react-dom";
+import StudentFilterBar from "../../components/common/StudentFilterBar";
 
 const Payroll = ({ hideHeader = false, internOnly = false }) => {
 const { user } = useAuth();
@@ -49,6 +50,38 @@ const [currentPayslipName, setCurrentPayslipName] = useState("");
 const [selectedTableRows, setSelectedTableRows] = useState([]);
 const [toggleClearRows, setToggleClearRows] = useState(false);
 
+const [filterType, setFilterType] = useState([]);
+const [filterCenter, setFilterCenter] = useState([]);
+const [filterCourse, setFilterCourse] = useState([]);
+const [filterBatch, setFilterBatch] = useState([]);
+const [filterYears, setFilterYears] = useState([]);
+const [filterVendor, setFilterVendor] = useState([]);
+
+const [studentsMap, setStudentsMap] = useState({});
+const [centers, setCenters] = useState([]);
+const [courses, setCourses] = useState([]);
+const [batches, setBatches] = useState([]);
+const [vendors, setVendors] = useState([]);
+
+useEffect(() => {
+  api.get("/centers").then(res => setCenters(res.data || [])).catch(() => {});
+  api.get("/courses").then(res => {
+    const list = res.data?.courses || res.data || [];
+    setCourses(list.filter(c => c.type === "Center Courses"));
+  }).catch(() => {});
+  api.get("/batches").then(res => setBatches(res.data?.batches || res.data || [])).catch(() => {});
+  api.get("/vendors").then(res => setVendors(res.data || [])).catch(() => {});
+  api.get("/students").then(res => {
+    const list = res.data?.students || [];
+    const map = {};
+    list.forEach(s => {
+      if (s._id) map[s._id] = s;
+      if (s.user?._id) map[s.user._id] = s;
+    });
+    setStudentsMap(map);
+  }).catch(() => {});
+}, []);
+
 const handleRowSelected = React.useCallback(state => {
   setSelectedTableRows(state.selectedRows);
 }, []);
@@ -74,7 +107,7 @@ const handleStatusUpdate = async (records, status) => {
     await fetchPayrolls();
   } catch (err) {
     console.error(err);
-    toast.error("Failed to update status");
+    toast.error(err.response?.data?.message || err.message || "Failed to update status");
   }
 };
 
@@ -183,21 +216,22 @@ SAVE ADJUSTMENT
 ================================ */
 const handleSavePayroll = async () => {
 
-if (!selectedEmployee) return toast.error("Select employee");
+if (!selectedEmployee) return toast.error(internOnly ? "Select intern student" : "Select employee");
 if (!salaryData.adjustmentMonth) return toast.error("Select month");
 if (!salaryData.adjustmentType) return toast.error("Select type");
 if (!salaryData.adjustmentAmount) return toast.error("Enter amount");
 
 try {
 const [year, month] = salaryData.adjustmentMonth.split("-");
+const internshipId = selectedEmployee.internshipId || (selectedEmployee.internships && selectedEmployee.internships[selectedEmployee.internships.length - 1]?._id);
 const payload = {
-employeeId: selectedEmployee.employeeId || selectedEmployee._id,
+employeeId: selectedEmployee._id || selectedEmployee.employeeId,
 type: salaryData.adjustmentType,
 month: Number(month),
 year: Number(year),
 amount: salaryData.adjustmentAmount,
 note: salaryData.adjustmentNote || "",
-internshipId: selectedEmployee.internshipId || undefined
+internshipId: internshipId || undefined
 };
 
 await api.post("/payroll/adjustment", payload);
@@ -284,21 +318,21 @@ const generatePayslip = async (payrollId, employeeName) => {
 
   // --- COLUMN DEFINITIONS ---
   const payrollColumns = [
-    { name: 'S.No', selector: (row, i) => i + 1, width: '80px', center: true },
+    { name: 'S.No', selector: (row, i) => i + 1, width: '70px', center: "true" },
     { 
       name: 'Employee', selector: row => row.name, sortable: true, width: '160px',
       cell: row => <div onClick={() => fetchAttendance(row, "all")} className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 truncate">{row.name}</div>
     },
     {
-      name: 'Dept', selector: row => row.department, center: true, width: '180px',
+      name: 'Dept', selector: row => row.department, center: "true", width: '180px',
       cell: row => <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{row.department || "-"}</span>
     },
-    { name: 'Basic Salary', selector: row => row.basic, sortable: true,width:"145px", right: true, cell: row => <div className="text-gray-700 font-medium"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
-    { name: 'Days', selector: row => row.totalDays, center: true, width: '80px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
-    { name: 'Present', selector: row => row.present, center: true, width: '95px', cell: row => <div className="font-bold text-green-600 cursor-pointer hover:bg-green-50 p-1 rounded" onClick={() => fetchAttendance(row, "present")}>{row.present ?? "-"}</div> },
-    { name: 'Leave', selector: row => row.absent, center: true, width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
+    { name: 'Basic Salary', selector: row => row.basic, sortable: true, width:"145px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
+    { name: 'Days', selector: row => row.totalDays, center: "true", width: '80px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
+    { name: 'Present', selector: row => row.present, center: "true", width: '95px', cell: row => <div className="font-bold text-green-600 cursor-pointer hover:bg-green-50 p-1 rounded" onClick={() => fetchAttendance(row, "present")}>{row.present ?? "-"}</div> },
+    { name: 'Leave', selector: row => row.absent, center: "true", width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
     { 
-      name: 'Late Info', center: true, width: '110px',
+      name: 'Late Info', center: "true", width: '110px',
       cell: row => (
         <div className="flex flex-col items-center cursor-pointer hover:bg-orange-50 p-1 rounded" onClick={() => fetchAttendance(row, "all")}>
           <span className="text-xs font-semibold text-orange-600">{row.lateDays} {row.lateDays === 1 ? 'day' : 'days'}</span>
@@ -306,31 +340,116 @@ const generatePayslip = async (payrollId, employeeName) => {
         </div>
       )
     },
-    { name: 'Allowances', selector: row => row.allowances, right: true, width: '130px', cell: row => <div className="font-bold text-blue-600 cursor-pointer hover:bg-blue-50 p-1 rounded" onClick={() => viewAdjustments(row, "allowance")}>{row.allowances > 0 ? <><span className="text-blue-300 mr-1">+ ₹</span>{row.allowances.toLocaleString("en-IN")}</> : '-'}</div> },
-    { name: 'Deductions', selector: row => row.deductions, right: true, width: '130px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => viewAdjustments(row, "deduction")}>{row.deductions > 0 ? <><span className="text-red-300 mr-1">- ₹</span>{row.deductions.toLocaleString("en-IN")}</> : '-'}</div> },
-    { name: 'Advance', selector: row => row.advance, right: true, width: '100px', cell: row => <div className="font-bold text-orange-600 cursor-pointer hover:bg-orange-50 p-1 rounded" onClick={() => viewAdjustments(row, "advance")}>{row.advance > 0 ? <><span className="text-orange-300 mr-1">₹</span>{row.advance.toLocaleString("en-IN")}</> : '-'}</div> },
-    { name: 'Net Salary', selector: row => row.netSalary, sortable: true, right: true, width: '130px', cell: row => <div className="font-bold text-gray-800"><span className="text-green-600 mr-1">₹</span><span className="text-[15px]">{row.netSalary?.toLocaleString("en-IN")}</span></div> },
+    { name: 'Allowances', selector: row => row.allowances, center: "true", width: '130px', cell: row => <div className="font-bold text-blue-600 cursor-pointer hover:bg-blue-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "allowance")}>{row.allowances > 0 ? <><span className="text-blue-300 mr-1">+ ₹</span>{row.allowances.toLocaleString("en-IN")}</> : '-'}</div> },
+    { name: 'Deductions', selector: row => row.deductions, center: "true", width: '130px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "deduction")}>{row.deductions > 0 ? <><span className="text-red-300 mr-1">- ₹</span>{row.deductions.toLocaleString("en-IN")}</> : '-'}</div> },
+    { name: 'Advance', selector: row => row.advance, center: "true", width: '100px', cell: row => <div className="font-bold text-orange-600 cursor-pointer hover:bg-orange-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "advance")}>{row.advance > 0 ? <><span className="text-orange-300 mr-1">₹</span>{row.advance.toLocaleString("en-IN")}</> : '-'}</div> },
+    { name: 'Net Salary', selector: row => row.netSalary, sortable: true, center: "true", width: '130px', cell: row => <div className="font-bold text-gray-800 text-center w-full"><span className="text-green-600 mr-1">₹</span><span className="text-[15px]">{row.netSalary?.toLocaleString("en-IN")}</span></div> },
     { 
-      name: 'Action', center: true, width: '110px',
-      cell: row => (
-        <div className="flex flex-col gap-1.5 w-full items-center">
-          <select 
-            value={row.status || "processing"}
-            onChange={(e) => handleStatusUpdate([{employeeId: row.employeeId, internshipId: row.internshipId}], e.target.value)}
-            className={`border px-2 py-1 rounded text-[11px] font-bold w-full outline-none focus:ring-1 cursor-pointer shadow-sm text-center ${row.status === 'hold' ? 'bg-orange-100 border-orange-300 text-orange-700 focus:border-orange-500 focus:ring-orange-500' : 'bg-white border-gray-300 text-slate-700 focus:border-brand-500 focus:ring-brand-500'}`}
-          >
-            <option value="processing">Process</option>
-            <option value="hold">Hold</option>
-          </select>
-          {row._id && (
-            <button className="text-brand-600 hover:text-brand-800 transition text-[10px] font-bold underline" onClick={() => generatePayslip(row._id, row.name)}>Payslip</button>
-          )} 
-        </div>
-      )
+      name: 'Action', center: "true", width: '120px',
+      cell: row => {
+        const currentStatus = row.status || "process";
+        const hasBeenActedUpon = currentStatus === "processed" || currentStatus === "hold" || currentStatus === "paid";
+        
+        return (
+          <div className="flex flex-col gap-1.5 w-full items-center">
+            <select 
+              value={currentStatus}
+              onChange={(e) => handleStatusUpdate([{employeeId: row.employeeId || row._id, internshipId: row.internshipId}], e.target.value)}
+              className={`border px-2 py-1 rounded text-[11px] font-bold w-full outline-none focus:ring-1 cursor-pointer shadow-sm text-center ${
+                currentStatus === 'hold'
+                  ? 'bg-orange-100 border-orange-300 text-orange-700 focus:border-orange-500 focus:ring-orange-500'
+                  : currentStatus === 'processed'
+                  ? 'bg-emerald-100 border-emerald-300 text-emerald-700 focus:border-emerald-500 focus:ring-emerald-500'
+                  : currentStatus === 'paid'
+                  ? 'bg-blue-100 border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-blue-500'
+                  : 'bg-white border-gray-300 text-slate-700 focus:border-brand-500 focus:ring-brand-500'
+              }`}
+            >
+              <option value="process">Process</option>
+              <option value="processed">Processed</option>
+              <option value="hold">Hold</option>
+              <option value="paid">Paid</option>
+            </select>
+            {hasBeenActedUpon && row._id && (
+              <button className="text-brand-600 hover:text-brand-800 transition text-[10px] font-bold underline" onClick={() => generatePayslip(row._id, row.name)}>Payslip</button>
+            )} 
+          </div>
+        );
+      }
     }
   ];
 
-  const filteredPayrolls = payrolls.filter(p => p.name?.toLowerCase().includes(searchPayroll.toLowerCase()) || p.department?.toLowerCase().includes(searchPayroll.toLowerCase()));
+  const filteredPayrolls = React.useMemo(() => {
+    return payrolls.filter(p => {
+      const matchSearch = searchPayroll
+        ? p.name?.toLowerCase().includes(searchPayroll.toLowerCase()) || p.department?.toLowerCase().includes(searchPayroll.toLowerCase())
+        : true;
+      if (!matchSearch) return false;
+
+      const sProfile = studentsMap[p.employeeId] || Object.values(studentsMap).find(s => s._id === p.employeeId || s.user?._id === p.employeeId);
+
+      if (filterVendor.length > 0) {
+        const recordVendorNames = [];
+        const recordVendorIds = [];
+
+        if (p.vendorName) {
+          recordVendorNames.push(p.vendorName.toLowerCase());
+        }
+
+        if (sProfile && sProfile.internships) {
+          sProfile.internships.forEach(i => {
+            if (i.vendorName) recordVendorNames.push(i.vendorName.toLowerCase());
+            if (i.vendor) {
+              if (typeof i.vendor === 'object') {
+                if (i.vendor._id) recordVendorIds.push(String(i.vendor._id));
+                if (i.vendor.companyName) recordVendorNames.push(i.vendor.companyName.toLowerCase());
+                if (i.vendor.name) recordVendorNames.push(i.vendor.name.toLowerCase());
+              } else {
+                recordVendorIds.push(String(i.vendor));
+              }
+            }
+          });
+        }
+
+        const matchVendor = filterVendor.some(val => {
+          const valStr = String(val).toLowerCase();
+          if (recordVendorIds.includes(String(val))) return true;
+          if (recordVendorNames.some(name => name.includes(valStr) || valStr.includes(name))) return true;
+          const vendorObj = vendors.find(v => String(v._id) === String(val) || (v.companyName || v.name)?.toLowerCase() === valStr);
+          if (vendorObj) {
+            const vName = (vendorObj.companyName || vendorObj.name || "").toLowerCase();
+            if (vName && recordVendorNames.some(name => name.includes(vName) || vName.includes(name))) return true;
+          }
+          return false;
+        });
+
+        if (!matchVendor) return false;
+      }
+
+      if (sProfile) {
+        if (filterCenter.length > 0) {
+          const cId = sProfile.center?._id || sProfile.center;
+          if (!cId || !filterCenter.includes(cId)) return false;
+        }
+        if (filterCourse.length > 0) {
+          const hasCourse = sProfile.enrolledCourses?.some(ec => filterCourse.includes(ec.course?._id || ec.course)) || filterCourse.includes(sProfile.department);
+          if (!hasCourse) return false;
+        }
+        if (filterBatch.length > 0) {
+          const selectedBatches = batches.filter(b => filterBatch.includes(b._id || b.name));
+          const matchBatch = selectedBatches.some(b => b.students?.some(bs => bs === sProfile._id || bs?._id === sProfile._id));
+          if (!matchBatch) return false;
+        }
+        if (filterYears.length > 0) {
+          if (!sProfile.year || !filterYears.includes(String(sProfile.year))) return false;
+        }
+      } else if (filterCenter.length > 0 || filterCourse.length > 0 || filterBatch.length > 0 || filterYears.length > 0) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [payrolls, searchPayroll, filterCenter, filterCourse, filterBatch, filterYears, filterVendor, studentsMap, batches, vendors]);
 
   const attendanceColumns = attendanceFilter === "leave" ? [
     { name: 'S.No', selector: (row, i) => i + 1, width: '60px' },
@@ -412,17 +531,25 @@ const generatePayslip = async (payrollId, employeeName) => {
                 {selectedTableRows.length} selected
               </span>
               <button
-                onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId, internshipId: r.internshipId})), "hold")}
+                onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId || r._id, internshipId: r.internshipId})), "hold")}
                 className="bg-orange-500 text-white text-xs px-3 py-1.5 rounded hover:bg-orange-600 transition shadow-sm font-bold"
               >
                 Hold Selected
               </button>
               <button
-                onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId, internshipId: r.internshipId})), "processing")}
+                onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId || r._id, internshipId: r.internshipId})), "processed")}
                 className="bg-brand-600 text-white text-xs px-3 py-1.5 rounded hover:bg-brand-700 transition shadow-sm font-bold"
               >
                 Process Selected
               </button>
+              {selectedTableRows.every(r => r.status === "processed" || r.status === "hold" || r.status === "paid") && (
+                <button
+                  onClick={() => handleStatusUpdate(selectedTableRows.map(r => ({employeeId: r.employeeId || r._id, internshipId: r.internshipId})), "paid")}
+                  className="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded hover:bg-emerald-700 transition shadow-sm font-bold"
+                >
+                  Paid Selected
+                </button>
+              )}
             </div>
           )}
 
@@ -438,6 +565,28 @@ const generatePayslip = async (payrollId, employeeName) => {
       )}
 
       {/* PAYROLL TABLE */}
+      {internOnly && (
+        <StudentFilterBar
+          filterType={filterType}
+          setFilterType={setFilterType}
+          filterCenter={filterCenter}
+          setFilterCenter={setFilterCenter}
+          filterCourse={filterCourse}
+          setFilterCourse={setFilterCourse}
+          filterBatch={filterBatch}
+          setFilterBatch={setFilterBatch}
+          filterYears={filterYears}
+          setFilterYears={setFilterYears}
+          filterVendor={filterVendor}
+          setFilterVendor={setFilterVendor}
+          centers={centers}
+          courses={courses}
+          batches={batches}
+          vendors={vendors}
+          showVendor={true}
+          showType={false}
+        />
+      )}
       <div
         ref={tableRef}
         className="bg-white border rounded-xl shadow-sm overflow-hidden"
@@ -540,7 +689,9 @@ const generatePayslip = async (payrollId, employeeName) => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-[10000] p-4">
           <div className="bg-white rounded-2xl p-6 w-[450px] shadow-2xl space-y-5">
             <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-800">New Payroll Adjustment</h2>
+              <h2 className="text-xl font-bold text-gray-800">
+                {internOnly ? "New Intern Payroll Adjustment" : "New Payroll Adjustment"}
+              </h2>
               <button
                 onClick={() => setPayrollFormOpen(false)}
                 className="bg-gray-100 rounded-full p-1.5 text-gray-500 hover:bg-gray-200 transition"
@@ -550,9 +701,11 @@ const generatePayslip = async (payrollId, employeeName) => {
             </div>
 
             <div className="space-y-4">
-              {/* EMPLOYEE */}
+              {/* EMPLOYEE / INTERN */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {internOnly ? "Intern Student" : "Employee"}
+                </label>
                 <select
                   className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-gray-50 text-gray-800 font-medium cursor-pointer"
                   value={selectedEmployee?._id || ""}
@@ -562,12 +715,16 @@ const generatePayslip = async (payrollId, employeeName) => {
                     )
                   }
                 >
-                  <option value="">-- Select Employee --</option>
-                  {employees.map((emp) => (
-                    <option key={emp._id} value={emp._id}>
-                      {emp.firstName} {emp.lastName} {emp.department ? `(${emp.department})` : ""}
-                    </option>
-                  ))}
+                  <option value="">-- Select {internOnly ? "Intern Student" : "Employee"} --</option>
+                  {employees.map((emp) => {
+                    const name = emp.studentNameEnglish || emp.user?.name || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || "Intern Student";
+                    const detail = emp.studentId ? `(${emp.studentId})` : emp.department ? `(${emp.department})` : "";
+                    return (
+                      <option key={emp._id} value={emp._id}>
+                        {name} {detail}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

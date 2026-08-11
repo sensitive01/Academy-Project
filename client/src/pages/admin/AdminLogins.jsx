@@ -19,8 +19,8 @@ import {
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import ReactDOM from "react-dom";
-import CustomDataTable from "../../components/DataTable";
-import Loading from "../../components/Loading";
+import CustomDataTable from "../../components/common/DataTable";
+import Loading from "../../components/common/Loading";
 
 const AdminLogins = () => {
   const [users, setUsers] = useState([]);

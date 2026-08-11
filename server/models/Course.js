@@ -40,16 +40,17 @@ const courseSchema = mongoose.Schema({
   
   title: {
     type: String,
-    required: true,
+    default: 'Untitled Course'
   },
 
   description: {
     type: String,
-    required: true,
+    default: ''
   },
 
   duration: {
     type: Number,
+    default: 0
   },
 
   durationUnit: {
@@ -72,8 +73,7 @@ const courseSchema = mongoose.Schema({
 
   instructor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
+    ref: 'User'
   },
 
   thumbnail: {
@@ -83,13 +83,12 @@ const courseSchema = mongoose.Schema({
 
   price: {
     type: Number,
-    required: true,
     default: 0,
   },
 
   category: {
     type: String,
-    required: true,
+    default: 'General',
   },
 
   type: {

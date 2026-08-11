@@ -18,7 +18,7 @@ import {
   CornerDownRight
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const DiscussionForum = () => {

@@ -28,19 +28,22 @@ const payrollSchema = new mongoose.Schema(
     present: { type: Number, default: 0 },
     absent: { type: Number, default: 0 },
     lateDays: { type: Number, default: 0 },
-    lateTime: { type: Number, default: 0 },
+    lateTime: { type: mongoose.Schema.Types.Mixed, default: 0 },
 
     netSalary: { type: Number, default: 0 },
 
     // Store multiple adjustments
     adjustments: [adjustmentSchema],
 
-    status: { type: String, enum: ["processing", "hold"], default: "processing" },
+    status: { type: String, default: "process" },
   },
   { timestamps: true }
 );
 
 // Ensure unique payroll per employee/month/year/internship
 payrollSchema.index({ employee: 1, month: 1, year: 1, internshipId: 1 }, { unique: true });
+
+delete mongoose.models.Payroll;
+delete mongoose.modelSchemas?.Payroll;
 
 module.exports = mongoose.model("Payroll", payrollSchema);

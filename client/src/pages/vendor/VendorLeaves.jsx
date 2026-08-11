@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import { toast } from "react-hot-toast";
-import Loading from "../../components/Loading";
-import CustomDataTable from "../../components/DataTable";
+import Loading from "../../components/common/Loading";
+import CustomDataTable from "../../components/common/DataTable";
 
 const VendorLeaves = () => {
     const [leaveData, setLeaveData] = useState([]);

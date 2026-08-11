@@ -20,9 +20,9 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 import LessonManagementModal from "../../components/modals/LessonManagementModal";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const CoursesTab = ({ courseType }) => {
@@ -281,21 +281,15 @@ const CoursesTab = ({ courseType }) => {
   const handleSave = async (e) => {
     e.preventDefault();
 
-    // Validation: Check if all syllabus topics are filled
-    const incompleteSyllabus = formData.syllabus.some(s => !s.topic || !s.description);
-    if (incompleteSyllabus) {
-      return toast.error("Please fill in topic and description for all modules before submitting.");
-    }
-
     const loadingToast = toast.loading("Saving course...");
     try {
       const data = new FormData();
-      data.append("title", formData.title);
-      data.append("description", formData.description);
-      data.append("price", formData.price);
-      data.append("category", formData.category);
-      data.append("type", formData.type);
-      data.append("level", formData.level);
+      data.append("title", formData.title || "Untitled Course");
+      data.append("description", formData.description || "");
+      data.append("price", courseType === "Center Courses" ? "0" : (formData.price || "0"));
+      data.append("category", courseType === "Center Courses" ? "Center Courses" : (formData.category || "Development"));
+      data.append("type", courseType);
+      data.append("level", courseType === "Center Courses" ? "Beginner" : (formData.level || "Beginner"));
       data.append("duration", formData.duration);
       data.append("durationUnit", formData.durationUnit);
       data.append("instructor", formData.instructor || user?._id);
@@ -334,8 +328,8 @@ const CoursesTab = ({ courseType }) => {
     setFormData({
       title: "",
       description: "",
-      price: "",
-      category: "Development",
+      price: courseType === "Center Courses" ? "0" : "",
+      category: courseType === "Center Courses" ? "Center Courses" : "Development",
       type: courseType,
       level: "Beginner",
       duration: "",
@@ -366,17 +360,22 @@ const CoursesTab = ({ courseType }) => {
           </div>
           <div className="ml-4">
             <div className="text-sm font-bold text-gray-900">{row.title}</div>
-            <div className="text-xs font-semibold text-slate-500">{row.duration} {row.durationUnit}s • {row.level}</div>
+            <div className="text-xs font-semibold text-slate-500">
+              {row.duration ? `${row.duration} ${row.durationUnit || 'week'}s` : ''}
+              {courseType !== "Center Courses" && row.level ? ` • ${row.level}` : ''}
+            </div>
           </div>
         </div>
       )
     },
-    { name: 'Category', selector: row => row.category, sortable: true, cell: row => (
-      <span className="px-2.5 py-1 inline-flex text-[11px] font-bold uppercase tracking-wider rounded-full bg-blue-100 text-blue-800">{row.category}</span>
-    )},
-    { name: 'Price', selector: row => row.price, sortable: true, cell: row => (
-      <span className="text-sm text-gray-900 font-bold">{row.price === 0 || row.price === "0" ? "Free" : `₹${row.price}`}</span>
-    )},
+    ...(courseType !== "Center Courses" ? [
+      { name: 'Category', selector: row => row.category, sortable: true, cell: row => (
+        <span className="px-2.5 py-1 inline-flex text-[11px] font-bold uppercase tracking-wider rounded-full bg-blue-100 text-blue-800">{row.category}</span>
+      )},
+      { name: 'Price', selector: row => row.price, sortable: true, cell: row => (
+        <span className="text-sm text-gray-900 font-bold">{row.price === 0 || row.price === "0" ? "Free" : `₹${row.price}`}</span>
+      )},
+    ] : []),
     { name: 'Status', selector: row => row.isActive, sortable: true, cell: row => (
       <span className={`px-2.5 py-1 inline-flex text-[11px] font-bold uppercase tracking-wider rounded-full ${row.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
         {row.isActive ? "Published" : "Draft"}
@@ -683,7 +682,6 @@ const CoursesTab = ({ courseType }) => {
                       </label>
                       <input
                         type="text"
-                        required
                         className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm"
                         placeholder="e.g. Master React in 30 Days"
                         value={formData.title}
@@ -697,7 +695,6 @@ const CoursesTab = ({ courseType }) => {
                         Description
                       </label>
                       <textarea
-                        required
                         rows={8}
                         className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm"
                         placeholder="Write a brief overview of the course..."
@@ -710,79 +707,62 @@ const CoursesTab = ({ courseType }) => {
                         }
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Price (₹)
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm"
-                          placeholder="0.00"
-                          value={formData.price}
-                          onChange={(e) =>
-                            setFormData({ ...formData, price: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Level
-                        </label>
-                        <select
-                          className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm appearance-none"
-                          value={formData.level}
-                          onChange={(e) =>
-                            setFormData({ ...formData, level: e.target.value })
-                          }
-                        >
-                          <option>Beginner</option>
-                          <option>Intermediate</option>
-                          <option>Advanced</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Category
-                        </label>
-                        <select
-                          className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm appearance-none"
-                          value={formData.category}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              category: e.target.value,
-                            })
-                          }
-                        >
-                          <option>Development</option>
-                          <option>Design</option>
-                          <option>Business</option>
-                          <option>Marketing</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Type
-                        </label>
-                        <select
-                          className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm appearance-none"
-                          value={formData.type}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              type: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="Online Courses">Online Course</option>
-                          <option value="Center Courses">Center Course</option>
-                        </select>
-                      </div>
-                    </div>
+                    {courseType !== "Center Courses" && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">
+                              Price (₹)
+                            </label>
+                            <input
+                              type="number"
+                              className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm"
+                              placeholder="0.00"
+                              value={formData.price}
+                              onChange={(e) =>
+                                setFormData({ ...formData, price: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">
+                              Level
+                            </label>
+                            <select
+                              className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm appearance-none"
+                              value={formData.level}
+                              onChange={(e) =>
+                                setFormData({ ...formData, level: e.target.value })
+                              }
+                            >
+                              <option>Beginner</option>
+                              <option>Intermediate</option>
+                              <option>Advanced</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Category
+                          </label>
+                          <select
+                            className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm appearance-none"
+                            value={formData.category}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                category: e.target.value,
+                              })
+                            }
+                          >
+                            <option>Development</option>
+                            <option>Design</option>
+                            <option>Business</option>
+                            <option>Marketing</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
                           Duration
@@ -821,7 +801,6 @@ const CoursesTab = ({ courseType }) => {
                         Course Instructor / Coach
                       </label>
                       <select
-                        required
                         className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm appearance-none"
                         value={formData.instructor}
                         onChange={(e) =>

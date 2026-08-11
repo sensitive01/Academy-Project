@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import { UserPlus, Check, Loader2, Trash2, Users } from "lucide-react";
 import toast from "react-hot-toast";
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
-import AssignParentStudentsModal from "../../components/AssignParentStudentsModal";
+import AssignParentStudentsModal from "../../components/modals/AssignParentStudentsModal";
 
 const ParentManagement = () => {
   const [parents, setParents] = useState([]);

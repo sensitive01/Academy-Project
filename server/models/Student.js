@@ -5,7 +5,6 @@ const studentSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
 
     parent: {
@@ -14,8 +13,8 @@ const studentSchema = new mongoose.Schema(
     },
 
     // BASIC DETAILS
-    studentId: { type: String, unique: true },
-    studentNameEnglish: { type: String, required: true },
+    studentId: { type: String, unique: true, sparse: true },
+    studentNameEnglish: { type: String, default: "New Student" },
     studentNameMotherTongue: String,
     fatherName: String,
     dob: Date,
@@ -36,7 +35,7 @@ const studentSchema = new mongoose.Schema(
     maritalStatus: String,
 
     // CONTACT
-    email: { type: String, required: true },
+    email: { type: String, default: "" },
     phone: String,
     whatsapp: String,
 

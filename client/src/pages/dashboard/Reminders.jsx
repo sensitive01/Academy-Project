@@ -13,8 +13,8 @@ import {
   CheckCircle,
   LayoutDashboard
 } from "lucide-react";
-import Loading from "../../components/Loading";
-import CustomDataTable from "../../components/DataTable";
+import Loading from "../../components/common/Loading";
+import CustomDataTable from "../../components/common/DataTable";
 
 const Reminders = () => {
   const [reminders, setReminders] = useState([]);

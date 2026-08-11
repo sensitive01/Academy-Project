@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BookOpen, MapPin, Layers, BookType } from "lucide-react";
 import api from "../../services/api";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 
 const CourseDashboardTab = () => {
   const [courses, setCourses] = useState([]);

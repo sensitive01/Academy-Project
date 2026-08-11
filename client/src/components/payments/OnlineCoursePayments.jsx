@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
-import CustomDataTable from "../DataTable";
+import CustomDataTable from "../common/DataTable";
 import { downloadReceipt } from "../../utils/downloadReceipt";
 import { Download } from "lucide-react";
 

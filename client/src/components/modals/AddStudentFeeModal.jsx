@@ -72,9 +72,9 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Fee Type</label>
               <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.feeType} onChange={e => setFormData({...formData, feeType: e.target.value})}>
+                <option value="Sem">Sem Fee</option>
                 <option value="Term">Term Fee</option>
                 <option value="Monthly">Monthly Fee</option>
-                <option value="Exam">Exam Fee</option>
                 <option value="Other">Other</option>
               </select>
             </div>
@@ -82,6 +82,15 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Specify Other Fee</label>
                 <input type="text" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.otherFeeType} onChange={e => setFormData({...formData, otherFeeType: e.target.value})} />
+              </div>
+            )}
+            {formData.feeType === 'Sem' && (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
+                <select className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.terms[0] || ""} onChange={e => setFormData({...formData, terms: e.target.value ? [Number(e.target.value)] : []})}>
+                  <option value="">Select Semester (Optional)</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => <option key={sem} value={sem}>Semester {sem}</option>)}
+                </select>
               </div>
             )}
             {formData.feeType === 'Term' && (

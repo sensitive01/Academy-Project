@@ -7,8 +7,8 @@ import AddEmployeeModal from "../../components/modals/AddEmployeeModal";
 import TakeAttendanceModal from "../../components/modals/TakeAttendanceModal";
 
 import Attendance from "../../pages/attendance/Attendance";
-import Payroll from "../../pages/payroll/Payroll";
-import LeaveRequestList from "../../components/LeaveRequestList";
+import Payroll from "../../pages/finance/Payroll";
+import LeaveRequestList from "../../components/leave/LeaveRequestList";
 import DepartmentTab from "../../components/employee-management/DepartmentTab";
 import DesignationTab from "../../components/employee-management/DesignationTab";
 import { CheckCircle, Clock } from "lucide-react";
@@ -16,7 +16,7 @@ import { CheckCircle, Clock } from "lucide-react";
 // Assuming EmployeeList is kept in the same file or a new one. I will just paste the EmployeeList code here so it works seamlessly.
 import ReactDOM from "react-dom";
 import { Mail, Phone, MoreVertical, Edit, Ban, Unlock, XCircle, Filter } from "lucide-react";
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 
 const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete }) => {
   const [openMenuId, setOpenMenuId] = useState(null);

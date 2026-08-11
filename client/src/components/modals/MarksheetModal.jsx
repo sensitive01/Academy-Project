@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { X, Printer } from 'lucide-react';
-import logo from '../assets/logo-2.jpeg';
+import logo from '../../assets/logo-2.jpeg';
 
 const MarksheetModal = ({ data, onClose }) => {
   const printRef = useRef();

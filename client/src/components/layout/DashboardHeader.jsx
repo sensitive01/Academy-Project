@@ -14,9 +14,9 @@ import {
   CreditCard,
   Inbox
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import api from "../services/api";
+import api from "../../services/api";
 
 const DashboardHeader = ({ toggleMobileSidebar }) => {
   const { user, logout } = useAuth();

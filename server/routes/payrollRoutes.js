@@ -1,3 +1,4 @@
+// Payroll routes API
 const express = require("express");
 const router = express.Router();
 const Payroll = require("../models/Payroll");
@@ -26,17 +27,19 @@ router.get("/salary/all", protect, async (req, res) => {
     let targetUsers = [];
     if (internOnly === "true") {
       const Student = require("../models/Student");
-      const students = await Student.find({ status: "active", "internships.0": { $exists: true } }).populate("user");
+      const students = await Student.find({ "internships.0": { $exists: true } }).populate("user");
       
       students.forEach(s => {
-        const activeInternships = (s.internships || []).filter(internship => {
-          if (internship.status !== 'active' && internship.status !== 'completed') return false;
+        let activeInternships = (s.internships || []).filter(internship => {
+          if (internship.status && internship.status !== 'active' && internship.status !== 'completed') return false;
           
+          if (!internship.startDate) return true;
           const iStart = new Date(internship.startDate);
+          if (isNaN(iStart.getTime())) return true;
           iStart.setHours(0, 0, 0, 0);
           
           const iEnd = internship.endDate ? new Date(internship.endDate) : null;
-          if (iEnd) iEnd.setHours(23, 59, 59, 999);
+          if (iEnd && !isNaN(iEnd.getTime())) iEnd.setHours(23, 59, 59, 999);
           
           // Check overlap with current month (startDate to endDate)
           if (iStart > endDate) return false;
@@ -44,22 +47,38 @@ router.get("/salary/all", protect, async (req, res) => {
           
           return true;
         });
-        
-        activeInternships.forEach(internship => {
+
+        // Fallback: if no internships strictly overlap the selected month, include all internships for this intern
+        if (activeInternships.length === 0 && (s.internships || []).length > 0) {
+          activeInternships = s.internships;
+        }
+
+        // Pick the latest/primary internship for this student so each student appears once
+        const internship = activeInternships[activeInternships.length - 1];
+        if (internship) {
           const salary = internship.salary ? Number(internship.salary) : 0;
-          let overlapStart = new Date(Math.max(startDate.getTime(), new Date(internship.startDate).getTime()));
-          overlapStart.setHours(0, 0, 0, 0);
+          let overlapStart = startDate;
+          if (internship.startDate) {
+            const d = new Date(internship.startDate);
+            if (!isNaN(d.getTime())) {
+              overlapStart = new Date(Math.max(startDate.getTime(), d.getTime()));
+              overlapStart.setHours(0, 0, 0, 0);
+            }
+          }
           
           let overlapEnd = new Date(endDate);
           if (internship.endDate) {
-            overlapEnd = new Date(Math.min(endDate.getTime(), new Date(internship.endDate).getTime()));
-            overlapEnd.setHours(23, 59, 59, 999);
+            const d = new Date(internship.endDate);
+            if (!isNaN(d.getTime())) {
+              overlapEnd = new Date(Math.min(endDate.getTime(), d.getTime()));
+              overlapEnd.setHours(23, 59, 59, 999);
+            }
           }
           
           targetUsers.push({
             _id: s._id,
             user: s.user?._id,
-            firstName: s.user?.name || s.studentNameEnglish,
+            firstName: s.user?.name || s.studentNameEnglish || "Intern Student",
             lastName: "",
             department: "Intern",
             salary: salary,
@@ -70,7 +89,7 @@ router.get("/salary/all", protect, async (req, res) => {
             overlapStart,
             overlapEnd
           });
-        });
+        }
       });
     } else {
       targetUsers = await Employee.find({ status: "active" });
@@ -80,86 +99,60 @@ router.get("/salary/all", protect, async (req, res) => {
       targetUsers.map(async (emp, index) => {
         const userId = emp.user;
 
-        if (!userId) {
-          return {
-            sNo: index + 1,
-            employeeId: emp._id,
-            internshipId: emp.internshipId,
-            vendorName: emp.vendorName,
-            name: `${emp.firstName} ${emp.lastName}` + (emp.vendorName ? ` (${emp.vendorName})` : ""),
-            department: emp.department,
-            basic: emp.salary,
-            allowances: 0,
-            deductions: 0,
-            advance: 0,
-            totalDays: totalDaysInMonth,
-            present: 0,
-            absent: 0,
-            lateDays: 0,
-            lateTime: "0h 0m",
-            netSalary: emp.salary,
-            _id: null
-          };
-        }
-
         // 1. Fetch Payroll Record (for adjustments)
         const payrollQuery = {
           employee: emp._id,
           month: m,
-          year: y
+          year: y,
+          internshipId: emp.internshipId || null
         };
-        if (emp.internshipId) {
-          payrollQuery.internshipId = emp.internshipId;
-        } else {
-          payrollQuery.internshipId = { $in: [null, undefined] };
-        }
         
         const payroll = await Payroll.findOne(payrollQuery);
 
-        // 2. Fetch Attendance Records
-        const attStart = emp.overlapStart || startDate;
-        const attEnd = emp.overlapEnd || endDate;
-        
-        const attendance = await Attendance.find({
-          userId,
-          date: { $gte: attStart, $lte: attEnd }
-        });
-
-        const present = attendance.length;
-
-        // 3. Fetch Approved Leaves
-        const leaves = await Leave.find({
-          userId: userId.toString(),
-          status: "approved",
-          startDate: { $lte: attEnd },
-          endDate: { $gte: attStart }
-        });
-
-        const absent = leaves.length;
-
-        // 4. Calculate Late Days/Time
-        let shiftStart = emp.shift?.start || "09:30"; 
-        // Ensure shift start is in HH:mm:ss format
-        if (shiftStart.split(":").length === 2) shiftStart += ":00";
-        
-        const shift = new Date(`1970-01-01T${shiftStart}`);
-
+        // 2. Fetch Attendance & Leaves
+        let present = 0;
+        let absent = 0;
         let lateDays = 0;
-        let totalLateMinutes = 0;
+        let lateTimeDisplay = "0h 0m";
 
-        attendance.forEach((record) => {
-          if (!record.loginTime) return;
-          const login = new Date(`1970-01-01T${record.loginTime}`);
-          if (login > shift) {
-            lateDays++;
-            const diffMinutes = Math.floor((login - shift) / (1000 * 60));
-            totalLateMinutes += diffMinutes;
-          }
-        });
+        if (userId) {
+          const attStart = emp.overlapStart || startDate;
+          const attEnd = emp.overlapEnd || endDate;
+          
+          const attendance = await Attendance.find({
+            userId,
+            date: { $gte: attStart, $lte: attEnd }
+          });
+          present = attendance.length;
 
-        const lateHours = Math.floor(totalLateMinutes / 60);
-        const lateMins = totalLateMinutes % 60;
-        const lateTimeDisplay = `${lateHours}h ${lateMins}m`;
+          const leaves = await Leave.find({
+            userId: userId.toString(),
+            status: "approved",
+            startDate: { $lte: attEnd },
+            endDate: { $gte: attStart }
+          });
+          absent = leaves.length;
+
+          let shiftStart = emp.shift?.start || "09:30"; 
+          if (shiftStart.split(":").length === 2) shiftStart += ":00";
+          
+          const shift = new Date(`1970-01-01T${shiftStart}`);
+          let totalLateMinutes = 0;
+
+          attendance.forEach((record) => {
+            if (!record.loginTime) return;
+            const login = new Date(`1970-01-01T${record.loginTime}`);
+            if (login > shift) {
+              lateDays++;
+              const diffMinutes = Math.floor((login - shift) / (1000 * 60));
+              totalLateMinutes += diffMinutes;
+            }
+          });
+
+          const lateHours = Math.floor(totalLateMinutes / 60);
+          const lateMins = totalLateMinutes % 60;
+          lateTimeDisplay = `${lateHours}h ${lateMins}m`;
+        }
 
         // 5. Calculate Salary
         const allowances = payroll ? payroll.totalAllowances : 0;
@@ -196,7 +189,7 @@ router.get("/salary/all", protect, async (req, res) => {
           lateDays,
           lateTime: lateTimeDisplay,
           netSalary,
-          status: payroll ? payroll.status : "processing",
+          status: payroll ? payroll.status : "process",
           _id: payroll ? payroll._id : null
         };
       })
@@ -219,59 +212,95 @@ router.post("/bulk-status", protect, async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    if (!["processing", "hold"].includes(status)) {
+    if (!["processing", "process", "processed", "hold", "paid"].includes(status)) {
       return res.status(400).json({ message: "Invalid status value" });
     }
 
-    const { Student } = require("../models/Student"); // Need to fetch base salaries for missing payrolls
+    const StudentModel = require("../models/Student");
+    const mongoose = require("mongoose");
 
     for (const record of records) {
       const { employeeId, internshipId } = record;
-      const query = { employee: employeeId, month: Number(month), year: Number(year) };
-      if (internshipId) query.internshipId = internshipId;
-      else query.internshipId = { $in: [null, undefined] };
+      if (!employeeId) continue;
+
+      let targetEmpId = employeeId;
+      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+        const empDoc = await Employee.findOne({ empId: employeeId });
+        if (empDoc) {
+          targetEmpId = empDoc._id;
+        } else {
+          const stuDoc = await StudentModel.findOne({ studentId: employeeId });
+          if (stuDoc) {
+            targetEmpId = stuDoc._id;
+          } else {
+            continue;
+          }
+        }
+      }
+
+      let validInternshipId = null;
+      if (internshipId && mongoose.Types.ObjectId.isValid(internshipId)) {
+        validInternshipId = internshipId;
+      }
+
+      const findQuery = { 
+        employee: targetEmpId, 
+        month: Number(month), 
+        year: Number(year)
+      };
+      if (validInternshipId) {
+        findQuery.internshipId = validInternshipId;
+      } else {
+        findQuery.internshipId = { $in: [null, undefined] };
+      }
       
-      let payroll = await Payroll.findOne(query);
+      let payroll = await Payroll.findOne(findQuery);
       
-      if (!payroll) {
-        // We need to create a default payroll record so we can persist the status
+      if (payroll) {
+        await Payroll.updateOne({ _id: payroll._id }, { $set: { status: status } });
+      } else {
         let salary = 0;
-        let employee = await Employee.findById(employeeId);
+        let employee = await Employee.findById(targetEmpId);
         
         if (employee) {
-          salary = employee.salary;
+          salary = employee.salary || 0;
         } else {
-          const StudentModel = require("../models/Student");
-          employee = await StudentModel.findById(employeeId);
-          if (employee && employee.internships) {
-             const internship = employee.internships.find(i => i._id.toString() === internshipId);
-             if (internship) salary = internship.salary ? Number(internship.salary) : 0;
-          } else if (employee) {
-             const latestInternship = employee.internships?.[employee.internships.length - 1];
-             salary = latestInternship?.salary ? Number(latestInternship.salary) : 0;
+          employee = await StudentModel.findById(targetEmpId);
+          if (employee && employee.internships && employee.internships.length > 0) {
+            if (validInternshipId) {
+              const internship = employee.internships.find(i => i._id && i._id.toString() === String(validInternshipId));
+              if (internship && internship.salary) salary = Number(internship.salary);
+            }
+            if (!salary) {
+              const latestInternship = employee.internships[employee.internships.length - 1];
+              if (latestInternship && latestInternship.salary) salary = Number(latestInternship.salary);
+            }
           }
         }
 
         if (employee) {
-          payroll = new Payroll({
-            employee: employeeId,
-            month: Number(month),
-            year: Number(year),
-            internshipId: internshipId || null,
-            basicSalary: salary,
-            totalAllowances: 0,
-            totalDeductions: 0,
-            advance: 0,
-            adjustments: [],
-            status: status
-          });
-          // Note: we don't calculate netSalary, let it default or remain 0 since basic is salary
-          payroll.netSalary = salary; 
-          await payroll.save();
+          try {
+            payroll = new Payroll({
+              employee: targetEmpId,
+              month: Number(month),
+              year: Number(year),
+              internshipId: validInternshipId || null,
+              basicSalary: salary,
+              totalAllowances: 0,
+              totalDeductions: 0,
+              advance: 0,
+              adjustments: [],
+              status: status,
+              netSalary: salary
+            });
+            await payroll.save({ validateBeforeSave: false });
+          } catch (dupErr) {
+            await Payroll.updateOne(
+              { employee: targetEmpId, month: Number(month), year: Number(year) },
+              { $set: { status: status } }
+            );
+          }
         }
-      } else {
-        payroll.status = status;
-        await payroll.save();
       }
     }
 
@@ -293,8 +322,25 @@ router.post("/adjustment", protect, async (req, res) => {
       return res.status(400).json({ message: "All fields required" });
     }
 
+    let targetEmpId = employeeId;
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      const Employee = require("../models/Employee");
+      const empDoc = await Employee.findOne({ empId: employeeId });
+      if (empDoc) {
+        targetEmpId = empDoc._id;
+      } else {
+        const Student = require("../models/Student");
+        const stuDoc = await Student.findOne({ studentId: employeeId });
+        if (stuDoc) {
+          targetEmpId = stuDoc._id;
+        } else {
+          return res.status(404).json({ message: "Employee/Intern not found" });
+        }
+      }
+    }
+
     const query = {
-      employee: employeeId,
+      employee: targetEmpId,
       month: Number(month),
       year: Number(year)
     };
@@ -335,7 +381,8 @@ router.post("/adjustment", protect, async (req, res) => {
         totalAllowances: 0,
         totalDeductions: 0,
         advance: 0,
-        adjustments: []
+        adjustments: [],
+        status: "process"
       });
     }
 
@@ -356,7 +403,7 @@ router.post("/adjustment", protect, async (req, res) => {
       payroll.totalDeductions -
       payroll.advance;
 
-    await payroll.save();
+    await payroll.save({ validateBeforeSave: false });
 
     res.status(200).json({
       message: "Adjustment applied",
@@ -379,7 +426,8 @@ router.get('/payslip/:id', protect, async (req, res) => {
     
     let payroll = await Payroll.findById(req.params.id).populate('employee');
     let emp = payroll.employee;
-    
+    let isIntern = Boolean(payrollRaw.internshipId);
+
     if (!emp) {
       const Student = require("../models/Student");
       const student = await Student.findById(payrollRaw.employee).populate('user');
@@ -395,14 +443,26 @@ router.get('/payslip/:id', protect, async (req, res) => {
         emp = {
           _id: student._id,
           user: student.user?._id,
+          studentId: student.studentId || student._id.toString().substring(0,8).toUpperCase(),
           firstName: student.user?.name || student.studentNameEnglish,
           lastName: "",
           department: internDept,
           shift: { start: "09:30" },
-          internshipId: payrollRaw.internshipId
+          internshipId: payrollRaw.internshipId,
+          isIntern: true
         };
+        isIntern = true;
       } else {
         return res.status(404).json({ message: "Employee/Intern not found for this payroll" });
+      }
+    } else {
+      if (emp.department?.toLowerCase().includes("intern") || payrollRaw.internshipId) {
+        isIntern = true;
+        const Student = require("../models/Student");
+        const student = await Student.findById(payrollRaw.employee);
+        if (student) {
+          emp.studentId = student.studentId || student._id.toString().substring(0,8).toUpperCase();
+        }
       }
     }
     
@@ -482,7 +542,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
 
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename=Payslip_${emp.firstName}_${emp.lastName}_${m}_${y}.pdf`
+      `attachment; filename=${isIntern ? 'Stipend_Slip' : 'Payslip'}_${emp.firstName}_${m}_${y}.pdf`
     );
     res.setHeader('Content-Type', 'application/pdf');
 
@@ -508,13 +568,13 @@ router.get('/payslip/:id', protect, async (req, res) => {
        
     doc.fontSize(10).font('Helvetica')
        .opacity(0.8)
-       .text("Official Employee Payslip", 50, 65)
+       .text(isIntern ? "Official Intern Stipend Slip" : "Official Employee Payslip", 50, 65)
        .opacity(1);
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthName = monthNames[m - 1];
 
-    let payslipPeriod = `Payslip for ${monthName} ${y}`;
+    let payslipPeriod = `${isIntern ? 'Stipend Slip' : 'Payslip'} for ${monthName} ${y}`;
     if (emp.internshipId) {
       const sDateStr = startDate.getDate().toString().padStart(2, '0') + '-' + monthNames[startDate.getMonth()].substring(0,3);
       const eDateStr = endDate.getDate().toString().padStart(2, '0') + '-' + monthNames[endDate.getMonth()].substring(0,3);
@@ -528,24 +588,24 @@ router.get('/payslip/:id', protect, async (req, res) => {
        .text(payslipPeriod, doc.page.width - 250, 45, { align: 'right' });
 
     // ===============================
-    // EMPLOYEE DETAILS SECTION
+    // EMPLOYEE / INTERN DETAILS SECTION
     // ===============================
     doc.moveDown(4);
     let topY = Math.max(doc.y, 120);
 
-    // Box around employee details
+    // Box around details
     doc.rect(50, topY, doc.page.width - 100, 90)
        .lineWidth(1).strokeColor(accentColor).stroke();
 
     doc.fillColor(textDark)
        .fontSize(13).font('Helvetica-Bold')
-       .text("Employee Information", 65, topY + 15);
+       .text(isIntern ? "Intern Information" : "Employee Information", 65, topY + 15);
 
     doc.fontSize(10).font('Helvetica').fillColor(textLight);
     
     // Left column info
     doc.text("Name:", 65, topY + 40)
-       .text("Employee ID:", 65, topY + 60);
+       .text(isIntern ? "Student ID:" : "Employee ID:", 65, topY + 60);
 
     // Right column info
     const midX = doc.page.width / 2;
@@ -553,11 +613,15 @@ router.get('/payslip/:id', protect, async (req, res) => {
        .text("Designation:", midX, topY + 60);
 
     // Values (Dark details)
+    const displayId = isIntern 
+      ? (emp.studentId || emp.empId || payroll._id.toString().substring(0,8).toUpperCase())
+      : (emp.empId || payroll._id.toString().substring(0,8).toUpperCase());
+
     doc.fillColor(textDark).font('Helvetica-Bold');
-    doc.text(`${emp.firstName} ${emp.lastName}`, 145, topY + 40)
-       .text(emp.empId || payroll._id.toString().substring(0,8).toUpperCase(), 145, topY + 60)
+    doc.text(`${emp.firstName} ${emp.lastName}`.trim(), 145, topY + 40)
+       .text(displayId, 145, topY + 60)
        .text((emp.department || '-').toUpperCase(), midX + 80, topY + 40)
-       .text((emp.position || '-').toUpperCase(), midX + 80, topY + 60);
+       .text((emp.position || (isIntern ? 'INTERN' : '-')).toUpperCase(), midX + 80, topY + 60);
 
 
     // ===============================
@@ -586,7 +650,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
        .text(lateTimeDisplay, 455, topY + 45);
 
     // ===============================
-    // SALARY BREAKDOWN TABLE
+    // SALARY / STIPEND BREAKDOWN TABLE
     // ===============================
     topY += 95;
 
@@ -601,17 +665,36 @@ router.get('/payslip/:id', protect, async (req, res) => {
     let currentY = topY + 35;
 
     const earnings = [
-      { name: 'Basic Salary', amount: payroll.basicSalary },
-      { name: 'Allowances (Total)', amount: payroll.totalAllowances },
+      { name: isIntern ? 'Basic Stipend' : 'Basic Salary', amount: payroll.basicSalary }
     ];
 
-    const deductions = [
-      { name: 'Deductions (Total)', amount: payroll.totalDeductions },
-      { name: 'Advance Pay', amount: payroll.advance },
-    ];
+    const allowanceAdjustments = (payroll.adjustments || []).filter(a => a.type === 'allowance');
+    if (allowanceAdjustments.length > 0) {
+      allowanceAdjustments.forEach(a => {
+        earnings.push({ name: a.note ? `Allowance (${a.note})` : 'Allowance', amount: a.amount });
+      });
+    } else if (payroll.totalAllowances > 0) {
+      earnings.push({ name: 'Allowances (Total)', amount: payroll.totalAllowances });
+    }
 
-    // Filter adjustments out to show individual ones if preferred, but they are summarized in totals in Payroll Schema
-    // We will show the generalized details here.
+    const deductions = [];
+    const deductionAdjustments = (payroll.adjustments || []).filter(a => a.type === 'deduction');
+    if (deductionAdjustments.length > 0) {
+      deductionAdjustments.forEach(a => {
+        deductions.push({ name: a.note ? `Deduction (${a.note})` : 'Deduction', amount: a.amount });
+      });
+    } else if (payroll.totalDeductions > 0) {
+      deductions.push({ name: 'Deductions (Total)', amount: payroll.totalDeductions });
+    }
+
+    const advanceAdjustments = (payroll.adjustments || []).filter(a => a.type === 'advance');
+    if (advanceAdjustments.length > 0) {
+      advanceAdjustments.forEach(a => {
+        deductions.push({ name: a.note ? `Advance (${a.note})` : 'Advance Pay', amount: a.amount });
+      });
+    } else if (payroll.advance > 0) {
+      deductions.push({ name: 'Advance Pay', amount: payroll.advance });
+    }
 
     doc.font('Helvetica').fontSize(10);
     const tableRows = Math.max(earnings.length, deductions.length);
@@ -625,14 +708,13 @@ router.get('/payslip/:id', protect, async (req, res) => {
       if (e) totalEarning += e.amount;
       if (d) totalDeduction += d.amount;
 
-      // Ensure alternating colors if we had many rows, but we use lines here instead
       doc.fillColor(textDark);
       if (e) {
-        doc.text(e.name, 60, currentY);
+        doc.text(e.name, 60, currentY, { width: 145 });
         doc.text(e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 210, currentY, { width: 80, align: 'right' });
       }
       if (d) {
-        doc.text(d.name, 310, currentY);
+        doc.text(d.name, 310, currentY, { width: 135 });
         doc.text(d.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 450, currentY, { width: 80, align: 'right' });
       }
       currentY += 20;
@@ -662,7 +744,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
        .fill('#1e40af'); // blue-800
     
     doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold');
-    doc.text("Net Salary :", doc.page.width - 240, currentY + 11);
+    doc.text(isIntern ? "Net Stipend :" : "Net Salary :", doc.page.width - 240, currentY + 11);
     doc.text("₹ " + payroll.netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2 }), doc.page.width - 150, currentY + 11, { width: 90, align: 'right' });
 
     // Amount in words
@@ -684,7 +766,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
     currentY += 10;
     doc.fillColor(secondaryColor).fontSize(10).font('Helvetica');
     doc.text("Employer Signature", 50, currentY, { width: 150, align: 'center' });
-    doc.text("Employee Signature", doc.page.width - 200, currentY, { width: 150, align: 'center' });
+    doc.text(isIntern ? "Intern Signature" : "Employee Signature", doc.page.width - 200, currentY, { width: 150, align: 'center' });
 
     doc.moveDown(4);
     doc.fontSize(8).fillColor('#94a3b8')

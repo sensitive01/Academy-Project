@@ -16,11 +16,11 @@ import {
   FileText,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import Slider from "../components/Slider";
-import medicalImg from "../assets/medical.png";
-import hospitalityImg from "../assets/hospitality.png";
-import vocationalImg from "../assets/vocational.png";
-import campusImg from "../assets/campus.png";
+import Slider from "../../components/common/Slider";
+import medicalImg from "../../assets/medical.png";
+import hospitalityImg from "../../assets/hospitality.png";
+import vocationalImg from "../../assets/vocational.png";
+import campusImg from "../../assets/campus.png";
 
 const Home = () => {
   const [searchParams, setSearchParams] = useSearchParams();

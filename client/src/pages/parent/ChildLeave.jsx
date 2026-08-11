@@ -3,8 +3,8 @@ import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { Search } from "lucide-react";
-import CustomDataTable from "../../components/DataTable";
-import Loading from "../../components/Loading";
+import CustomDataTable from "../../components/common/DataTable";
+import Loading from "../../components/common/Loading";
 
 const ChildLeave = () => {
   const { user } = useAuth();

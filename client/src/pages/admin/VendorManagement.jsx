@@ -3,8 +3,8 @@ import api from "../../services/api";
 import { toast } from "react-hot-toast";
 import { Plus, Briefcase, Mail, Phone, MapPin, Building, Globe, MoreVertical, Edit, Trash2, Ban, UserCheck, X } from "lucide-react";
 import ReactDOM from "react-dom";
-import Loading from "../../components/Loading";
-import CustomDataTable from "../../components/DataTable";
+import Loading from "../../components/common/Loading";
+import CustomDataTable from "../../components/common/DataTable";
 
 const VendorManagement = () => {
   const [vendors, setVendors] = useState([]);

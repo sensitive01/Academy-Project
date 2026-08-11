@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import medicalHero from '../assets/medical_hero.png';
-import hospitalityHero from '../assets/hospitality_hero.png';
-import techHero from '../assets/tech_hero.png';
+import medicalHero from '../../assets/medical_hero.png';
+import hospitalityHero from '../../assets/hospitality_hero.png';
+import techHero from '../../assets/tech_hero.png';
 
 const slides = [
   {

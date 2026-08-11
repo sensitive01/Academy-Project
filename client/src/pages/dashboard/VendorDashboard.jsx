@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import { toast } from "react-hot-toast";
 import { UserCheck, CalendarDays, Watch, Search } from "lucide-react";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 
 const VendorDashboard = () => {
     const [interns, setInterns] = useState([]);

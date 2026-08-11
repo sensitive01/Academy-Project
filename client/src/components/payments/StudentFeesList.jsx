@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
-import CustomDataTable from "../DataTable";
+import CustomDataTable from "../common/DataTable";
 import toast from "react-hot-toast";
-import AddStudentFeeModal from "../AddStudentFeeModal";
+import AddStudentFeeModal from "../modals/AddStudentFeeModal";
 import CollectPaymentModal from "./CollectPaymentModal";
 import { downloadReceipt } from "../../utils/downloadReceipt";
 import { Download } from "lucide-react";

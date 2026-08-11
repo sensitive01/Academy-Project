@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import AddExpenseModal from "./AddExpenseModel";
-import CustomDataTable from "../../components/DataTable";
+import AddExpenseModal from "../expenses/AddExpenseModel";
+import CustomDataTable from "../../components/common/DataTable";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import { downloadReceipt } from "../../utils/downloadReceipt";
 

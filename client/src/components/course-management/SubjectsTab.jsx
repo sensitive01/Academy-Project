@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import CustomDataTable from "../../components/DataTable";
-import AssignStudentsModal from "../../components/AssignStudentsModal";
-import MultiSelectSubjects from "../../components/MultiSelectSubjects";
+import CustomDataTable from "../../components/common/DataTable";
+import AssignStudentsModal from "../../components/modals/AssignStudentsModal";
+import MultiSelectSubjects from "../../components/common/MultiSelectSubjects";
 
 const toTitleCase = (str) => {
   return str

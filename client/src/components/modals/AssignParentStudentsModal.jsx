@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Users, Save, Plus, Search } from 'lucide-react';
-import api from '../services/api';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const AssignParentStudentsModal = ({ parent, onClose, onAssignSuccess }) => {

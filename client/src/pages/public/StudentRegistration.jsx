@@ -4,10 +4,10 @@ import {
   CreditCard, Languages, ShieldCheck, Globe, GraduationCap, Phone, Mail, Home,
   Info, AlertCircle, FileText
 } from "lucide-react";
-import api from "../services/api";
+import api from "../../services/api";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 const StudentRegistration = () => {
   const navigate = useNavigate();
@@ -83,8 +83,78 @@ const StudentRegistration = () => {
   const [adminEnrollment, setAdminEnrollment] = useState({
     course: "",
     batch: "",
+    councilFee: "",
+    courseFee: "",
+    selectedScheme: "",
     fees: []
   });
+
+  const calculateAndApplyScheme = (councilFeeVal, courseFeeVal, scheme) => {
+    const cFee = Number(councilFeeVal) || 0;
+    const crsFee = Number(courseFeeVal) || 0;
+    const generatedFees = [];
+
+    if (cFee > 0) {
+      generatedFees.push({
+        feeType: 'Other',
+        otherFeeType: 'Council Fees',
+        amount: cFee,
+        name: 'Council Fees'
+      });
+    }
+
+    if (crsFee > 0 && scheme) {
+      if (scheme === 'monthly') {
+        const monthlyAmt = Math.round(crsFee / 12);
+        for (let i = 1; i <= 12; i++) {
+          generatedFees.push({
+            feeType: 'Monthly',
+            otherFeeType: `Month ${i}`,
+            amount: monthlyAmt,
+            name: `Month ${i} Installment`
+          });
+        }
+      } else if (scheme === 'sem') {
+        const semAmt = Math.round(crsFee / 6);
+        for (let i = 1; i <= 6; i++) {
+          generatedFees.push({
+            feeType: 'Sem',
+            otherFeeType: `Semester ${i}`,
+            amount: semAmt,
+            name: `Semester ${i} Fee`
+          });
+        }
+      } else if (scheme === 'term3') {
+        const termAmt = Math.round(crsFee / 3);
+        for (let i = 1; i <= 3; i++) {
+          generatedFees.push({
+            feeType: 'Term',
+            otherFeeType: `Term ${i}`,
+            amount: termAmt,
+            name: `Term ${i} Fee`
+          });
+        }
+      } else if (scheme === 'term4') {
+        const termAmt = Math.round(crsFee / 4);
+        for (let i = 1; i <= 4; i++) {
+          generatedFees.push({
+            feeType: 'Term',
+            otherFeeType: `Term ${i}`,
+            amount: termAmt,
+            name: `Term ${i} Fee`
+          });
+        }
+      }
+    }
+
+    setAdminEnrollment(prev => ({
+      ...prev,
+      councilFee: councilFeeVal,
+      courseFee: courseFeeVal,
+      selectedScheme: scheme,
+      fees: generatedFees.length > 0 ? generatedFees : prev.fees
+    }));
+  };
 
   useEffect(() => {
     const fetchCenters = async () => {
@@ -179,9 +249,12 @@ const StudentRegistration = () => {
     }));
   };
 
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdmin = (user?.role === 'admin') || (storedUser?.role === 'admin');
+
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      const maxSteps = user?.role === 'admin' ? 6 : 5;
+      const maxSteps = isAdmin ? 6 : 5;
       setCurrentStep((prev) => Math.min(prev + 1, maxSteps));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -193,39 +266,12 @@ const StudentRegistration = () => {
   };
 
   const validateStep = (step) => {
-    if (step === 1) {
-      if (!formData.studentNameEnglish || !formData.dob || !formData.gender) {
-        toast.error("Required: Student Name, Date of Birth, and Gender.");
-        return false;
-      }
-    }
-    if (step === 2) {
-      if (!formData.whatsapp || !formData.email) {
-        toast.error("Required: Phone Number and Email Address.");
-        return false;
-      }
-      if (!isEmailVerified) {
-        toast.error("Please verify your email address to proceed.");
-        return false;
-      }
-    }
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitAttempted(true);
-
-    if (!declaration) {
-      toast.error("Please read and accept the final declaration to submit your application.");
-      return;
-    }
-
-    if (!isEmailVerified) {
-      toast.error("Your email is not verified. Please go back to Step 2 and verify your email.");
-      setCurrentStep(2);
-      return;
-    }
 
     setLoading(true);
     try {
@@ -279,12 +325,12 @@ const StudentRegistration = () => {
           placeOfSchool: formData.hscPlace,
           boardOfExamination: formData.hscBoard,
         },
-        adminEnrollment: user?.role === 'admin' ? adminEnrollment : undefined,
+        adminEnrollment: isAdmin ? adminEnrollment : undefined,
       };
 
       const res = await api.post("/students/public-registration", payload);
       toast.success("Application Submitted Successfully!");
-      setCurrentStep(6);
+      setCurrentStep(isAdmin ? 7 : 6);
     } catch (err) {
       console.error(err);
       if (err.response?.data?.errors) {
@@ -304,9 +350,10 @@ const StudentRegistration = () => {
     { title: "Background", icon: <GraduationCap size={20} /> },
     { title: "Marksheet", icon: <BookOpen size={20} /> },
     { title: "Family", icon: <Users size={20} /> },
+    ...(isAdmin ? [{ title: "Fees", icon: <CreditCard size={20} /> }] : [])
   ];
 
-  if (currentStep === 6) {
+  if (currentStep === (isAdmin ? 7 : 6)) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="max-w-2xl w-full bg-white rounded-3xl p-12 text-center shadow-2xl border-t-8 border-brand-700">
@@ -347,7 +394,7 @@ const StudentRegistration = () => {
 
       <div className="max-w-6xl mx-auto px-4 pb-20">
         {/* Professional Stepper Indicator */}
-        <div className="grid grid-cols-5 gap-2 md:gap-4 -mt-8 mb-10">
+        <div className={`grid ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'} gap-2 md:gap-4 -mt-8 mb-10`}>
           {steps.map((s, i) => (
             <div key={i}
               onClick={() => {
@@ -373,7 +420,7 @@ const StudentRegistration = () => {
               <span className="text-[10px] font-bold tracking-widest">Fields marked with (*) are mandatory</span>
             </div>
             <div className="text-[10px] font-bold text-slate-400 tracking-widest">
-              Step {currentStep} of 5
+              Step {currentStep} of {isAdmin ? 6 : 5}
             </div>
           </div>
 
@@ -848,16 +895,17 @@ const StudentRegistration = () => {
               </div>
             )}
 
-            {currentStep === 6 && user?.role === 'admin' && (
-              <div className="space-y-10 animate-fade-in-up">
-                <StepHeader title="Course & Fees" subtitle="Assign a course, batch, and upfront fees (Admin Only)" icon={<CreditCard className="text-brand-700" />} />
+            {currentStep === 6 && isAdmin && (
+              <div className="space-y-8 animate-fade-in-up">
+                <StepHeader title="Fee Structure & Course Assignment" subtitle="Assign Course, Batch, Council Fees, and Course Fee Schemes (Step 6)" icon={<CreditCard className="text-brand-700" />} />
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
+                {/* Course & Batch Selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50/70 rounded-2xl border border-slate-100 shadow-sm">
                   <SelectBox 
                     label="Assign Course" 
                     value={adminEnrollment.course} 
                     onChange={(e) => setAdminEnrollment(prev => ({...prev, course: e.target.value}))} 
-                    options={[{value: '', label: 'Select a Course'}, ...courses.map(c => ({value: c._id, label: c.title}))]} 
+                    options={[{value: '', label: 'Select a Course'}, ...courses.filter(c => c.type === 'Center Courses' || c.category === 'Center Courses').map(c => ({value: c._id, label: c.title}))]} 
                     isObjectOptions 
                   />
                   <SelectBox 
@@ -869,60 +917,219 @@ const StudentRegistration = () => {
                   />
                 </div>
 
+                {/* Fees Input Section */}
+                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                  <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-brand-600"></span> Fee Amounts & Structure
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <FormInput 
+                        label="Council Fees (₹) [Direct Enter]" 
+                        type="number" 
+                        value={adminEnrollment.councilFee} 
+                        onChange={(e) => calculateAndApplyScheme(e.target.value, adminEnrollment.courseFee, adminEnrollment.selectedScheme)}
+                        placeholder="e.g. 5000" 
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1 font-semibold">One-time / direct council fee amount</p>
+                    </div>
+
+                    <div>
+                      <FormInput 
+                        label="Total Course Fees (₹) [Will Split Below]" 
+                        type="number" 
+                        value={adminEnrollment.courseFee} 
+                        onChange={(e) => calculateAndApplyScheme(adminEnrollment.councilFee, e.target.value, adminEnrollment.selectedScheme)}
+                        placeholder="e.g. 60000" 
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1 font-semibold">Total course fee to split into payment schemes</p>
+                    </div>
+                  </div>
+
+                  {/* Payment Schemes Cards */}
+                  {Number(adminEnrollment.courseFee) > 0 && (
+                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                      <label className="text-xs font-black tracking-wider uppercase text-slate-700">
+                        Select Course Fee Payment Scheme
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                        {/* Monthly Scheme */}
+                        <div 
+                          onClick={() => calculateAndApplyScheme(adminEnrollment.councilFee, adminEnrollment.courseFee, 'monthly')}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            adminEnrollment.selectedScheme === 'monthly'
+                              ? 'border-brand-600 bg-brand-50/40 ring-2 ring-brand-600/20 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:border-brand-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-brand-700">Monthly</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-100 text-brand-800">12 Split</span>
+                          </div>
+                          <div className="text-lg font-black text-slate-900">
+                            ₹{Math.round(Number(adminEnrollment.courseFee) / 12).toLocaleString("en-IN")} <span className="text-xs font-normal text-slate-500">/ mo</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">12 Monthly Installments (amount / 12)</p>
+                        </div>
+
+                        {/* Semester Scheme */}
+                        <div 
+                          onClick={() => calculateAndApplyScheme(adminEnrollment.councilFee, adminEnrollment.courseFee, 'sem')}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            adminEnrollment.selectedScheme === 'sem'
+                              ? 'border-brand-600 bg-brand-50/40 ring-2 ring-brand-600/20 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:border-brand-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-brand-700">Semester</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">6 Split</span>
+                          </div>
+                          <div className="text-lg font-black text-slate-900">
+                            ₹{Math.round(Number(adminEnrollment.courseFee) / 6).toLocaleString("en-IN")} <span className="text-xs font-normal text-slate-500">/ sem</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">6 Semester Payments (amount / 6)</p>
+                        </div>
+
+                        {/* 3 Terms Scheme */}
+                        <div 
+                          onClick={() => calculateAndApplyScheme(adminEnrollment.councilFee, adminEnrollment.courseFee, 'term3')}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            adminEnrollment.selectedScheme === 'term3'
+                              ? 'border-brand-600 bg-brand-50/40 ring-2 ring-brand-600/20 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:border-brand-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-brand-700">Term (3 Split)</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">3 Terms</span>
+                          </div>
+                          <div className="text-lg font-black text-slate-900">
+                            ₹{Math.round(Number(adminEnrollment.courseFee) / 3).toLocaleString("en-IN")} <span className="text-xs font-normal text-slate-500">/ term</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">3 Term Payments (amount / 3)</p>
+                        </div>
+
+                        {/* 4 Terms Scheme */}
+                        <div 
+                          onClick={() => calculateAndApplyScheme(adminEnrollment.councilFee, adminEnrollment.courseFee, 'term4')}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            adminEnrollment.selectedScheme === 'term4'
+                              ? 'border-brand-600 bg-brand-50/40 ring-2 ring-brand-600/20 shadow-md'
+                              : 'border-slate-200 bg-slate-50 hover:border-brand-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-brand-700">Term (4 Split)</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">4 Terms</span>
+                          </div>
+                          <div className="text-lg font-black text-slate-900">
+                            ₹{Math.round(Number(adminEnrollment.courseFee) / 4).toLocaleString("en-IN")} <span className="text-xs font-normal text-slate-500">/ term</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">4 Term Payments (amount / 4)</p>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Generated Fee Schedule Breakdown Table */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-slate-900">Upfront Fees</h3>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">Generated Fee Schedule & Breakdown</h3>
+                      <p className="text-xs text-slate-500">Review, modify, or add custom fee items before completing registration</p>
+                    </div>
                     <button 
                       type="button" 
-                      onClick={() => setAdminEnrollment(prev => ({ ...prev, fees: [...prev.fees, { feeType: 'Term', amount: '' }] }))} 
-                      className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-sm font-bold hover:bg-slate-300 transition-colors"
+                      onClick={() => setAdminEnrollment(prev => ({ ...prev, fees: [...prev.fees, { feeType: 'Other', otherFeeType: 'Custom Fee', amount: '' }] }))} 
+                      className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors shadow-sm"
                     >
-                      + Add Fee
+                      + Add Custom Fee Row
                     </button>
                   </div>
                   
-                  {adminEnrollment.fees.map((fee, idx) => (
-                    <div key={idx} className="flex gap-4 items-center bg-white p-4 border border-slate-200 rounded-xl">
-                      <div className="flex-1">
-                        <SelectBox 
-                          label="Fee Type" 
-                          value={fee.feeType} 
-                          onChange={(e) => {
-                            const newFees = [...adminEnrollment.fees];
-                            newFees[idx].feeType = e.target.value;
-                            setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                          }} 
-                          options={[{value: 'Term', label: 'Term'}, {value: 'Exam', label: 'Exam'}, {value: 'Monthly', label: 'Monthly'}, {value: 'Other', label: 'Other'}]} 
-                          isObjectOptions 
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <FormInput 
-                          label="Amount (₹)" 
-                          type="number" 
-                          value={fee.amount} 
-                          onChange={(e) => {
-                            const newFees = [...adminEnrollment.fees];
-                            newFees[idx].amount = e.target.value;
-                            setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                          }} 
-                          placeholder="e.g. 5000" 
-                        />
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={() => {
-                          const newFees = adminEnrollment.fees.filter((_, i) => i !== idx);
-                          setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                        }}
-                        className="mt-5 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors font-bold text-xs"
-                      >
-                        REMOVE
-                      </button>
+                  {adminEnrollment.fees.length > 0 ? (
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider">
+                          <tr>
+                            <th className="p-3">#</th>
+                            <th className="p-3">Fee Name / Type</th>
+                            <th className="p-3">Category</th>
+                            <th className="p-3 text-right">Amount (₹)</th>
+                            <th className="p-3 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {adminEnrollment.fees.map((fee, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="p-3 font-semibold text-slate-400">{idx + 1}</td>
+                              <td className="p-3">
+                                <input
+                                  type="text"
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 focus:bg-white focus:border-brand-600 outline-none"
+                                  value={fee.otherFeeType || fee.name || fee.feeType}
+                                  onChange={(e) => {
+                                    const newFees = [...adminEnrollment.fees];
+                                    newFees[idx].otherFeeType = e.target.value;
+                                    newFees[idx].name = e.target.value;
+                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                                  }}
+                                />
+                              </td>
+                              <td className="p-3">
+                                <select 
+                                  value={fee.feeType}
+                                  onChange={(e) => {
+                                    const newFees = [...adminEnrollment.fees];
+                                    newFees[idx].feeType = e.target.value;
+                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                                  }}
+                                  className="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-700 outline-none"
+                                >
+                                  <option value="Sem">Sem Fee</option>
+                                  <option value="Term">Term Fee</option>
+                                  <option value="Monthly">Monthly Fee</option>
+                                  <option value="Other">Other / Council</option>
+                                </select>
+                              </td>
+                              <td className="p-3 text-right">
+                                <input
+                                  type="number"
+                                  className="w-32 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-right text-slate-900 focus:bg-white focus:border-brand-600 outline-none"
+                                  value={fee.amount}
+                                  onChange={(e) => {
+                                    const newFees = [...adminEnrollment.fees];
+                                    newFees[idx].amount = e.target.value;
+                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                                  }}
+                                />
+                              </td>
+                              <td className="p-3 text-center">
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    const newFees = adminEnrollment.fees.filter((_, i) => i !== idx);
+                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors font-bold text-[11px]"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                  {adminEnrollment.fees.length === 0 && (
-                    <p className="text-sm text-slate-500 italic">No fees added yet.</p>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+                      No fees structured yet. Enter Council Fees & Course Fees above and select a payment scheme to split automatically.
+                    </p>
                   )}
                 </div>
               </div>
@@ -938,7 +1145,7 @@ const StudentRegistration = () => {
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-4 w-full md:w-auto">
-                {currentStep < (user?.role === 'admin' ? 6 : 5) ? (
+                {currentStep < (isAdmin ? 6 : 5) ? (
                   <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
                     Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </button>

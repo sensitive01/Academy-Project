@@ -14,8 +14,8 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import CustomDataTable from "../../components/DataTable";
-import Loading from "../../components/Loading";
+import CustomDataTable from "../../components/common/DataTable";
+import Loading from "../../components/common/Loading";
 
 const MyCourses = () => {
   const [courses, setCourses] = useState([]);

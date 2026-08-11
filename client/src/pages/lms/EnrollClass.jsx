@@ -3,7 +3,7 @@ import { BookOpen, IndianRupee, GraduationCap, Clock } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 
 const EnrollClass = () => {
   const { user } = useAuth();

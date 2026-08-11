@@ -13,12 +13,12 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import PublicLayout from "./layouts/PublicLayout";
 
 // Public Pages
-import Home from "./pages/Home";
-import Login from "./pages/Login";
+import Home from "./pages/public/Home";
+import Login from "./pages/public/Login";
 import CourseCatalog from "./pages/lms/CourseCatalog";
-import ForgotPassword from "./components/ForgotPassword";
-import StudentRegistration from "./pages/StudentRegistration";
-import PublicResults from "./pages/PublicResults";
+import ForgotPassword from "./components/auth/ForgotPassword";
+import StudentRegistration from "./pages/public/StudentRegistration";
+import PublicResults from "./pages/public/PublicResults";
 
 import CertificateView from "./pages/lms/CertificateView";
 
@@ -26,15 +26,15 @@ import CertificateView from "./pages/lms/CertificateView";
 import Dashboard from "./pages/Dashboard";
 import MyLearning from "./pages/lms/MyLearning";
 import CoursePlayer from "./pages/lms/CoursePlayer";
-import PaymentsHub from "./pages/dashboard/PaymentsHub";
+import PaymentsHub from "./pages/finance/PaymentsHub";
 import EnrollClass from "./pages/lms/EnrollClass";
 import CourseManagement from "./pages/admin/CourseManagement";
-import ExamManagement from "./pages/dashboard/ExamManagement";
+import ExamManagement from "./pages/admin/ExamManagement";
 import CenterManagement from "./pages/admin/CenterManagement";
 import GlobalSearch from "./pages/admin/GlobalSearch";
-import HR from "./pages/dashboard/HR";
+import HR from "./pages/admin/HR";
 import Settings from "./pages/dashboard/Settings";
-import Students from "./pages/dashboard/Students";
+import Students from "./pages/students/Students";
 import VendorManagement from "./pages/admin/VendorManagement";
 import EnquiryManagement from "./pages/admin/EnquiryManagement";
 import Reminders from "./pages/dashboard/Reminders";
@@ -48,23 +48,23 @@ import RegisterChild from "./pages/parent/RegisterChild";
 import Attendance from "./pages/attendance/Attendance";
 import BulkAttendance from "./pages/attendance/BulkAttendance";
 import Profile from "./pages/profile/Profile";
-import Finance from "./pages/Finance";
+import Finance from "./pages/finance/Finance";
 import Announcement from "./pages/dashboard/Announcement";
 import DiscussionForum from "./pages/dashboard/DiscussionForum";
-import Expenses from "./pages/expenses/Expenses";
-import MyCourses from "./pages/coach/MyCourses";
+import Expenses from "./pages/finance/Expenses";
+import MyCourses from "./pages/lms/MyCourses";
 import Subscription from "./pages/dashboard/Subscription";
 import Notifications from "./pages/dashboard/Notifications";
 
 // Leave
-import LeaveRequestList from "./components/LeaveRequestList";
+import LeaveRequestList from "./components/leave/LeaveRequestList";
 
-import Loading from "./components/Loading";
+import Loading from "./components/common/Loading";
 
 // Vendor Pages
 import VendorAttendance from "./pages/vendor/VendorAttendance";
 import VendorLeaves from "./pages/vendor/VendorLeaves";
-import PublicAttendance from "./pages/PublicAttendance";
+import PublicAttendance from "./pages/public/PublicAttendance";
 
 // Helper components for professional placeholders
 const PlaceholderPage = ({ title, content, features }) => (

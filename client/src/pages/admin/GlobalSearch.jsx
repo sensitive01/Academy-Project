@@ -13,7 +13,7 @@ import {
   Clock,
   Briefcase
 } from "lucide-react";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 
 const GlobalSearch = () => {
   const [query, setQuery] = useState("");

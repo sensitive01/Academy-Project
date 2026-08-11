@@ -11,8 +11,8 @@ import {
   BookOpen
 } from "lucide-react";
 import api from "../../services/api";
-import CustomDataTable from "../../components/DataTable";
-import Loading from "../../components/Loading";
+import CustomDataTable from "../../components/common/DataTable";
+import Loading from "../../components/common/Loading";
 import toast from "react-hot-toast";
 
 const Subscription = () => {

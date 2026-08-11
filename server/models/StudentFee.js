@@ -8,23 +8,20 @@ const studentFeeSchema = new mongoose.Schema({
   },
   center: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Center',
-    required: true
+    ref: 'Center'
   },
   course: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Course',
-    required: true
+    ref: 'Course'
   },
   batch: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Batch',
-    required: true
+    ref: 'Batch'
   },
   feeType: {
     type: String,
     required: true,
-    enum: ['Term', 'Exam', 'Other', 'Monthly']
+    enum: ['Term', 'Sem', 'Exam', 'Other', 'Monthly']
   },
   otherFeeType: {
     type: String

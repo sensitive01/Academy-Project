@@ -24,9 +24,9 @@ import {
   ChevronDown
 } from "lucide-react";
 import toast from "react-hot-toast";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
-import CustomDataTable from "../../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 
 const Announcement = () => {
   const { user } = useAuth();

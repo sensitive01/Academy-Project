@@ -16,8 +16,8 @@ import {
   X,
   FileText
 } from "lucide-react";
-import Loading from "../../components/Loading";
-import CustomDataTable from "../../components/DataTable";
+import Loading from "../../components/common/Loading";
+import CustomDataTable from "../../components/common/DataTable";
 
 const EnquiryManagement = () => {
   const [enquiries, setEnquiries] = useState([]);

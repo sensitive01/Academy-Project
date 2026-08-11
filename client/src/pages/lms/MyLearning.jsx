@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import Loading from "../../components/Loading";
+import Loading from "../../components/common/Loading";
 
 const MyLearning = () => {
   const [courses, setCourses] = useState([]);

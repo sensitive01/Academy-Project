@@ -17,8 +17,8 @@ import {
   Coins,
   Home,
 } from "lucide-react";
-import Expenses from "../expenses/Expenses";
-import Payroll from "../payroll/Payroll";
+import Expenses from "./Expenses";
+import Payroll from "./Payroll";
 import OnlineCoursePayments from "../../components/payments/OnlineCoursePayments";
 import StudentFeesList from "../../components/payments/StudentFeesList";
 import VendorPaymentsList from "../../components/payments/VendorPaymentsList";
@@ -95,7 +95,7 @@ const PaymentsHub = () => {
 
   const inwardTabs = {
     online_course: { label: "Online Course", icon: <MonitorPlay size={18} /> },
-    exam_fees: { label: "Exam Fees", icon: <FileText size={18} /> },
+    sem_fees: { label: "Sem Fees", icon: <FileText size={18} /> },
     term_fees: { label: "Term Fees", icon: <CalendarDays size={18} /> },
     monthly_fees: { label: "Monthly Fees", icon: <CalendarDays size={18} /> },
     vendor_payments: { label: "Vendor Payments", icon: <Building size={18} /> },
@@ -191,7 +191,7 @@ const PaymentsHub = () => {
         {mainTab === "inward" ? (
           <>
             {inwardTab === "online_course" && <OnlineCoursePayments />}
-            {inwardTab === "exam_fees" && <StudentFeesList feeType="Exam" />}
+            {inwardTab === "sem_fees" && <StudentFeesList feeType="Sem" />}
             {inwardTab === "term_fees" && <StudentFeesList feeType="Term" />}
             {inwardTab === "monthly_fees" && <StudentFeesList feeType="Monthly" />}
             {inwardTab === "vendor_payments" && (

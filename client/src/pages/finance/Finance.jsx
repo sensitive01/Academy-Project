@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from "react";
-import api from "../services/api";
-import Loading from "../components/Loading";
+import api from "../../services/api";
+import Loading from "../../components/common/Loading";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import CustomDataTable from "../components/DataTable";
+import CustomDataTable from "../../components/common/DataTable";
 import { Search } from "lucide-react";
+import StudentFilterBar from "../../components/common/StudentFilterBar";
 
 const Finance = () => {
   const [payments, setPayments] = useState([]);
@@ -18,6 +19,32 @@ const Finance = () => {
   // Search Filters
   const [inwardSearch, setInwardSearch] = useState("");
   const [outwardSearch, setOutwardSearch] = useState("");
+
+  const [filterType, setFilterType] = useState([]);
+  const [filterCenter, setFilterCenter] = useState([]);
+  const [filterCourse, setFilterCourse] = useState([]);
+  const [filterBatch, setFilterBatch] = useState([]);
+  const [filterYears, setFilterYears] = useState([]);
+
+  const [centers, setCenters] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [studentsMap, setStudentsMap] = useState({});
+
+  useEffect(() => {
+    api.get("/centers").then(res => setCenters(res.data || [])).catch(() => {});
+    api.get("/courses").then(res => setCourses(res.data?.courses || res.data || [])).catch(() => {});
+    api.get("/batches").then(res => setBatches(res.data?.batches || res.data || [])).catch(() => {});
+    api.get("/students").then(res => {
+      const list = res.data?.students || [];
+      const map = {};
+      list.forEach(s => {
+        if (s._id) map[s._id] = s;
+        if (s.user?._id) map[s.user._id] = s;
+      });
+      setStudentsMap(map);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchPayments();
@@ -46,9 +73,43 @@ const Finance = () => {
           ?.includes(inwardSearch.toLowerCase()) ||
         p.recipientName?.toLowerCase()?.includes(inwardSearch.toLowerCase()) ||
         inwardSearch === "";
-      return matchesSearch;
+      if (!matchesSearch) return false;
+
+      const sProfile = (p.student && typeof p.student === "object")
+        ? p.student
+        : (p.student ? studentsMap[p.student] : null);
+
+      if (filterType.length > 0) {
+        const isIntern = sProfile?.internships && sProfile.internships.length > 0;
+        const matchType = (filterType.includes("intern") && isIntern) || (filterType.includes("inhouse") && !isIntern);
+        if (!matchType) return false;
+      }
+
+      if (sProfile) {
+        if (filterCenter.length > 0) {
+          const cId = sProfile.center?._id || sProfile.center;
+          if (!cId || !filterCenter.includes(cId)) return false;
+        }
+        if (filterCourse.length > 0) {
+          const courseId = p.course?._id || p.course;
+          const hasCourse = filterCourse.includes(courseId) || sProfile.enrolledCourses?.some(ec => filterCourse.includes(ec.course?._id || ec.course)) || filterCourse.includes(sProfile.department);
+          if (!hasCourse) return false;
+        }
+        if (filterBatch.length > 0) {
+          const selectedBatches = batches.filter(b => filterBatch.includes(b._id || b.name));
+          const matchBatch = selectedBatches.some(b => b.students?.some(bs => bs === sProfile._id || bs?._id === sProfile._id));
+          if (!matchBatch) return false;
+        }
+        if (filterYears.length > 0) {
+          if (!sProfile.year || !filterYears.includes(String(sProfile.year))) return false;
+        }
+      } else if (filterCenter.length > 0 || filterCourse.length > 0 || filterBatch.length > 0 || filterYears.length > 0) {
+        return false;
+      }
+
+      return true;
     });
-  }, [payments, inwardSearch]);
+  }, [payments, inwardSearch, filterType, filterCenter, filterCourse, filterBatch, filterYears, studentsMap, batches]);
 
   const outwardPayments = useMemo(() => {
     return payments.filter((p) => {
@@ -214,6 +275,22 @@ return (
     </div>
 
     {/* INWARD TABLE */}
+    <StudentFilterBar
+      filterType={filterType}
+      setFilterType={setFilterType}
+      filterCenter={filterCenter}
+      setFilterCenter={setFilterCenter}
+      filterCourse={filterCourse}
+      setFilterCourse={setFilterCourse}
+      filterBatch={filterBatch}
+      setFilterBatch={setFilterBatch}
+      filterYears={filterYears}
+      setFilterYears={setFilterYears}
+      centers={centers}
+      courses={courses}
+      batches={batches}
+      showType={true}
+    />
     <Table
       payments={inwardPayments}
       getStatusColor={getStatusColor}

@@ -27,8 +27,8 @@ import {
   Newspaper,
   ListTodo
 } from "lucide-react";
-import logo from "../assets/logo-2.jpeg";
-import { useAuth } from "../context/AuthContext";
+import logo from "../../assets/logo-2.jpeg";
+import { useAuth } from "../../context/AuthContext";
 
 const NavItem = ({ item, isCollapsed, closeMobile }) => {
   const [isOpen, setIsOpen] = useState(false);
