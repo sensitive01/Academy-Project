@@ -1,5 +1,6 @@
 // Payroll routes API
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const Payroll = require("../models/Payroll");
 const Employee = require("../models/Employee");
@@ -584,8 +585,8 @@ router.get('/payslip/:id', protect, async (req, res) => {
     }
 
     doc.fillColor('#ffffff')
-       .fontSize(14).font('Helvetica-Bold')
-       .text(payslipPeriod, doc.page.width - 250, 45, { align: 'right' });
+       .fontSize(12).font('Helvetica-Bold')
+       .text(payslipPeriod, doc.page.width - 320, 45, { width: 270, align: 'right' });
 
     // ===============================
     // EMPLOYEE / INTERN DETAILS SECTION
@@ -664,15 +665,13 @@ router.get('/payslip/:id', protect, async (req, res) => {
 
     let currentY = topY + 35;
 
-    const earnings = [
-      { name: isIntern ? 'Basic Stipend' : 'Basic Salary', amount: payroll.basicSalary }
-    ];
+    const earnings = [];
 
     const allowanceAdjustments = (payroll.adjustments || []).filter(a => a.type === 'allowance');
     if (allowanceAdjustments.length > 0) {
       allowanceAdjustments.forEach(a => {
         earnings.push({ name: a.note ? `Allowance (${a.note})` : 'Allowance', amount: a.amount });
-      });
+      }); 
     } else if (payroll.totalAllowances > 0) {
       earnings.push({ name: 'Allowances (Total)', amount: payroll.totalAllowances });
     }
@@ -698,7 +697,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
 
     doc.font('Helvetica').fontSize(10);
     const tableRows = Math.max(earnings.length, deductions.length);
-    let totalEarning = 0;
+    let totalEarning = payroll.basicSalary;
     let totalDeduction = 0;
 
     for (let i = 0; i < tableRows; i++) {
@@ -725,14 +724,45 @@ router.get('/payslip/:id', protect, async (req, res) => {
     doc.moveTo(50, currentY).lineTo(doc.page.width - 50, currentY).lineWidth(1).strokeColor(accentColor).stroke();
 
     // ===============================
-    // TOTALS ROW
+    // SUB-TOTALS
     // ===============================
     currentY += 10;
+    doc.font('Helvetica').fontSize(10).fillColor(textDark);
+    
+    let sumAllowances = totalEarning - payroll.basicSalary;
+    
+    let sumAdvances = 0;
+    const advAdj = (payroll.adjustments || []).filter(a => a.type === 'advance');
+    if (advAdj.length > 0) {
+      advAdj.forEach(a => sumAdvances += a.amount);
+    } else if (payroll.advance > 0) {
+      sumAdvances = payroll.advance;
+    }
+    let sumDeductionsOnly = totalDeduction - sumAdvances;
+
+    doc.text(isIntern ? "Basic Stipend" : "Basic Pay", 60, currentY);
+    doc.text(payroll.basicSalary.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 210, currentY, { width: 80, align: 'right' });
+    doc.text("Total Deductions", 310, currentY);
+    doc.text(sumDeductionsOnly.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 450, currentY, { width: 80, align: 'right' });
+    currentY += 15;
+
+    doc.text("Total Allowances", 60, currentY);
+    doc.text(sumAllowances.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 210, currentY, { width: 80, align: 'right' });
+    doc.text("Total Advances", 310, currentY);
+    doc.text(sumAdvances.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 450, currentY, { width: 80, align: 'right' });
+    currentY += 15;
+    
+    doc.moveTo(50, currentY).lineTo(doc.page.width - 50, currentY).lineWidth(1).strokeColor(accentColor).stroke();
+    currentY += 10;
+
+    // ===============================
+    // GRAND TOTALS ROW
+    // ===============================
     doc.font('Helvetica-Bold').fontSize(10).fillColor(textDark);
     doc.text("Gross Earnings", 60, currentY);
     doc.text(totalEarning.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 210, currentY, { width: 80, align: 'right' });
     
-    doc.text("Total Deductions", 310, currentY);
+    doc.text("Total Deducted", 310, currentY);
     doc.text(totalDeduction.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 450, currentY, { width: 80, align: 'right' });
 
     // ===============================
@@ -753,12 +783,12 @@ router.get('/payslip/:id', protect, async (req, res) => {
       doc.text(`Amount in words: Rupees ${toWords.toWords(payroll.netSalary).replace(/-/g, ' ')} only.`, 50, currentY + 14);
     } catch (e) {
       // Ignore if number-to-words is not robust enough
-    }
+    } 
 
     // ===============================
     // FOOTER (Signatures & Notes)
     // ===============================
-    currentY += 100;
+    currentY += 50;
 
     doc.moveTo(50, currentY).lineTo(200, currentY).strokeColor(secondaryColor).stroke();
     doc.moveTo(doc.page.width - 200, currentY).lineTo(doc.page.width - 50, currentY).stroke();
@@ -768,9 +798,13 @@ router.get('/payslip/:id', protect, async (req, res) => {
     doc.text("Employer Signature", 50, currentY, { width: 150, align: 'center' });
     doc.text(isIntern ? "Intern Signature" : "Employee Signature", doc.page.width - 200, currentY, { width: 150, align: 'center' });
 
-    doc.moveDown(4);
+    const oldBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+
     doc.fontSize(8).fillColor('#94a3b8')
-       .text("This is a computer-generated document. No signature is required for official purposes.", 0, doc.page.height - 50, { align: "center" });
+       .text("This is a computer-generated document. No signature is required for official purposes.", 0, doc.page.height - 30, { align: "center", width: doc.page.width });
+
+    doc.page.margins.bottom = oldBottomMargin;
 
     doc.end();
 

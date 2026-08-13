@@ -32,7 +32,7 @@ import CourseManagement from "./pages/admin/CourseManagement";
 import ExamManagement from "./pages/admin/ExamManagement";
 import CenterManagement from "./pages/admin/CenterManagement";
 import GlobalSearch from "./pages/admin/GlobalSearch";
-import HR from "./pages/admin/HR";
+import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import Settings from "./pages/dashboard/Settings";
 import Students from "./pages/students/Students";
 import VendorManagement from "./pages/admin/VendorManagement";
@@ -308,7 +308,7 @@ function App() {
             <Route path="vendor/leaves" element={<VendorLeaves />} />
 
             {/* HR */}
-            <Route path="hr" element={<HR />} />
+            <Route path="hr" element={<EmployeeManagement />} />
             <Route path="finance" element={<Finance />} />
             <Route path="expenses" element={<Expenses />} />
 

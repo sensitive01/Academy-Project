@@ -14,7 +14,7 @@ const studentSchema = new mongoose.Schema(
 
     // BASIC DETAILS
     studentId: { type: String, unique: true, sparse: true },
-    studentNameEnglish: { type: String, default: "New Student" },
+    studentNameEnglish: { type: String, default: "" },
     studentNameMotherTongue: String,
     fatherName: String,
     dob: Date,
@@ -141,6 +141,10 @@ const studentSchema = new mongoose.Schema(
         course: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Course",
+        },
+        batch: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Batch",
         },
         completed: { type: Boolean, default: false },
         completionDate: Date,

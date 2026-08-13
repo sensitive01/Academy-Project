@@ -670,7 +670,7 @@ const CoursesTab = ({ courseType }) => {
                 className="flex-1 overflow-y-auto p-6 space-y-8"
               >
                 {/* Form Inputs (Existing Logic) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className={`grid grid-cols-1 ${courseType !== "Center Courses" ? "lg:grid-cols-2" : ""} gap-8`}>
                   {/* Left Column: Basic Info */}
                   <div className="space-y-4">
                     <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
@@ -829,56 +829,58 @@ const CoursesTab = ({ courseType }) => {
                   </div>
 
                   {/* Right Column: Thumbnail */}
-                  <div className="space-y-6">
-                    <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
-                      Thumbnail Image
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="h-48 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 overflow-hidden relative group">
-                        {preview ? (
-                          <>
-                            <img
-                              src={preview}
-                              alt="Course"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPreview(null);
-                                  setFormData({ ...formData, thumbnail: null });
-                                }}
-                                className="bg-white/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/40"
-                              >
-                                <Trash2 size={20} />
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-6">
-                            <label className="cursor-pointer">
-                              <div className="bg-brand-50 p-2 rounded-full inline-block mb-2 text-brand-600">
-                                <Plus size={24} />
-                              </div>
-                              <p className="text-sm font-bold text-gray-700">
-                                Click to upload thumbnail
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                PNG, JPG up to 2MB (16:9 ratio)
-                              </p>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={handleThumbnailChange}
+                  {courseType !== "Center Courses" && (
+                    <div className="space-y-6">
+                      <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
+                        Thumbnail Image
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="h-48 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 overflow-hidden relative group">
+                          {preview ? (
+                            <>
+                              <img
+                                src={preview}
+                                alt="Course"
+                                className="w-full h-full object-cover"
                               />
-                            </label>
-                          </div>
-                        )}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPreview(null);
+                                    setFormData({ ...formData, thumbnail: null });
+                                  }}
+                                  className="bg-white/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/40"
+                                >
+                                  <Trash2 size={20} />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center p-6">
+                              <label className="cursor-pointer">
+                                <div className="bg-brand-50 p-2 rounded-full inline-block mb-2 text-brand-600">
+                                  <Plus size={24} />
+                                </div>
+                                <p className="text-sm font-bold text-gray-700">
+                                  Click to upload thumbnail
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  PNG, JPG up to 2MB (16:9 ratio)
+                                </p>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={handleThumbnailChange}
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Curriculum Section */}

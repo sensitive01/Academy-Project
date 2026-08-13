@@ -5,7 +5,8 @@ import toast from "react-hot-toast";
 import { 
   User, Phone, Mail, Edit2, Check, X, Shield, Users, MapPin, 
   Briefcase, GraduationCap, CreditCard, Languages, Info, 
-  BookOpen, Heart, Globe, Plus, Trash2, Calendar, History
+  BookOpen, Heart, Globe, Plus, Trash2, Calendar, History,
+  Building2, Wallet
 } from "lucide-react";
 
 const Profile = () => {
@@ -110,6 +111,18 @@ const Profile = () => {
         }
       }
 
+      if (userData.role === "admin") {
+        try {
+          const setRes = await api.get("/settings");
+          setProfileData(prev => ({
+            ...prev,
+            globalBankDetails: setRes.data?.globalBankDetails || {}
+          }));
+        } catch (e) {
+          console.log("Error fetching global settings");
+        }
+      }
+
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -184,10 +197,10 @@ const Profile = () => {
       setEmployeeProfile(prev => ({ ...prev, [field]: value }));
   };
 
-  const updateCenterBank = (field, value) => {
-      setCenterProfile(prev => ({
+  const updateGlobalBank = (field, value) => {
+      setProfileData(prev => ({
           ...prev,
-          bankDetails: { ...(prev.bankDetails || {}), [field]: value }
+          globalBankDetails: { ...(prev.globalBankDetails || {}), [field]: value }
       }));
   };
 
@@ -295,9 +308,8 @@ const Profile = () => {
              headers: { "Content-Type": "multipart/form-data" }
           });
       } else {
-          // If role is center, also update the center model
-          if (authUser?.role === "center" && centerProfile) {
-            await api.put(`/centers/${centerProfile._id}`, { bankDetails: centerProfile.bankDetails });
+          if (authUser?.role === "admin" && profileData.globalBankDetails) {
+            await api.put("/settings", { globalBankDetails: profileData.globalBankDetails });
           }
           res = await api.put("/auth/profile", data, {
              headers: { "Content-Type": "multipart/form-data" }
@@ -501,13 +513,13 @@ const Profile = () => {
               {/* Top Bar Navigation for Students */}
               {studentProfile && (
                 <div className="bg-white border border-gray-200 rounded-xl p-1 flex gap-1 overflow-x-auto shadow-sm">
-                  {["personal", "academic", "family", "references"].map(tab => (
+                  {["personal", "academic", "family", "references", "internship"].map(tab => (
                     <button 
                       key={tab}
                       onClick={() => setChildEditorTab(tab)}
                       className={`flex-1 min-w-[120px] items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold transition-all ${childEditorTab === tab ? "bg-indigo-600 text-white shadow-md" : "text-gray-600 hover:bg-gray-50"}`}
                     >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)} Info
+                        {tab === "internship" ? "Internship Info" : tab.charAt(0).toUpperCase() + tab.slice(1) + " Info"}
                     </button>
                   ))}
                 </div>
@@ -598,15 +610,15 @@ const Profile = () => {
                       </div>
                     )}
 
-                    {centerProfile && authUser?.role === "center" && (
+                    {authUser?.role === "admin" && (
                       <div className="space-y-8 mt-6">
-                        <SectionCard title="Center Bank Details (For Online Fee Collection)" icon={<CreditCard size={20} />}>
+                        <SectionCard title="Global Payment Settings (Applied to all Centers)" icon={<CreditCard size={20} />}>
                           <div className="grid md:grid-cols-2 gap-5">
-                            <InputCard label="Account Name" value={centerProfile.bankDetails?.accountName} onChange={(e)=>updateCenterBank("accountName", e.target.value)} isEditing={isEditingPersonal} />
-                            <InputCard label="Account Number" value={centerProfile.bankDetails?.accountNumber} onChange={(e)=>updateCenterBank("accountNumber", e.target.value)} isEditing={isEditingPersonal} />
-                            <InputCard label="Bank Name" value={centerProfile.bankDetails?.bankName} onChange={(e)=>updateCenterBank("bankName", e.target.value)} isEditing={isEditingPersonal} />
-                            <InputCard label="IFSC Code" value={centerProfile.bankDetails?.ifscCode} onChange={(e)=>updateCenterBank("ifscCode", e.target.value)} isEditing={isEditingPersonal} />
-                            <InputCard label="UPI ID (Important for QR)" value={centerProfile.bankDetails?.upiId} onChange={(e)=>updateCenterBank("upiId", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="Account Name" value={profileData.globalBankDetails?.accountName || ""} onChange={(e)=>updateGlobalBank("accountName", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="Account Number" value={profileData.globalBankDetails?.accountNumber || ""} onChange={(e)=>updateGlobalBank("accountNumber", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="Bank Name" value={profileData.globalBankDetails?.bankName || ""} onChange={(e)=>updateGlobalBank("bankName", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="IFSC Code" value={profileData.globalBankDetails?.ifscCode || ""} onChange={(e)=>updateGlobalBank("ifscCode", e.target.value)} isEditing={isEditingPersonal} />
+                            <InputCard label="UPI ID (Important for QR)" value={profileData.globalBankDetails?.upiId || ""} onChange={(e)=>updateGlobalBank("upiId", e.target.value)} isEditing={isEditingPersonal} />
                           </div>
                         </SectionCard>
                       </div>
@@ -680,13 +692,13 @@ const Profile = () => {
                     </div>
 
                     <div className="border-b border-gray-200 bg-gray-50 flex shadow-sm">
-                        {["personal", "academic", "family", "references"].map(tab => (
+                        {["personal", "academic", "family", "references", "internship"].map(tab => (
                           <button 
                             key={tab}
                             onClick={() => setChildEditorTab(tab)}
                             className={`flex-1 py-3 text-sm font-medium transition-colors ${childEditorTab === tab ? "bg-white text-indigo-700 border-t-2 border-t-indigo-600 border-x border-x-gray-200 -mb-px" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/50"}`}
                           >
-                              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                              {tab === "internship" ? "Internship" : tab.charAt(0).toUpperCase() + tab.slice(1)}
                           </button>
                         ))}
                     </div>
@@ -1051,6 +1063,159 @@ const StudentFormContent = ({ data, isEditing, activeTab, handlers, centers, pro
                         {(!data.references || data.references.length === 0) && <p className="col-span-2 text-gray-400 italic text-sm py-4">No references listed.</p>}
                     </div>
                 </SectionCard>
+                </div>
+            )}
+
+            {activeTab === "internship" && (
+                <div className="space-y-8">
+                    {/* Active/Latest Internship */}
+                    {data.internships && data.internships.length > 0 ? (
+                        <div className="space-y-8 animate-in fade-in duration-300">
+                            {(() => {
+                                const currentInternship = data.internships[data.internships.length - 1];
+                                const isCurrentActive = currentInternship.status === 'active';
+                                
+                                return (
+                                    <SectionCard 
+                                        title={isCurrentActive ? "Active Internship Details" : "Latest Internship Details"} 
+                                        icon={<Briefcase size={20} />}
+                                    >
+                                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 border border-slate-100 p-6 shadow-sm">
+                                            {/* Status Badge */}
+                                            <div className="absolute top-6 right-6">
+                                                <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border ${
+                                                    currentInternship.status === 'active' 
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
+                                                        : currentInternship.status === 'completed'
+                                                        ? 'bg-blue-50 text-blue-700 border-blue-200/50'
+                                                        : 'bg-rose-50 text-rose-700 border-rose-200/50'
+                                                }`}>
+                                                    {currentInternship.status || 'active'}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                                                        <Building2 size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hiring Partner</p>
+                                                        <p className="text-base font-bold text-slate-800 mt-0.5">{currentInternship.vendorName || "Unspecified Vendor"}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                                                        <MapPin size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Work Location</p>
+                                                        <p className="text-base font-bold text-slate-800 mt-0.5">{currentInternship.location || "Remote"}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                                                        <Calendar size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Duration</p>
+                                                        <p className="text-sm font-bold text-slate-800 mt-0.5">
+                                                            {currentInternship.startDate ? new Date(currentInternship.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "N/A"}
+                                                            <span className="text-gray-400 font-medium px-2">to</span>
+                                                            {currentInternship.endDate ? new Date(currentInternship.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "N/A"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                                                        <Wallet size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Stipend / Salary</p>
+                                                        <p className="text-base font-bold text-slate-800 mt-0.5">
+                                                            {currentInternship.salary ? `₹${currentInternship.salary}` : "No Stipend Info"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-start gap-3 col-span-2">
+                                                    <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                                                        <Info size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Stipend Source / Payout Method</p>
+                                                        <p className="text-base font-bold text-slate-800 mt-0.5">{currentInternship.paymentBy || "Academy Stipend"}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </SectionCard>
+                                );
+                            })()}
+
+                            {/* Internship History */}
+                            {data.internships.length > 1 && (
+                                <SectionCard title="Internship Placement History" icon={<History size={20} />}>
+                                    <div className="flow-root">
+                                        <ul className="-mb-8">
+                                            {data.internships.slice(0, -1).reverse().map((internship, idx) => (
+                                                <li key={idx}>
+                                                    <div className="relative pb-8">
+                                                        {idx !== data.internships.length - 2 ? (
+                                                            <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-slate-200" aria-hidden="true"></span>
+                                                        ) : null}
+                                                        <div className="relative flex space-x-4 items-start">
+                                                            <div>
+                                                                <span className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 ring-8 ring-white">
+                                                                    <Briefcase size={16} />
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0 pt-1.5 flex justify-between space-x-4">
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-900">{internship.vendorName || "Unknown Partner"}</p>
+                                                                    <p className="text-xs text-slate-500 mt-0.5 flex gap-3">
+                                                                        <span>Location: <strong className="font-semibold text-slate-700">{internship.location || "Remote"}</strong></span>
+                                                                        <span>Stipend: <strong className="font-semibold text-slate-700">{internship.salary ? `₹${internship.salary}` : "N/A"}</strong></span>
+                                                                    </p>
+                                                                </div>
+                                                                <div className="text-right text-xs whitespace-nowrap text-slate-500">
+                                                                    <time className="font-semibold text-slate-600">
+                                                                        {internship.startDate ? new Date(internship.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A"}
+                                                                        {" - "}
+                                                                        {internship.endDate ? new Date(internship.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A"}
+                                                                    </time>
+                                                                    <span className={`block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                                        internship.status === 'completed' 
+                                                                            ? 'bg-blue-50 text-blue-700' 
+                                                                            : 'bg-rose-50 text-rose-700'
+                                                                    }`}>
+                                                                        {internship.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </SectionCard>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm animate-in fade-in duration-300">
+                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-slate-400">
+                                <Briefcase size={32} />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">No Internship Details Available</h3>
+                            <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                                There are no internship placements recorded for this student profile.
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -20,9 +20,19 @@ const StudentFeesList = ({ feeType }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  const [selectedCenter, setSelectedCenter] = useState("all");
+  const [selectedCourse, setSelectedCourse] = useState("all");
+  const [selectedBatch, setSelectedBatch] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+
   useEffect(() => {
     fetchFees();
     fetchDropdownData();
+    // Reset filters on tab changes
+    setSelectedCenter("all");
+    setSelectedCourse("all");
+    setSelectedBatch("all");
+    setSelectedStatus("all");
   }, [feeType]);
 
   const fetchDropdownData = async () => {
@@ -101,13 +111,35 @@ const StudentFeesList = ({ feeType }) => {
 
   const filtered = fees.filter((f) => {
     const term = search.toLowerCase();
-    return (
+    const matchesSearch =
+      !term ||
       f.student?.studentNameEnglish?.toLowerCase().includes(term) ||
       f.student?.studentId?.toLowerCase().includes(term) ||
       f.course?.title?.toLowerCase().includes(term) ||
       f.center?.name?.toLowerCase().includes(term) ||
-      f.batch?.name?.toLowerCase().includes(term)
-    );
+      f.batch?.name?.toLowerCase().includes(term);
+
+    const fCenterId = f.center?._id ? f.center._id.toString() : f.center ? f.center.toString() : "";
+    const matchesCenter = selectedCenter === "all" || fCenterId === selectedCenter;
+
+    const fCourseId = f.course?._id ? f.course._id.toString() : f.course ? f.course.toString() : "";
+    const matchesCourse = selectedCourse === "all" || fCourseId === selectedCourse;
+
+    const fBatchId = f.batch?._id ? f.batch._id.toString() : f.batch ? f.batch.toString() : "";
+    const matchesBatch = selectedBatch === "all" || fBatchId === selectedBatch;
+
+    let matchesStatus = true;
+    if (selectedStatus !== "all") {
+      if (selectedStatus === "paid") {
+        matchesStatus = f.status === "paid";
+      } else if (selectedStatus === "pending_approval") {
+        matchesStatus = f.status === "pending_approval";
+      } else if (selectedStatus === "unpaid") {
+        matchesStatus = f.status !== "paid" && f.status !== "pending_approval";
+      }
+    }
+
+    return matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesStatus;
   });
 
   const columns = [
@@ -196,9 +228,16 @@ const StudentFeesList = ({ feeType }) => {
           );
         } else if (row.status === 'pending_approval') {
           return (
-            <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700">
-              Pending Approval
-            </span>
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 whitespace-nowrap">
+                Pending Approval
+              </span>
+              {row.paymentMode && (
+                <span className="text-[10px] text-slate-500 font-bold lowercase">
+                  ({row.paymentMode})
+                </span>
+              )}
+            </div>
           );
         } else {
           return (
@@ -264,6 +303,67 @@ const StudentFeesList = ({ feeType }) => {
         setSearch={setSearch}
         searchPlaceholder={`Search ${feeType} fees by student, ID, course...`}
         pagination
+        additionalHeaderContent={
+          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
+            <select
+              value={selectedCenter}
+              onChange={(e) => setSelectedCenter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+            >
+              <option value="all">All Centers</option>
+              {centers.map(c => (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedCourse}
+              onChange={(e) => setSelectedCourse(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
+            >
+              <option value="all">All Courses</option>
+              {courses.map(c => (
+                <option key={c._id} value={c._id}>{c.title}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedBatch}
+              onChange={(e) => setSelectedBatch(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+            >
+              <option value="all">All Batches</option>
+              {batches.map(b => (
+                <option key={b._id} value={b._id}>{b.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+            >
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending_approval">Pending Approval</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+
+            {(selectedCenter !== "all" || selectedCourse !== "all" || selectedBatch !== "all" || selectedStatus !== "all") && (
+              <button
+                onClick={() => {
+                  setSelectedCenter("all");
+                  setSelectedCourse("all");
+                  setSelectedBatch("all");
+                  setSelectedStatus("all");
+                }}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        }
       />
       {showModal && (
         <AddStudentFeeModal 

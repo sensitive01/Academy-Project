@@ -24,6 +24,19 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder }) => {
     }
   };
 
+  const getButtonText = () => {
+    if (!selected || selected.length === 0) return placeholder;
+    if (selected.includes("all")) {
+      const match = options.find(o => o.value === "all");
+      return match ? match.label : placeholder;
+    }
+    if (selected.length === 1) {
+      const match = options.find(o => o.value === selected[0]);
+      return match ? match.label : placeholder;
+    }
+    return `${selected.length} Selected`;
+  };
+
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <button 
@@ -32,7 +45,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder }) => {
         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-brand-500 outline-none transition-all flex items-center justify-between min-w-[140px]"
       >
         <span className="truncate pr-2 text-slate-700">
-          {selected.length === 0 ? placeholder : `${selected.length} Selected`}
+          {getButtonText()}
         </span>
         <ChevronDown size={14} className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>

@@ -51,10 +51,17 @@ const upload = multer({
 
 router.post("/", protect, upload.single("receipt"), createExpenseValidation, validate, async (req, res) => {
   try {
-    const { title, amount, category, description, date } = req.body;
+    const { title, amount, category, description, date, submittedBy } = req.body;
 
     if (!title || !amount || !category) {
       return res.status(400).json({ message: "Required fields missing" });
+    }
+
+    const role = req.user.role.toLowerCase();
+    let finalSubmittedBy = req.user._id;
+
+    if ((role === "admin" || role === "finance") && submittedBy) {
+      finalSubmittedBy = submittedBy;
     }
 
     const expense = await Expense.create({
@@ -64,7 +71,7 @@ router.post("/", protect, upload.single("receipt"), createExpenseValidation, val
       description,
       date: date ? new Date(date) : Date.now(),
       receipt: req.file?.path,
-      submittedBy: req.user._id,
+      submittedBy: finalSubmittedBy,
     });
 
     res.status(201).json({ success: true, data: expense });
@@ -215,13 +222,74 @@ router.patch("/:id/reimburse", protect, async (req, res) => {
 });
 
 // =================================================
+// ================ DIRECT PAY ====================
+// =================================================
+
+router.patch("/:id/pay", protect, async (req, res) => {
+  try {
+    const role = req.user.role.toLowerCase();
+
+    if (role !== "admin" && role !== "finance") {
+      return res.status(403).json({ message: "Admin/Finance only" });
+    }
+
+    const { paymentMethod, transactionId } = req.body;
+
+    const expense = await Expense.findById(req.params.id)
+      .populate("submittedBy", "name email");
+
+    if (!expense) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    if (expense.status !== "approved") {
+      return res
+        .status(400)
+        .json({ message: "Expense must be approved first" });
+    }
+
+    // UPDATE EXPENSE
+    expense.status = "paid";
+    expense.reimbursement.status = "paid";
+    expense.reimbursement.paidAt = Date.now();
+    expense.reimbursement.paymentMethod = paymentMethod || "UPI";
+    expense.reimbursement.transactionId = transactionId || "AUTO-TXN";
+
+    await expense.save();
+
+    // CREATE OUTWARD PAYMENT
+    const outwardPayment = await Payment.create({
+      type: "outward",
+      amount: expense.amount,
+      recipientName: expense.submittedBy?.name || "Employee",
+      recipientType: "employee",
+      category: "operationalExpense",
+      paymentMethod: paymentMethod || "UPI",
+      status: "paid",
+      notes: `Direct payment for expense: ${expense.title}`,
+      referenceInvoice: expense._id.toString(),
+    });
+
+    res.json({
+      success: true,
+      message: "Expense marked as paid and outward payment recorded",
+      expense,
+      outwardPayment,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// =================================================
 // ================ CATEGORY REPORT ================
 // =================================================
 
 router.get("/reports/category", protect, async (req, res) => {
   try {
     let match = {
-      status: "reimbursed",
+      status: { $in: ["reimbursed", "paid"] },
       "reimbursement.status": "paid",
     };
 
@@ -254,7 +322,7 @@ router.get("/reports/category", protect, async (req, res) => {
 router.get("/reports/monthly", protect, async (req, res) => {
   try {
     let match = {
-      status: "reimbursed",
+      status: { $in: ["reimbursed", "paid"] },
       "reimbursement.status": "paid",
     };
 
@@ -287,7 +355,7 @@ router.get("/reports/monthly", protect, async (req, res) => {
 router.get("/reports/summary", protect, async (req, res) => {
   try {
     let match = {
-      status: "reimbursed",
+      status: { $in: ["reimbursed", "paid"] },
       "reimbursement.status": "paid",
     };
 
@@ -327,7 +395,7 @@ router.get("/reimbursed", protect, async (req, res) => {
     const role = req.user.role.toLowerCase();
 
     let query = {
-      status: "reimbursed",
+      status: { $in: ["reimbursed", "paid"] },
       "reimbursement.status": "paid",
     };
 
@@ -374,9 +442,10 @@ router.delete("/:id", protect, async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // Prevent deleting reimbursed (paid) expenses
+    // Prevent deleting reimbursed (paid) expenses for non-admins
     if (
-      expense.status === "reimbursed" &&
+      role !== "admin" &&
+      ["reimbursed", "paid"].includes(expense.status) &&
       expense.reimbursement?.status === "paid"
     ) {
       return res.status(400).json({
@@ -430,14 +499,14 @@ router.get("/:id/receipt", protect, async (req, res) => {
       return res.status(404).json({ message: "Expense not found" });
     }
 
-    if (expense.status !== "reimbursed" || expense.reimbursement?.status !== "paid") {
-      return res.status(400).json({ message: "Expense is not fully reimbursed yet" });
+    if (!["reimbursed", "paid"].includes(expense.status) || expense.reimbursement?.status !== "paid") {
+      return res.status(400).json({ message: "Expense is not fully settled/paid yet" });
     }
 
     const { generateReceiptPDF } = require("../utils/receiptGenerator");
 
     const data = {
-      documentTitle: "REIMBURSEMENT VOUCHER",
+      documentTitle: expense.status === "paid" ? "PAYMENT VOUCHER" : "REIMBURSEMENT VOUCHER",
       receiptNo: expense._id.toString().substring(0, 8).toUpperCase(),
       date: expense.reimbursement?.paidAt || Date.now(),
       transactionId: expense.reimbursement?.transactionId || "N/A",

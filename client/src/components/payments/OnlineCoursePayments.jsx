@@ -8,10 +8,22 @@ const OnlineCoursePayments = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState("all");
 
   useEffect(() => {
     fetchPayments();
+    fetchCourses();
   }, []);
+
+  const fetchCourses = async () => {
+    try {
+      const res = await api.get("/courses");
+      setCourses(res.data?.filter(c => c.type === "Online Courses") || []);
+    } catch (err) {
+      console.error("Failed to load courses", err);
+    }
+  };
 
   const fetchPayments = async () => {
     try {
@@ -27,12 +39,16 @@ const OnlineCoursePayments = () => {
 
   const filtered = payments.filter((p) => {
     const term = search.toLowerCase();
-    return (
+    const matchesSearch =
       p.student?.studentNameEnglish?.toLowerCase().includes(term) ||
       p.student?.email?.toLowerCase().includes(term) ||
       p.course?.title?.toLowerCase().includes(term) ||
-      p.razorpayPaymentId?.toLowerCase().includes(term)
-    );
+      p.razorpayPaymentId?.toLowerCase().includes(term);
+
+    const pCourseId = p.course?._id ? p.course._id.toString() : p.course ? p.course.toString() : "";
+    const matchesCourse = selectedCourse === "all" || pCourseId === selectedCourse;
+
+    return matchesSearch && matchesCourse;
   });
 
   const columns = [
@@ -114,6 +130,28 @@ const OnlineCoursePayments = () => {
         setSearch={setSearch}
         searchPlaceholder="Search by student, email, course or payment ID..."
         pagination
+        additionalHeaderContent={
+          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
+            <select
+              value={selectedCourse}
+              onChange={(e) => setSelectedCourse(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[180px] truncate"
+            >
+              <option value="all">All Courses</option>
+              {courses.map(c => (
+                <option key={c._id} value={c._id}>{c.title}</option>
+              ))}
+            </select>
+            {selectedCourse !== "all" && (
+              <button
+                onClick={() => setSelectedCourse("all")}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        }
       />
     </div>
   );

@@ -186,7 +186,6 @@ router.patch("/:id/status", protect, async (req, res) => {
   try {
     const { id } = req.params;
     const role = req.user.role?.toLowerCase();
-    console.log(`[VENDOR_STATUS_TOGGLE] Request by: ${req.user.email} (Role: ${role}) for Vendor ID: ${id}`);
 
     if (role !== 'admin' && role !== 'sub-admin') {
       return res.status(403).json({ message: "Only admin and sub-admin can toggle vendor status" });
@@ -206,7 +205,7 @@ router.patch("/:id/status", protect, async (req, res) => {
     const oldStatus = vendor.status;
     vendor.status = oldStatus === "active" ? "inactive" : "active";
     
-    console.log(`[VENDOR_STATUS_TOGGLE] Changing status from ${oldStatus} to ${vendor.status}`);
+    
     
     await vendor.save();
 

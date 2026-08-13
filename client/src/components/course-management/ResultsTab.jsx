@@ -96,6 +96,24 @@ const ResultsTab = () => {
     fetchData();
   }, []);
 
+  const getFilteredSubjects = (batchId, semesterNumber) => {
+    if (!batchId || !semesterNumber) return subjects;
+    const batch = batches.find(b => b._id === batchId);
+    if (!batch || !batch.semesters) return subjects;
+    const sem = batch.semesters.find(s => Number(s.semesterNumber) === Number(semesterNumber));
+    if (!sem || !sem.subjects || sem.subjects.length === 0) return [];
+    
+    const subjectIds = sem.subjects.map(s => typeof s === 'object' ? (s._id || s) : s).map(String);
+    return subjects.filter(sub => subjectIds.includes(String(sub._id)));
+  };
+
+  const getAvailableSemesters = (batchId) => {
+    if (!batchId) return [1];
+    const batch = batches.find(b => b._id === batchId);
+    if (!batch || !batch.numberOfSemesters) return [1];
+    return Array.from({ length: batch.numberOfSemesters }, (_, i) => i + 1);
+  };
+
   const openModal = (exam = null) => {
     if (exam) {
       setFormData({
@@ -306,14 +324,34 @@ const ResultsTab = () => {
   };
 
   const handleStudentChange = (studentId) => {
+    if (!studentId) {
+      setMarkFormData(prev => ({ ...prev, student: "", course: "", batch: "" }));
+      return;
+    }
     const st = students.find(s => s._id === studentId);
     let courseId = "";
     let batchId = "";
-    if (st && st.enrolledCourses && st.enrolledCourses.length > 0) {
-      courseId = st.enrolledCourses[0].course?._id || st.enrolledCourses[0].course || "";
-      batchId = st.enrolledCourses[0].batch || "";
+    if (st) {
+      const studentBatch = batches.find(b => 
+        b.students && b.students.some(sid => {
+          const idStr = typeof sid === 'object' ? (sid._id || sid).toString() : sid.toString();
+          return idStr === studentId;
+        })
+      );
+      if (studentBatch) {
+        batchId = studentBatch._id;
+        courseId = studentBatch.course?._id || studentBatch.course || "";
+      } else if (st.enrolledCourses && st.enrolledCourses.length > 0) {
+        courseId = st.enrolledCourses[0].course?._id || st.enrolledCourses[0].course || "";
+        batchId = st.enrolledCourses[0].batch?._id || st.enrolledCourses[0].batch || "";
+      }
     }
-    setMarkFormData({ ...markFormData, student: studentId, course: courseId, batch: batchId });
+
+    // Ensure they are strings, not populated objects
+    courseId = typeof courseId === 'object' ? (courseId._id || "") : String(courseId || "");
+    batchId = typeof batchId === 'object' ? (batchId._id || "") : String(batchId || "");
+
+    setMarkFormData(prev => ({ ...prev, student: studentId, course: courseId, batch: batchId }));
   };
 
   const handlePaymentSubmit = async (formData) => {
@@ -751,7 +789,7 @@ const ResultsTab = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.semester} onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}>
-                    {[1, 2, 3, 4, 5, 6].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                    {getAvailableSemesters(formData.batch).map(s => <option key={s} value={s}>Semester {s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -772,7 +810,7 @@ const ResultsTab = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Subject</label>
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })}>
                     <option value="">Select Subject</option>
-                    {subjects.map(sub => <option key={sub._id} value={sub._id}>{sub.name} ({sub.code})</option>)}
+                    {getFilteredSubjects(formData.batch, formData.semester).map(sub => <option key={sub._id} value={sub._id}>{sub.name} ({sub.code})</option>)}
                   </select>
                 </div>
               </div>
@@ -835,14 +873,14 @@ const ResultsTab = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Batch</label>
-                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.batch} onChange={(e) => setMarkFormData({ ...markFormData, batch: e.target.value })}>
+                  <select required className={`w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm ${markFormData.student ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50'}`} value={markFormData.batch} onChange={(e) => setMarkFormData({ ...markFormData, batch: e.target.value })} disabled={!!markFormData.student}>
                     <option value="">Select Batch</option>
                     {batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Course</label>
-                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.course} onChange={(e) => setMarkFormData({ ...markFormData, course: e.target.value })}>
+                  <select required className={`w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm ${markFormData.student ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50'}`} value={markFormData.course} onChange={(e) => setMarkFormData({ ...markFormData, course: e.target.value })} disabled={!!markFormData.student}>
                     <option value="">Select Course</option>
                     {courses.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
                   </select>
@@ -850,14 +888,14 @@ const ResultsTab = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.semester} onChange={(e) => setMarkFormData({ ...markFormData, semester: Number(e.target.value) })}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                    {getAvailableSemesters(markFormData.batch).map(s => <option key={s} value={s}>Semester {s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Subject</label>
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.subject} onChange={(e) => setMarkFormData({ ...markFormData, subject: e.target.value })}>
                     <option value="">Select Subject</option>
-                    {subjects.map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
+                    {getFilteredSubjects(markFormData.batch, markFormData.semester).map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
                   </select>
                 </div>
                 

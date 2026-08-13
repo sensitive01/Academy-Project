@@ -11,14 +11,20 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
   const [mode, setMode] = useState(initialMode); // "view" | "edit"
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState(1);
+  const [courses, setCourses] = useState([]);
+  const [batches, setBatches] = useState([]);
 
   const [formData, setFormData] = useState(() => {
     const clone = JSON.parse(JSON.stringify(student || {}));
+    const currentCourse = clone.enrolledCourses?.[0]?.course;
+    const currentBatch = clone.enrolledCourses?.[0]?.batch;
     return {
       ...clone,
       email: student?.user?.email || student?.email || "",
       whatsapp: student?.whatsapp || student?.phone || "",
       center: student?.center?._id || student?.center || "",
+      course: typeof currentCourse === 'object' ? currentCourse?._id || "" : currentCourse || "",
+      batch: typeof currentBatch === 'object' ? currentBatch?._id || "" : currentBatch || "",
       village: clone.address?.village || clone.village || "",
       post: clone.address?.post || clone.post || "",
       taluk: clone.address?.taluk || clone.taluk || "",
@@ -60,10 +66,33 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
         }));
       }).catch(err => console.error("Error fetching student fees:", err));
     }
+    
+    // Fetch options for course and batch assignment
+    api.get("/courses").then(res => setCourses(res.data)).catch(console.error);
+    api.get("/batches").then(res => setBatches(res.data)).catch(console.error);
   }, [student]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "center") {
+      setFormData(prev => ({ ...prev, [name]: value, batch: "", course: "" }));
+      return;
+    }
+
+    if (name === "batch") {
+      const selectedBatch = batches.find(b => b._id === value);
+      const courseIdForBatch = selectedBatch ? (selectedBatch.course?._id || selectedBatch.course) : "";
+      const centerIdForBatch = selectedBatch ? (selectedBatch.center?._id || selectedBatch.center) : "";
+      setFormData(prev => ({ 
+        ...prev, 
+        batch: value, 
+        ...(courseIdForBatch && { course: typeof courseIdForBatch === 'object' ? courseIdForBatch.toString() : courseIdForBatch }),
+        ...(centerIdForBatch && { center: typeof centerIdForBatch === 'object' ? centerIdForBatch.toString() : centerIdForBatch })
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value,
@@ -141,7 +170,20 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
     if (e) e.preventDefault();
     setSaving(true);
     try {
-      await onUpdate({ ...formData, fees: feeForm.fees });
+      const payload = { ...formData, fees: feeForm.fees };
+      
+      // Update enrolledCourses based on selected course and batch
+      if (payload.course || payload.batch) {
+        payload.enrolledCourses = [{
+          ...((payload.enrolledCourses && payload.enrolledCourses[0]) || {}),
+          course: payload.course || undefined,
+          batch: payload.batch || undefined,
+          completed: false,
+          progress: 0
+        }];
+      }
+
+      await onUpdate(payload);
       setMode("view");
     } catch (err) {
       console.error(err);
@@ -492,13 +534,50 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
             </div>
           </div>
 
-          {/* STEP 6: FEES STRUCTURE */}
+          {/* STEP 6: FEES STRUCTURE & ENROLLMENT */}
           <div id="section-6" className="bg-white border border-slate-100 rounded-3xl shadow-xl overflow-hidden p-6 md:p-10 scroll-mt-48">
-            <StepHeader title="Step 6. Fees Structure & Breakdown" icon={<Wallet className="text-brand-700" />} />
+            <StepHeader title="Step 6. Course, Batch & Fees" icon={<Wallet className="text-brand-700" />} />
             
             {mode === "edit" ? (
               <div className="space-y-8">
                 <div className="bg-slate-50/70 p-6 rounded-2xl border border-slate-200/80 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-slate-200/80">
+                    <SelectBox
+                      label="Assigned Batch"
+                      name="batch"
+                      value={formData.batch}
+                      onChange={handleChange}
+                      isObjectOptions
+                      options={(() => {
+                        const filtered = batches.filter(b => {
+                          let matchesCenter = true;
+                          if (formData.center) {
+                            const bCenterId = b.center?._id ? b.center._id.toString() : b.center?.toString();
+                            matchesCenter = bCenterId === formData.center.toString();
+                          }
+                          return matchesCenter;
+                        });
+                        
+                        if (filtered.length === 0) {
+                          return [{ value: "", label: "no batch available for these center" }];
+                        }
+                        
+                        return filtered.map(b => ({ value: b._id, label: b.name }));
+                      })()}
+                    />
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                        Enrolled Course
+                      </label>
+                      <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 min-h-[46px] flex items-center cursor-not-allowed">
+                        {formData.course 
+                          ? (courses.find(c => c._id === formData.course)?.title || formData.course)
+                          : "Select a batch to auto-assign course"}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <FormInput
                       label="Council Fees (₹)"
@@ -644,6 +723,25 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
               </div>
             ) : (
               <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pb-6 border-b border-slate-100">
+                  <FormDisplay 
+                    label="Enrolled Course" 
+                    value={
+                      courses.find(c => c._id === formData.course)?.title || 
+                      student.enrolledCourses?.[0]?.course?.title || 
+                      "Not Assigned"
+                    } 
+                  />
+                  <FormDisplay 
+                    label="Assigned Batch" 
+                    value={
+                      batches.find(b => b._id === formData.batch)?.name || 
+                      student.enrolledCourses?.[0]?.batch?.name || 
+                      "Not Assigned"
+                    } 
+                  />
+                </div>
+
                 {feeForm.fees.length > 0 ? (
                   <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                     <table className="w-full text-left text-xs">

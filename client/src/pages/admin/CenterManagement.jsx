@@ -12,6 +12,8 @@ import {
   BookOpen,
   DollarSign,
   Users,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -77,6 +79,8 @@ const CenterManagement = () => {
 
   // Login Management State
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [selectedCenter, setSelectedCenter] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     name: "",
     email: "",
@@ -265,17 +269,58 @@ const CenterManagement = () => {
 
   const openLoginModal = async (center) => {
     setCurrentId(center._id);
+    setSelectedCenter(center);
+    setShowPassword(false);
     setLoginData({ name: center.name, email: "", password: "", role: "center" });
     setCenterUsers([]);
     try {
       const { data } = await api.get(`/centers/${center._id}/login`);
       if (data && data.length > 0) {
         setCenterUsers(data);
+        const existing = data.find((u) => u.role === "center");
+        if (existing) {
+          setLoginData({
+            name: existing.name || center.name,
+            email: existing.email || "",
+            password: "",
+            role: "center",
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching login:", error);
     }
     setShowLoginModal(true);
+  };
+
+  const handleRoleSelectChange = (role) => {
+    setShowPassword(false);
+    const existing = centerUsers.find((u) => u.role === role);
+    if (existing) {
+      setLoginData({
+        name: existing.name || selectedCenter?.name || "",
+        email: existing.email || "",
+        password: "",
+        role: role,
+      });
+    } else {
+      setLoginData({
+        name: selectedCenter?.name || "",
+        email: "",
+        password: "",
+        role: role,
+      });
+    }
+  };
+
+  const handleSelectAccount = (user) => {
+    setShowPassword(false);
+    setLoginData({
+      name: user.name || "",
+      email: user.email || "",
+      password: "",
+      role: user.role,
+    });
   };
 
   const handleLoginSubmit = async (e) => {
@@ -287,7 +332,13 @@ const CenterManagement = () => {
       // refresh users
       const { data } = await api.get(`/centers/${currentId}/login`);
       setCenterUsers(data);
-      setLoginData({ ...loginData, email: "", password: "" });
+      const updated = data.find((u) => u.role === loginData.role);
+      setLoginData({
+        name: updated?.name || loginData.name,
+        email: updated?.email || loginData.email,
+        password: "",
+        role: loginData.role,
+      });
     } catch (error) {
       toast.error(error.response?.data?.message || "Error saving login");
     } finally {
@@ -876,17 +927,28 @@ const CenterManagement = () => {
                   <p className="text-sm text-slate-500">No accounts created for this center yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {centerUsers.map(u => (
-                      <div key={u._id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
-                        <div className="overflow-hidden">
-                          <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
-                          <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                    {centerUsers.map((u) => {
+                      const isSelected = loginData.role === u.role;
+                      return (
+                        <div
+                          key={u._id}
+                          onClick={() => handleSelectAccount(u)}
+                          className={`p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-blue-50 border-blue-300 ring-2 ring-blue-500/20 shadow-sm"
+                              : "bg-slate-50 border-slate-100 hover:bg-slate-100/80"
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
+                            <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                          </div>
+                          <div className="px-2 py-1 bg-brand-50 text-brand-700 text-[10px] font-bold rounded capitalize whitespace-nowrap">
+                            {u.role.replace('-', ' ')}
+                          </div>
                         </div>
-                        <div className="px-2 py-1 bg-brand-50 text-brand-700 text-[10px] font-bold rounded capitalize whitespace-nowrap">
-                          {u.role.replace('-', ' ')}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -894,14 +956,14 @@ const CenterManagement = () => {
               {/* Create/Update Form */}
               <div>
                 <h3 className="text-sm font-bold text-slate-700 mb-4">Create or Update Account</h3>
-                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Role</label>
                     <select
                       required
-                      className="w-full rounded-xl border border-gray-200 p-2.5 bg-white text-sm"
+                      className="w-full rounded-xl border border-gray-200 p-2.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       value={loginData.role}
-                      onChange={(e) => setLoginData({ ...loginData, role: e.target.value })}
+                      onChange={(e) => handleRoleSelectChange(e.target.value)}
                     >
                       <option value="center">Center Admin</option>
                       <option value="center-hr">Center HR</option>
@@ -914,7 +976,8 @@ const CenterManagement = () => {
                     <input
                       type="text"
                       required
-                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm"
+                      autoComplete="off"
+                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       value={loginData.name}
                       onChange={(e) => setLoginData({ ...loginData, name: e.target.value })}
                     />
@@ -924,20 +987,34 @@ const CenterManagement = () => {
                     <input
                       type="email"
                       required
-                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm"
+                      autoComplete="off"
+                      name="center_account_email"
+                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       value={loginData.email}
                       onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-                    <input
-                      type="password"
-                      className="w-full rounded-xl border border-gray-200 p-2.5 text-sm"
-                      placeholder="Enter password..."
-                      value={loginData.password}
-                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        name="center_account_password"
+                        className="w-full rounded-xl border border-gray-200 p-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder={centerUsers.some(u => u.role === loginData.role) ? "Enter new password to update..." : "Enter password..."}
+                        value={loginData.password}
+                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors p-1"
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
                   <div className="pt-2">
                     <button

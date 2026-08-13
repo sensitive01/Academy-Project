@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle, CreditCard, Banknote, UploadCloud, Check } from 'lucide-react';
+import { X, CheckCircle, CreditCard, Banknote, UploadCloud, Check, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import api from '../../services/api';
 
 const CollectPaymentModal = ({ onClose, onSave, fee }) => {
   const [paymentMode, setPaymentMode] = useState('Cash');
@@ -31,118 +32,167 @@ const CollectPaymentModal = ({ onClose, onSave, fee }) => {
     onSave(fee._id, data);
   };
 
-  const centerBank = fee.center?.bankDetails;
-  const hasUpiId = Boolean(centerBank?.upiId);
+  const [globalBank, setGlobalBank] = useState(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        if (res.data?.globalBankDetails) {
+          setGlobalBank(res.data.globalBankDetails);
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings", err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const hasUpiId = Boolean(globalBank?.upiId);
 
   // Generate UPI URI
-  const upiUri = hasUpiId ? `upi://pay?pa=${centerBank.upiId}&pn=${encodeURIComponent(centerBank.accountName || fee.center?.name || "Center")}&am=${totalAmount}&cu=INR` : "";
+  const upiUri = hasUpiId ? `upi://pay?pa=${globalBank.upiId}&pn=${encodeURIComponent(globalBank.accountName || fee.center?.name || "Center")}&am=${totalAmount}&cu=INR` : "";
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+    <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200 p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-green-50 text-green-600 rounded-xl">
-              <CheckCircle size={24} />
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+              <CreditCard size={24} />
             </div>
             <h2 className="text-xl font-bold text-slate-900">Collect Payment</h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center">
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Due</p>
-            <p className="text-2xl font-black text-slate-800">₹{totalAmount.toLocaleString('en-IN')}</p>
+        {/* Total Due Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 rounded-2xl text-white shadow-md flex justify-between items-center relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10 mix-blend-overlay flex items-center justify-center pointer-events-none">
+            <svg className="w-full h-full text-white" viewBox="0 0 100 100" preserveAspectRatio="none">
+               <path d="M0,0 L100,100 M100,0 L0,100" stroke="currentColor" strokeWidth="1" fill="none"/>
+            </svg>
           </div>
-          <div className="text-right">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student</p>
-            <p className="text-sm font-bold text-slate-700">{fee.student?.studentNameEnglish}</p>
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Total Due</p>
+            <p className="text-3xl font-black tracking-tight">₹{totalAmount.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="text-right relative z-10">
+            <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Student</p>
+            <p className="text-base font-bold">{fee.student?.studentNameEnglish}</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-3">Payment Mode</label>
-            <div className="grid grid-cols-3 gap-3">
-              <label className={`cursor-pointer border rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${paymentMode === 'Cash' ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-500/20' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                <input type="radio" name="mode" className="hidden" checked={paymentMode === 'Cash'} onChange={() => setPaymentMode('Cash')} />
-                <Banknote size={24} />
-                <span className="text-sm font-bold">Cash</span>
+        {/* Payment Mode Selection */}
+        <div>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Select Payment Mode</label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all ${paymentMode === 'Cash' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-4 ring-emerald-500/10' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+              <input type="radio" name="mode" className="hidden" checked={paymentMode === 'Cash'} onChange={() => setPaymentMode('Cash')} />
+              <Banknote size={24} className={paymentMode === 'Cash' ? 'text-emerald-600' : 'text-slate-400'} />
+              <span className="text-xs font-bold">Cash</span>
+            </label>
+            {hasUpiId && (
+              <label className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all ${paymentMode === 'Online' ? 'border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                <input type="radio" name="mode" className="hidden" checked={paymentMode === 'Online'} onChange={() => setPaymentMode('Online')} />
+                <QRCodeSVG value={upiUri} size={24} fgColor="currentColor" className="opacity-80" />
+                <span className="text-xs font-bold">Online / QR</span>
               </label>
-              {hasUpiId && (
-                <label className={`cursor-pointer border rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${paymentMode === 'Online' ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-500/20' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                  <input type="radio" name="mode" className="hidden" checked={paymentMode === 'Online'} onChange={() => setPaymentMode('Online')} />
-                  <QRCodeSVG value="dummy" size={24} fgColor="currentColor" className="opacity-70" />
-                  <span className="text-sm font-bold">Online / QR</span>
-                </label>
-              )}
-              <label className={`cursor-pointer border rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${paymentMode === 'Bank' ? 'border-purple-500 bg-purple-50 text-purple-700 ring-2 ring-purple-500/20' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                <input type="radio" name="mode" className="hidden" checked={paymentMode === 'Bank'} onChange={() => setPaymentMode('Bank')} />
-                <CreditCard size={24} />
-                <span className="text-sm font-bold">Bank Transfer</span>
-              </label>
-            </div>
+            )}
+            <label className={`cursor-pointer border rounded-2xl p-4 flex flex-col items-center gap-2 transition-all ${paymentMode === 'Bank' ? 'border-purple-500 bg-purple-50 text-purple-700 ring-4 ring-purple-500/10' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+              <input type="radio" name="mode" className="hidden" checked={paymentMode === 'Bank'} onChange={() => setPaymentMode('Bank')} />
+              <CreditCard size={24} className={paymentMode === 'Bank' ? 'text-purple-600' : 'text-slate-400'} />
+              <span className="text-xs font-bold">Bank Transfer</span>
+            </label>
           </div>
+        </div>
 
-          {paymentMode === 'Cash' && (
-            <div className="bg-green-50 text-green-800 p-4 rounded-xl border border-green-100 flex gap-3">
-              <CheckCircle size={20} className="shrink-0 mt-0.5" />
-              <p className="text-sm font-medium">Cash payment will immediately mark this fee as paid and update the center's cash balance.</p>
-            </div>
-          )}
+        {/* Conditional Content */}
+        {paymentMode === 'Cash' && (
+          <div className="bg-emerald-50/80 border border-emerald-100 p-4 rounded-2xl flex gap-3 text-emerald-850 animate-in fade-in duration-300">
+            <CheckCircle size={20} className="shrink-0 text-emerald-600" />
+            <p className="text-xs font-medium leading-relaxed">Cash payments require admin approval. Saving this will mark the fee as pending approval. Once approved, the center's cash balance ledger will be updated.</p>
+          </div>
+        )}
 
-          {paymentMode === 'Online' && (
-            <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Scan to Pay via UPI</p>
-                <div className="inline-block bg-white p-2 rounded-lg border border-slate-200 shadow-sm mb-3">
-                  {upiUri && <QRCodeSVG value={upiUri} size={150} />}
-                </div>
-                <div className="text-sm text-slate-700 font-medium">UPI ID: <span className="font-bold">{centerBank?.upiId}</span></div>
-                <div className="text-xs text-slate-500 mt-1">Beneficiary: {centerBank?.accountName || fee.center?.name}</div>
+        {paymentMode === 'Online' && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* QR Container */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col items-center shadow-sm">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-4">Scan using any UPI App</p>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-md mb-4 flex items-center justify-center shrink-0 w-44 h-44">
+                {upiUri && <QRCodeSVG value={upiUri} size={144} level="M" style={{ display: 'block' }} />}
               </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Upload Proof of Payment *</label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
-                  <div className="space-y-1 text-center">
-                    <UploadCloud className="mx-auto h-10 w-10 text-slate-400" />
-                    <div className="flex text-sm text-slate-600">
-                      <label className="relative cursor-pointer rounded-md font-bold text-brand-600 hover:text-brand-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-brand-500">
-                        <span>Upload a file</span>
-                        <input name="proof" type="file" className="sr-only" required accept="image/*,.pdf" onChange={handleFileChange} />
-                      </label>
+              <div className="text-center space-y-1">
+                <div className="text-xs text-slate-500">UPI ID</div>
+                <div className="text-sm font-bold text-slate-800 select-all">{globalBank?.upiId}</div>
+                <div className="text-[11px] font-medium text-slate-400 mt-1">Beneficiary: <span className="text-slate-600 font-semibold">{globalBank?.accountName || fee.center?.name}</span></div>
+              </div>
+            </div>
+            
+            {/* File Attachment */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Upload Proof of Payment *</label>
+              {!proofOfPayment ? (
+                <div className="relative border-2 border-slate-200 border-dashed rounded-2xl p-6 bg-slate-50/50 hover:bg-slate-50 hover:border-blue-400/80 transition-all flex flex-col items-center justify-center text-center cursor-pointer group">
+                  <input name="proof" type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required accept="image/*,.pdf" onChange={handleFileChange} />
+                  <UploadCloud className="h-10 w-10 text-slate-400 group-hover:text-blue-500 transition-colors mb-2" />
+                  <p className="text-sm font-bold text-slate-700">Click to upload file</p>
+                  <p className="text-xs text-slate-400 mt-1">Supports Images & PDF</p>
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/30 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {proofOfPayment.startsWith('data:image/') ? (
+                      <img src={proofOfPayment} alt="Proof preview" className="w-12 h-12 object-cover rounded-lg border border-slate-200" />
+                    ) : (
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-bold text-xs border border-blue-100">PDF</div>
+                    )}
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-bold text-slate-700 truncate">Attached Proof</p>
+                      <p className="text-[10px] text-green-600 font-medium flex items-center gap-1 mt-0.5"><Check size={12}/> Ready to save</p>
                     </div>
-                    {proofOfPayment && <p className="text-xs text-green-600 font-bold flex items-center justify-center gap-1"><Check size={12}/> File attached</p>}
                   </div>
+                  <button type="button" onClick={() => setProofOfPayment(null)} className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl transition-colors">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-
-          {paymentMode === 'Bank' && (
-            <div className="space-y-4">
-              <div className="bg-purple-50 text-purple-800 p-4 rounded-xl border border-purple-100 text-sm font-medium">
-                Bank transfers require approval from the Finance/Admin team before being marked as paid.
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Bank Reference / Check No. *</label>
-                <input type="text" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={bankReference} onChange={(e) => setBankReference(e.target.value)} placeholder="e.g., NEFT/RTGS UTR Number" />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-100">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
-            <button type="submit" className={`flex-1 px-4 py-3 text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 ${paymentMode === 'Bank' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20' : 'bg-green-600 hover:bg-green-700 shadow-green-600/20'}`}>
-              <CheckCircle size={18} /> {paymentMode === 'Bank' ? 'Submit for Approval' : 'Confirm Payment'}
-            </button>
           </div>
-        </form>
-      </div>
+        )}
+
+        {paymentMode === 'Bank' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="bg-purple-50 border border-purple-100 p-4 rounded-2xl flex gap-3 text-purple-850">
+              <CreditCard size={20} className="shrink-0 text-purple-600" />
+              <p className="text-xs font-medium leading-relaxed">Bank transfers require approval from the Finance/Admin team. The payment status will remain pending until approved.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Bank Reference / UTR Number *</label>
+              <input 
+                type="text" 
+                required 
+                className="w-full rounded-2xl border border-slate-200 p-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500" 
+                value={bankReference} 
+                onChange={(e) => setBankReference(e.target.value)} 
+                placeholder="Enter NEFT/RTGS UTR Reference Number" 
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center gap-3 pt-6 border-t border-slate-100">
+          <button type="button" onClick={onClose} className="flex-1 px-5 py-3.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-350 transition-all text-sm">Cancel</button>
+          <button type="submit" className={`flex-1 px-5 py-3.5 text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 text-sm ${paymentMode === 'Bank' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/25' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25'}`}>
+            <CheckCircle size={18} /> {paymentMode === 'Bank' ? 'Submit for Approval' : 'Confirm Payment'}
+          </button>
+        </div>
+      </form>
     </div>,
     document.body
   );

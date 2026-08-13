@@ -17,6 +17,9 @@ import {
 
 const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
   const today = new Date().toISOString().split("T")[0];
+  
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdmin = user?.role === "admin";
 
   const [employeeName, setEmployeeName] = useState(
     localStorage.getItem("name") || ""
@@ -61,7 +64,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
       if (!startDate || !endDate)
         return toast.error("Please select leave dates");
 
-      if (startDate < today)
+      if (!isAdmin && startDate < today)
         return toast.error("Start date cannot be in the past");
 
       if (endDate < startDate)
@@ -145,6 +148,14 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
         <div className="absolute top-0 right-0 p-4 opacity-10">
           <Briefcase size={80} />
         </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-4 right-4 z-20 text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-colors focus:outline-none"
+          title="Close"
+        >
+          <X size={20} />
+        </button>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -261,7 +272,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
                 <input
                   type="date"
                   value={startDate}
-                  min={today}
+                  min={isAdmin ? undefined : today}
                   onChange={(e) => setStartDate(e.target.value)}
                   className={inputClasses}
                 />
@@ -271,7 +282,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
                 <input
                   type="date"
                   value={endDate}
-                  min={startDate || today}
+                  min={isAdmin ? undefined : (startDate || today)}
                   onChange={(e) => setEndDate(e.target.value)}
                   className={inputClasses}
                 />
@@ -284,7 +295,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
                 <input
                   type="date"
                   value={startDate}
-                  min={today}
+                  min={isAdmin ? undefined : today}
                   onChange={(e) => setStartDate(e.target.value)}
                   className={inputClasses}
                 />

@@ -344,7 +344,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
           <ul className="space-y-1 mb-8">
             {currentNavItems.map((item) => (
               <NavItem
-                key={item.path}
+                key={item.path || item.label}
                 item={item}
                 isCollapsed={isCollapsed}
                 closeMobile={closeMobile}

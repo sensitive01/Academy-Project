@@ -12,12 +12,15 @@ import {
   BookOpen,
   DollarSign,
   Users,
+  X,
+  RotateCcw,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import CustomDataTable from "../../components/common/DataTable";
 import AssignStudentsModal from "../../components/modals/AssignStudentsModal";
 import MultiSelectSubjects from "../../components/common/MultiSelectSubjects";
+import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 
 const toTitleCase = (str) => {
   return str
@@ -46,6 +49,7 @@ const BatchesTab = () => {
     type: "Theory",
     semester: 1,
     center: "",
+    centers: [],
     course: "",
     batch: "",
     fee: 0,
@@ -59,11 +63,38 @@ const BatchesTab = () => {
     semesters: [],
   });
   const [searchQuery, setSearchQuery] = useState("");
-
+  const [selectedCenterFilters, setSelectedCenterFilters] = useState(["all"]);
   const [centersList, setCentersList] = useState([]);
   const [coursesList, setCoursesList] = useState([]);
   const [batchesList, setBatchesList] = useState([]);
   const [subjectsList, setSubjectsList] = useState([]);
+
+  const centerFilterOptions = [
+    { label: "All Centers", value: "all" },
+    ...centersList.map(c => ({ label: c.name, value: c._id }))
+  ];
+
+  const handleCenterFilterChange = (newSelection) => {
+    if (newSelection.includes("all") && !selectedCenterFilters.includes("all")) {
+      setSelectedCenterFilters(["all"]);
+    } else if (newSelection.length > 1 && newSelection.includes("all")) {
+      setSelectedCenterFilters(newSelection.filter(v => v !== "all"));
+    } else if (newSelection.length === 0) {
+      setSelectedCenterFilters(["all"]);
+    } else {
+      setSelectedCenterFilters(newSelection);
+    }
+  };
+
+  const handleModalCentersChange = (newSelection) => {
+    if (newSelection.includes("all") && !(formData.centers || []).includes("all")) {
+      setFormData({ ...formData, centers: ["all"] });
+    } else if (newSelection.length > 1 && newSelection.includes("all")) {
+      setFormData({ ...formData, centers: newSelection.filter(v => v !== "all") });
+    } else {
+      setFormData({ ...formData, centers: newSelection });
+    }
+  };
 
   const openAssignStudentsModal = (batch) => {
     setCurrentBatchAssignStudents(batch);
@@ -213,21 +244,106 @@ const BatchesTab = () => {
 
     try {
       if (isEditing) {
-        const { data: updatedItem } = await api.put(
-          `${config[activeTab].endpoint}/${currentId}`,
-          formattedData,
-        );
-        setData(
-          data.map((item) => (item._id === currentId ? updatedItem : item)),
-        );
-        toast.success(`${config[activeTab].singular} updated`);
+        if (activeTab === "batches") {
+          let targetCenters = formData.centers || [];
+          if (targetCenters.includes("all")) {
+            targetCenters = centersList.map(c => c._id);
+          }
+          if (targetCenters.length === 0) {
+            toast.error("Please select at least one center");
+            return;
+          }
+
+          const originalBatch = data.find(item => item._id === currentId);
+          const originalCenterId = (originalBatch?.center?._id || originalBatch?.center || "").toString();
+
+          let centerToUpdate = "";
+          let centersToCreate = [];
+
+          if (targetCenters.includes(originalCenterId)) {
+            centerToUpdate = originalCenterId;
+            centersToCreate = targetCenters.filter(cid => cid !== originalCenterId);
+          } else {
+            centerToUpdate = targetCenters[0];
+            centersToCreate = targetCenters.slice(1);
+          }
+
+          const loadToast = toast.loading("Updating batches...");
+          try {
+            const { data: updatedItem } = await api.put(
+              `${config[activeTab].endpoint}/${currentId}`,
+              { ...formattedData, center: centerToUpdate },
+            );
+
+            const createPromises = centersToCreate.map(centerId => {
+              return api.post(config[activeTab].endpoint, {
+                ...formattedData,
+                center: centerId
+              });
+            });
+
+            const createResponses = await Promise.all(createPromises);
+            const newBatches = createResponses.map(res => res.data);
+
+            setData(prevData => {
+              const updatedList = prevData.map(item => item._id === currentId ? updatedItem : item);
+              return [...updatedList, ...newBatches];
+            });
+
+            toast.success("Batch updated and saved to all selected centers");
+          } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to update batches");
+            fetchData();
+          } finally {
+            toast.dismiss(loadToast);
+          }
+        } else {
+          const { data: updatedItem } = await api.put(
+            `${config[activeTab].endpoint}/${currentId}`,
+            formattedData,
+          );
+          setData(
+            data.map((item) => (item._id === currentId ? updatedItem : item)),
+          );
+          toast.success(`${config[activeTab].singular} updated`);
+        }
       } else {
-        const { data: newItem } = await api.post(
-          config[activeTab].endpoint,
-          formattedData,
-        );
-        setData([...data, newItem]);
-        toast.success(`${config[activeTab].singular} created`);
+        if (activeTab === "batches") {
+          let centersToCreate = formData.centers || [];
+          if (centersToCreate.includes("all")) {
+            centersToCreate = centersList.map(c => c._id);
+          }
+          if (centersToCreate.length === 0) {
+            toast.error("Please select at least one center");
+            return;
+          }
+
+          const loadToast = toast.loading("Creating batches...");
+          try {
+            const promises = centersToCreate.map(centerId => {
+              return api.post(config[activeTab].endpoint, {
+                ...formattedData,
+                center: centerId
+              });
+            });
+            const responses = await Promise.all(promises);
+            const newBatches = responses.map(res => res.data);
+            setData([...data, ...newBatches]);
+            toast.success(`${newBatches.length} batch(es) created successfully`);
+          } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to create batches");
+            fetchData();
+          } finally {
+            toast.dismiss(loadToast);
+          }
+        } else {
+          const { data: newItem } = await api.post(
+            config[activeTab].endpoint,
+            formattedData,
+          );
+          setData([...data, newItem]);
+          toast.success(`${config[activeTab].singular} created`);
+        }
       }
       closeModal();
     } catch (error) {
@@ -247,6 +363,7 @@ const BatchesTab = () => {
         type: item.type || "Theory",
         semester: item.semester || 1,
         center: item.center?._id || item.center || "",
+        centers: item.center ? [item.center?._id || item.center] : [],
         course: item.course?._id || item.course || "",
         batch: item.batch?._id || item.batch || "",
         fee: item.fee || 0,
@@ -270,6 +387,7 @@ const BatchesTab = () => {
         type: "Theory",
         semester: 1,
         center: "",
+        centers: [],
         course: "",
         batch: "",
         fee: 0,
@@ -327,16 +445,27 @@ const BatchesTab = () => {
   };
 
   const openAssignSubjectModal = (batch) => {
+    console.log("OPEN ASSIGN SUBJECT MODAL - BATCH:", batch);
     setCurrentBatchAssign(batch);
     const initialData = Array.from({ length: batch.numberOfSemesters || 1 }).map((_, i) => {
       const semNum = i + 1;
       const existingSem = batch.semesters?.find(s => s.semesterNumber === semNum);
+      console.log(`Semester ${semNum} existingSem:`, existingSem);
+      const mappedSubjects = existingSem?.subjects?.map(s => {
+        if (!s) return null;
+        if (typeof s === 'object') {
+          return s._id ? s._id.toString() : s.toString();
+        }
+        return s.toString();
+      }).filter(Boolean) || [];
+      console.log(`Semester ${semNum} mappedSubjects:`, mappedSubjects);
       return {
         semesterNumber: semNum,
         noOfSubjects: existingSem?.subjects?.length || 0,
-        subjects: existingSem?.subjects?.map(s => typeof s === 'object' ? s._id : s) || []
+        subjects: mappedSubjects
       };
     });
+    console.log("initialData:", initialData);
     setAssignSubjectsData(initialData);
     setAssignSemTab(1);
     setShowAssignSubjectModal(true);
@@ -344,11 +473,13 @@ const BatchesTab = () => {
 
   const handleAssignSubjectSubmit = async (e) => {
     e.preventDefault();
+    console.log("SUBMIT ASSIGN SUBJECT - assignSubjectsData:", assignSubjectsData);
     try {
       const updatedSemesters = assignSubjectsData.map(sem => ({
         semesterNumber: sem.semesterNumber,
         subjects: sem.subjects
       }));
+      console.log("updatedSemesters to send:", updatedSemesters);
       
       const { data: updatedBatch } = await api.put(`/batches/${currentBatchAssign._id}`, {
         ...currentBatchAssign,
@@ -356,6 +487,7 @@ const BatchesTab = () => {
         course: currentBatchAssign.course?._id || currentBatchAssign.course,
         semesters: updatedSemesters
       });
+      console.log("updatedBatch returned from server:", updatedBatch);
       
       setData(data.map((item) => (item._id === currentBatchAssign._id ? updatedBatch : item)));
       toast.success("Subjects assigned successfully");
@@ -453,6 +585,7 @@ const BatchesTab = () => {
           name: "Center",
           selector: r => r.center?.name || "N/A",
           sortable: true,
+          width: "120px",
         },
         {
           name: "Semesters",
@@ -531,7 +664,18 @@ const BatchesTab = () => {
         item.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    return item.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeTab === "batches") {
+      const itemCenterId = item.center?._id
+        ? item.center._id.toString()
+        : item.center
+        ? item.center.toString()
+        : "";
+      const matchesCenter = selectedCenterFilters.includes("all") || 
+                            selectedCenterFilters.includes(itemCenterId);
+      return matchesSearch && matchesCenter;
+    }
+    return matchesSearch;
   });
 
   return (
@@ -557,6 +701,33 @@ const BatchesTab = () => {
           search={searchQuery}
           setSearch={setSearchQuery}
           searchPlaceholder={`Search ${config[activeTab].title.toLowerCase()}...`}
+          additionalHeaderContent={
+            activeTab === "batches" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Filter Center:</span>
+                <div className="w-56">
+                  <MultiSelectDropdown
+                    options={centerFilterOptions}
+                    selected={selectedCenterFilters}
+                    onChange={handleCenterFilterChange}
+                    placeholder="All Centers"
+                  />
+                </div>
+                {(!selectedCenterFilters.includes("all") || selectedCenterFilters.length > 1) && (
+                  <button
+                    onClick={() => {
+                      setSelectedCenterFilters(["all"]);
+                      setSearchQuery("");
+                    }}
+                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                    title="Reset Filter"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                )}
+              </div>
+            )
+          }
         />
       </div>
 
@@ -564,15 +735,24 @@ const BatchesTab = () => {
       {showModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-start justify-center p-4 py-10">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl scale-in-center">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-brand-50 text-brand-600 rounded-lg">
-                {config[activeTab].icon}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-brand-50 text-brand-600 rounded-lg">
+                  {config[activeTab].icon}
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {isEditing
+                    ? `Edit ${config[activeTab].singular}`
+                    : `Create ${config[activeTab].singular}`}
+                </h2>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
-                {isEditing
-                  ? `Edit ${config[activeTab].singular}`
-                  : `Create ${config[activeTab].singular}`}
-              </h2>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               {activeTab !== "examFees" && (
@@ -727,11 +907,13 @@ const BatchesTab = () => {
                     <input type="text" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.batchId} onChange={e => setFormData({ ...formData, batchId: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Center</label>
-                    <select required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white" value={formData.center} onChange={e => setFormData({ ...formData, center: e.target.value })}>
-                      <option value="">Select Center</option>
-                      {centersList.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                    </select>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Center(s) *</label>
+                    <MultiSelectDropdown
+                      options={[{ label: "All Centers", value: "all" }, ...centersList.map(c => ({ label: c.name, value: c._id }))] }
+                      selected={formData.centers || []}
+                      onChange={handleModalCentersChange}
+                      placeholder="Select Center(s)"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
@@ -790,13 +972,22 @@ const BatchesTab = () => {
       {showAssignSubjectModal && currentBatchAssign && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-start justify-center p-4 py-10">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl scale-in-center">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                <BookOpen size={20} />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <BookOpen size={20} />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Assign Subjects to {currentBatchAssign.name || currentBatchAssign.batchId}
+                </h2>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Assign Subjects to {currentBatchAssign.name || currentBatchAssign.batchId}
-              </h2>
+              <button
+                type="button"
+                onClick={() => setShowAssignSubjectModal(false)}
+                className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
             </div>
             
             <form onSubmit={handleAssignSubjectSubmit} className="space-y-4">
@@ -874,7 +1065,7 @@ const BatchesTab = () => {
                   type="submit"
                   className="px-6 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 shadow-md transition-all"
                 >
-                  Save Assignments
+                  Assign Subjects
                 </button>
               </div>
             </form>

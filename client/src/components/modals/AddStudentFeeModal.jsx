@@ -19,6 +19,55 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
     finalPenaltyAmount: 0
   });
 
+  const handleStudentChange = (studentId) => {
+    if (!studentId) {
+      setFormData(prev => ({
+        ...prev,
+        student: "",
+        center: "",
+        course: "",
+        batch: ""
+      }));
+      return;
+    }
+
+    const selectedStudent = students.find(s => s._id === studentId);
+    let batchId = "";
+    let courseId = "";
+    let centerId = "";
+
+    if (selectedStudent) {
+      // Find any batch that contains this student first
+      const studentBatch = batches.find(b => 
+        b.students && b.students.some(sid => {
+          const idStr = typeof sid === 'object' ? (sid._id || sid).toString() : sid.toString();
+          return idStr === studentId;
+        })
+      );
+
+      if (studentBatch) {
+        batchId = studentBatch._id;
+        courseId = studentBatch.course?._id || studentBatch.course;
+        centerId = studentBatch.center?._id || studentBatch.center;
+      } else {
+        // Fallback to student's profile settings if they have no assigned batch
+        centerId = selectedStudent.center?._id || selectedStudent.center || "";
+        const enrolledCourse = selectedStudent.enrolledCourses?.[0]?.course;
+        courseId = enrolledCourse?._id || enrolledCourse || "";
+        const enrolledBatch = selectedStudent.enrolledCourses?.[0]?.batch;
+        batchId = enrolledBatch?._id || enrolledBatch || "";
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      student: studentId,
+      batch: batchId,
+      course: courseId,
+      center: centerId
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(formData);
@@ -43,28 +92,28 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Student</label>
-              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.student} onChange={e => setFormData({...formData, student: e.target.value})}>
+              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.student} onChange={e => handleStudentChange(e.target.value)}>
                 <option value="">Select Student</option>
                 {students?.map(s => <option key={s._id} value={s._id}>{s.studentNameEnglish} ({s.studentId})</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Center</label>
-              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})}>
+              <select required className={`w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm ${formData.student ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50'}`} value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})} disabled={!!formData.student}>
                 <option value="">Select Center</option>
                 {centers?.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Course</label>
-              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.course} onChange={e => setFormData({...formData, course: e.target.value})}>
+              <select required className={`w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm ${formData.student ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50'}`} value={formData.course} onChange={e => setFormData({...formData, course: e.target.value})} disabled={!!formData.student}>
                 <option value="">Select Course</option>
                 {courses?.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Batch</label>
-              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})}>
+              <select required className={`w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm ${formData.student ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50'}`} value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} disabled={!!formData.student}>
                 <option value="">Select Batch</option>
                 {batches?.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
               </select>

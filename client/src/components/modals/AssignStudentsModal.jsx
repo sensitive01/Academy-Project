@@ -18,8 +18,12 @@ const AssignStudentsModal = ({ batch, onClose, onAssignSuccess }) => {
       try {
         const response = await api.get('/students');
         const studentsList = response.data.students || [];
-        // Filter students enrolled in the same course as the batch
+        // Filter students enrolled in the same course as the batch AND at the same center
         const filteredStudents = studentsList.filter(st => {
+          const studentCenterId = st.center?._id ? st.center._id.toString() : st.center ? st.center.toString() : "";
+          const batchCenterId = batch.center?._id ? batch.center._id.toString() : batch.center ? batch.center.toString() : "";
+          if (studentCenterId !== batchCenterId) return false;
+
           if (!st.enrolledCourses) return false;
           return st.enrolledCourses.some(ec => 
             ec.course && 

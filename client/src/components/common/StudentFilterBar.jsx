@@ -15,6 +15,8 @@ const StudentFilterBar = ({
   setFilterYears,
   filterVendor,
   setFilterVendor,
+  filterStatus,
+  setFilterStatus,
   centers = [],
   courses = [],
   batches = [],
@@ -30,6 +32,7 @@ const StudentFilterBar = ({
     if (setFilterBatch) setFilterBatch([]);
     if (setFilterYears) setFilterYears([]);
     if (setFilterVendor) setFilterVendor([]);
+    if (setFilterStatus) setFilterStatus([]);
     if (onReset) onReset();
   };
 
@@ -103,6 +106,20 @@ const StudentFilterBar = ({
             selected={filterYears}
             onChange={setFilterYears}
             placeholder="All Years"
+          />
+        </div>
+      )}
+
+      {setFilterStatus && (
+        <div className="min-w-[140px] flex-1">
+          <MultiSelectDropdown
+            options={[
+              { label: "Active", value: "active" },
+              { label: "Inactive", value: "inactive" }
+            ]}
+            selected={filterStatus}
+            onChange={setFilterStatus}
+            placeholder="All Statuses"
           />
         </div>
       )}

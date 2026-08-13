@@ -1,16 +1,15 @@
 const mongoose = require("mongoose");
 
+
 const batchSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true,
-      unique: true,
     },
     batchId: {
       type: String,
       required: true,
-      unique: true,
     },
     course: {
       type: mongoose.Schema.Types.ObjectId,

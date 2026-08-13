@@ -12,6 +12,8 @@ const VendorPaymentsList = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedVendor, setSelectedVendor] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
 
   useEffect(() => {
     fetchPayments();
@@ -74,11 +76,17 @@ const VendorPaymentsList = () => {
 
   const filtered = payments.filter((p) => {
     const term = search.toLowerCase();
-    return (
+    const matchesSearch =
       p.vendor?.companyName?.toLowerCase().includes(term) ||
       p.vendor?.contactPerson?.toLowerCase().includes(term) ||
-      p.title?.toLowerCase().includes(term)
-    );
+      p.title?.toLowerCase().includes(term);
+
+    const pVendorId = p.vendor?._id ? p.vendor._id.toString() : p.vendor ? p.vendor.toString() : "";
+    const matchesVendor = selectedVendor === "all" || pVendorId === selectedVendor;
+
+    const matchesStatus = selectedStatus === "all" || p.status === selectedStatus;
+
+    return matchesSearch && matchesVendor && matchesStatus;
   });
 
   const columns = [
@@ -172,6 +180,42 @@ const VendorPaymentsList = () => {
         setSearch={setSearch}
         searchPlaceholder="Search vendor payments..."
         pagination
+        additionalHeaderContent={
+          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
+            <select
+              value={selectedVendor}
+              onChange={(e) => setSelectedVendor(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[150px] truncate"
+            >
+              <option value="all">All Vendors</option>
+              {vendors.map(v => (
+                <option key={v._id} value={v._id}>{v.companyName}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+            >
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+            </select>
+
+            {(selectedVendor !== "all" || selectedStatus !== "all") && (
+              <button
+                onClick={() => {
+                  setSelectedVendor("all");
+                  setSelectedStatus("all");
+                }}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        }
       />
       {showModal && (
         <AddVendorPaymentModal 

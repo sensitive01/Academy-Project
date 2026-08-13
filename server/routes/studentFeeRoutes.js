@@ -162,18 +162,12 @@ router.post('/:id/collect', protect, async (req, res) => {
     fee.paymentMode = paymentMode;
 
     if (paymentMode === 'Cash') {
-      fee.status = 'paid';
-      fee.paidAt = new Date();
-      // Update Center Cash Balance
-      const center = await Center.findById(fee.center);
-      if (center) {
-        center.cashBalance = (center.cashBalance || 0) + fee.amount + fee.penaltyAmount + fee.finalPenaltyAmount;
-        await center.save();
-      }
+      fee.status = 'pending_approval';
+      fee.approvalStatus = 'Pending';
     } else if (paymentMode === 'Online') {
-      fee.status = 'paid';
-      fee.paidAt = new Date();
+      fee.status = 'pending_approval';
       fee.proofOfPayment = proofOfPayment;
+      fee.approvalStatus = 'Pending';
     } else if (paymentMode === 'Bank') {
       fee.status = 'pending_approval';
       fee.bankReference = bankReference;
@@ -214,6 +208,13 @@ router.patch('/:id/approve', protect, async (req, res) => {
     if (approvalStatus === 'Approved') {
       fee.status = 'paid';
       fee.paidAt = new Date();
+      if (fee.paymentMode === 'Cash') {
+        const center = await Center.findById(fee.center);
+        if (center) {
+          center.cashBalance = (center.cashBalance || 0) + fee.amount + fee.penaltyAmount + fee.finalPenaltyAmount;
+          await center.save();
+        }
+      }
     } else if (approvalStatus === 'Rejected') {
       fee.status = 'pending';
       // Reset payment details so they can try again if needed, or leave it for history

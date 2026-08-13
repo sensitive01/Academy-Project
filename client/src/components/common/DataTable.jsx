@@ -73,12 +73,13 @@ const CustomDataTable = ({
   search, 
   setSearch, 
   exportButton,
+  additionalHeaderContent,
   ...props 
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col w-full h-full">
       {/* Header section with search and export built-in if provided */}
-      {(setSearch || exportButton) && (
+      {(setSearch || exportButton || additionalHeaderContent) && (
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">
           {setSearch && (
             <div className="relative w-full sm:w-72 group">
@@ -92,11 +93,14 @@ const CustomDataTable = ({
               />
             </div>
           )}
-          {exportButton && (
-            <div className="w-full sm:w-auto flex justify-end">
-              {exportButton}
-            </div>
-          )}
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
+            {additionalHeaderContent}
+            {exportButton && (
+              <div className="w-full sm:w-auto flex justify-end">
+                {exportButton}
+              </div>
+            )}
+          </div>
         </div>
       )}
       

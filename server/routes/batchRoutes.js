@@ -11,9 +11,9 @@ router.post("/", protect, async (req, res) => {
   try {
     const { name, batchId, course, center, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
 
-    const exists = await Batch.findOne({ $or: [{ name }, { batchId }] });
+    const exists = await Batch.findOne({ center, $or: [{ name }, { batchId }] });
     if (exists) {
-      return res.status(400).json({ message: "Batch name or ID already exists" });
+      return res.status(400).json({ message: "Batch name or ID already exists for this center" });
     }
 
     const batch = await Batch.create({
@@ -79,11 +79,12 @@ router.put("/:id", protect, async (req, res) => {
 
     await batch.save();
 
-    await batch.populate("course");
-    await batch.populate("center");
-    await batch.populate("semesters.subjects");
+    const populatedBatch = await Batch.findById(batch._id)
+      .populate("course")
+      .populate("center")
+      .populate("semesters.subjects");
 
-    res.json(batch);
+    res.json(populatedBatch);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

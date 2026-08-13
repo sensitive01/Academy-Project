@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { XCircle, Plus } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import ReactDOM from "react-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => {
   const [title, setTitle] = useState("");
@@ -14,6 +15,25 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
   );
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [submittedBy, setSubmittedBy] = useState("");
+  const { user } = useAuth();
+
+  const isPrivileged = user?.role === "admin" || user?.role === "finance";
+
+  useEffect(() => {
+    if (isOpen && isPrivileged) {
+      const fetchEmployees = async () => {
+        try {
+          const res = await api.get("/employees");
+          setEmployees(res.data.filter(emp => emp.status === "active"));
+        } catch (err) {
+          console.error("Failed to fetch employees", err);
+        }
+      };
+      fetchEmployees();
+    }
+  }, [isOpen, isPrivileged]);
 
   /* ================= RESET ================= */
   const resetForm = () => {
@@ -23,6 +43,7 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
     setDescription("");
     setDate(new Date().toISOString().split("T")[0]);
     setReceipt(null);
+    setSubmittedBy("");
   };
 
   /* ================= FILE VALIDATION ================= */
@@ -71,6 +92,9 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
 
       if (receipt) {
         formData.append("receipt", receipt);
+      }
+      if (isPrivileged && submittedBy) {
+        formData.append("submittedBy", submittedBy);
       }
 
       await api.post("/expenses", formData);
@@ -147,6 +171,22 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
             <option value="Medical">Medical</option>
             <option value="Other">Other</option>
           </select>
+
+          {/* Assign to Employee (Admin/Finance Only) */}
+          {isPrivileged && (
+            <select
+              value={submittedBy}
+              onChange={(e) => setSubmittedBy(e.target.value)}
+              className="border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="">-- Assign to Employee (Optional) --</option>
+              {employees.map((emp) => (
+                <option key={emp.user?._id || emp._id} value={emp.user?._id || emp.user}>
+                  {emp.firstName} {emp.lastName} ({emp.department})
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Amount */}
           <input

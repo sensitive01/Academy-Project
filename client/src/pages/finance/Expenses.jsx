@@ -69,6 +69,21 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
     }
   };
 
+  /* ================= PAID DIRECT ================= */
+  const handlePayDirect = async (id) => {
+    try {
+      await api.patch(`/expenses/${id}/pay`, {
+        paymentMethod: "UPI",
+        transactionId: "AUTO-TXN",
+      });
+      toast.success("Expense marked as Paid");
+      setOpenMenuId(null);
+      fetchExpenses();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to mark as Paid");
+    }
+  };
+
   /* ================= DELETE ================= */
   const handleDelete = (id) => {
     setConfirmConfig({ isOpen: true, id });
@@ -136,12 +151,16 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
                 </>
               )}
               {user.role === "admin" && row.status === "approved" && (
-                <button onClick={() => handleReimburse(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition"><Banknote size={16} /> Reimburse</button>
+                <>
+                  <button onClick={() => handleReimburse(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition"><Banknote size={16} /> Reimburse</button>
+                  <button onClick={() => handlePayDirect(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition"><Banknote size={16} /> Paid</button>
+                </>
               )}
-              {row.status === "reimbursed" && (
+              {["reimbursed", "paid"].includes(row.status) && (
                 <button 
                   onClick={() => {
-                    downloadReceipt(`/expenses/${row._id}/receipt`, `Reimbursement_${row._id}.pdf`);
+                    const filename = row.status === "paid" ? `Payment_${row._id}.pdf` : `Reimbursement_${row._id}.pdf`;
+                    downloadReceipt(`/expenses/${row._id}/receipt`, filename);
                     setOpenMenuId(null);
                   }} 
                   className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-brand-600 hover:bg-brand-50 transition border-b border-gray-100"
@@ -239,6 +258,7 @@ const StatusBadge = ({ status }) => {
     approved: "bg-green-100 text-green-700",
     rejected: "bg-red-100 text-red-700",
     reimbursed: "bg-blue-100 text-blue-700",
+    paid: "bg-emerald-100 text-emerald-700",
   };
 
   return (

@@ -15,20 +15,147 @@ import { CheckCircle, Clock } from "lucide-react";
 
 // Assuming EmployeeList is kept in the same file or a new one. I will just paste the EmployeeList code here so it works seamlessly.
 import ReactDOM from "react-dom";
-import { Mail, Phone, MoreVertical, Edit, Ban, Unlock, XCircle, Filter } from "lucide-react";
+import { Mail, Phone, MoreVertical, Edit, Ban, Unlock, XCircle, Filter, RotateCcw, Download, FileSpreadsheet, FileText } from "lucide-react";
 import CustomDataTable from "../../components/common/DataTable";
+import { useMemo } from "react";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { saveAs } from "file-saver";
 
 const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete }) => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [search, setSearch] = useState("");
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
-  const filteredEmployees = employees.filter(emp =>
-    emp.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-    emp.lastName?.toLowerCase().includes(search.toLowerCase()) ||
-    emp.employeeId?.toLowerCase().includes(search.toLowerCase()) ||
-    emp.department?.toLowerCase().includes(search.toLowerCase())
-  );
+  const [selectedCenter, setSelectedCenter] = useState("all");
+  const [selectedDept, setSelectedDept] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedRole, setSelectedRole] = useState("all");
+
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState("excel");
+
+  const centerOptions = useMemo(() => {
+    const centers = employees.map(emp => emp.center).filter(Boolean);
+    const uniqueCenters = [];
+    const seenIds = new Set();
+    centers.forEach(c => {
+      const id = c._id ? c._id.toString() : c.toString();
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueCenters.push({ id, name: c.name || `Center ${id.substring(0, 4)}` });
+      }
+    });
+    return [
+      { label: "All Centers", value: "all" },
+      ...uniqueCenters.map(c => ({ label: c.name, value: c.id }))
+    ];
+  }, [employees]);
+
+  const departmentOptions = useMemo(() => {
+    const depts = employees.map(emp => emp.department).filter(Boolean);
+    const uniqueDepts = [...new Set(depts)];
+    return [
+      { label: "All Departments", value: "all" },
+      ...uniqueDepts.map(d => ({ label: d, value: d }))
+    ];
+  }, [employees]);
+
+  const roleOptions = useMemo(() => {
+    const roles = employees.map(emp => emp.user?.role).filter(Boolean);
+    const uniqueRoles = [...new Set(roles)];
+    return [
+      { label: "All Roles", value: "all" },
+      ...uniqueRoles.map(r => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r }))
+    ];
+  }, [employees]);
+
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch =
+      emp.firstName?.toLowerCase().includes(search.toLowerCase()) ||
+      emp.lastName?.toLowerCase().includes(search.toLowerCase()) ||
+      emp.employeeId?.toLowerCase().includes(search.toLowerCase()) ||
+      emp.department?.toLowerCase().includes(search.toLowerCase());
+
+    const empCenterId = emp.center?._id ? emp.center._id.toString() : emp.center ? emp.center.toString() : "";
+    const matchesCenter = selectedCenter === "all" || empCenterId === selectedCenter;
+
+    const matchesDept = selectedDept === "all" || emp.department === selectedDept;
+
+    const matchesStatus = selectedStatus === "all" || emp.status === selectedStatus;
+
+    const matchesRole = selectedRole === "all" || emp.user?.role === selectedRole;
+
+    return matchesSearch && matchesCenter && matchesDept && matchesStatus && matchesRole;
+  });
+
+  const handleExport = () => {
+    setShowExportModal(false);
+    if (exportFormat === "excel") {
+      const data = filteredEmployees.map((emp, i) => ({
+        "S.No": i + 1,
+        "Employee ID": emp.employeeId || "-",
+        Name: `${emp.firstName} ${emp.lastName}`,
+        Email: emp.user?.email || "-",
+        Phone: emp.phone || "-",
+        Role: emp.user?.role || "-",
+        Department: emp.department || "-",
+        Center: emp.center?.name || "-",
+        Status: emp.status || "-",
+        Joined: emp.joiningDate ? new Date(emp.joiningDate).toLocaleDateString("en-IN") : "-"
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+      XLSX.writeFile(workbook, "Employees.xlsx");
+      toast.success("Excel exported successfully!");
+    } else {
+      const doc = new jsPDF();
+      doc.text("Employees Directory", 14, 15);
+      
+      const tableColumn = ["S.No", "Employee ID", "Name", "Email", "Phone", "Role", "Dept", "Center", "Status"];
+      const tableRows = [];
+
+      filteredEmployees.forEach((emp, index) => {
+        const rowData = [
+          index + 1,
+          emp.employeeId || "-",
+          `${emp.firstName} ${emp.lastName}`,
+          emp.user?.email || "-",
+          emp.phone || "-",
+          emp.user?.role || "-",
+          emp.department || "-",
+          emp.center?.name || "-",
+          emp.status || "-"
+        ];
+        tableRows.push(rowData);
+      });
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 20,
+        theme: "striped",
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 10 }, // S.No
+          1: { cellWidth: 22 }, // Employee ID
+          2: { cellWidth: 28 }, // Name
+          3: { cellWidth: 38 }, // Email
+          4: { cellWidth: 22 }, // Phone
+          5: { cellWidth: 18 }, // Role
+          6: { cellWidth: 18 }, // Dept
+          7: { cellWidth: 18 }, // Center
+          8: { cellWidth: 16 }  // Status
+        }
+      });
+      
+      const pdfBlob = doc.output("blob");
+      saveAs(pdfBlob, "Employees_Report.pdf");
+      toast.success("PDF exported successfully!");
+    }
+  };
 
   const toggleMenu = (id, event) => {
     if (openMenuId === id) {
@@ -172,18 +299,134 @@ const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete })
         search={search}
         setSearch={setSearch}
         searchPlaceholder="Search employees by name, ID, or role..."
-        exportButton={
-          <button className="flex items-center gap-2 px-4 py-2 font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm transition-colors">
-            <Filter size={16} /> Filters
-          </button>
+        additionalHeaderContent={
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedCenter}
+              onChange={(e) => setSelectedCenter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+            >
+              {centerOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+            >
+              {departmentOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+            >
+              {roleOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Blocked</option>
+            </select>
+
+            {(selectedCenter !== "all" || selectedDept !== "all" || selectedStatus !== "all" || selectedRole !== "all") && (
+              <button
+                onClick={() => {
+                  setSelectedCenter("all");
+                  setSelectedDept("all");
+                  setSelectedStatus("all");
+                  setSelectedRole("all");
+                  setSearch("");
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                title="Reset Filters"
+              >
+                <RotateCcw size={14} />
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-600/10 transition-colors cursor-pointer"
+            >
+              <Download size={14} /> Export
+            </button>
+          </div>
         }
       />
+
+      {showExportModal && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 animate-out fade-out" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Export Data</h3>
+            <p className="text-slate-500 text-xs mb-6">Choose your preferred format to export the filtered employee list.</p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                onClick={() => setExportFormat("excel")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "excel"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="text-xs font-bold">Excel (.xlsx)</span>
+              </button>
+
+              <button
+                onClick={() => setExportFormat("pdf")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "pdf"
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileText size={20} />
+                </div>
+                <span className="text-xs font-bold">PDF Document</span>
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-brand-600/20 transition-all"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
 
 
-const HR = () => {
+const EmployeeManagement = () => {
   const [activeTab, setActiveTab] = useState("employee");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
@@ -356,7 +599,7 @@ const HR = () => {
       <div className="mt-6">
         {activeTab === "employee" && (
           <EmployeeTable
-            employees={employees}
+            employees={employees.filter(e => e.user?.role?.toLowerCase() !== "coach")}
             loading={loading}
             onEdit={handleEditInitiate}
             onToggleStatus={handleToggleStatus}
@@ -394,4 +637,4 @@ const HR = () => {
   );
 };
 
-export default HR;
+export default EmployeeManagement;

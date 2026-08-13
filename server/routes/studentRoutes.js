@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const Vendor = require('../models/Vendor');
 const StudentFee = require('../models/StudentFee');
+const Batch = require('../models/Batch');
 
 // ======================================================
 // PUBLIC REGISTRATION (Apply Now)
@@ -73,7 +74,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       department,
     } = req.body;
 
-    const finalName = (studentNameEnglish && studentNameEnglish.trim()) || "New Student";
+    const finalName = (studentNameEnglish && studentNameEnglish.trim()) || "";
     const finalEmail = (email && email.trim()) ? email.trim() : `student_${Date.now()}@dracademy.internal`;
     const finalPhone = phone || "";
 
@@ -148,7 +149,6 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       hscDetails,
       familyBackground,
       references,
-
       year,
       status: 'active'
     });
@@ -158,6 +158,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       if (course) {
         student.enrolledCourses.push({
           course: course,
+          batch: batch || undefined,
           completed: false,
           progress: 0
         });
@@ -165,6 +166,11 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       
       // Save student here to get _id for fees
       await student.save();
+
+      // Update Batch model to include this student
+      if (batch) {
+        await Batch.findByIdAndUpdate(batch, { $addToSet: { students: student._id } });
+      }
 
       if (fees && Array.isArray(fees) && fees.length > 0) {
         for (const fee of fees) {
@@ -361,6 +367,23 @@ router.put(
       );
 
       await student.save();
+
+      // If enrolledCourses contains a batch, ensure the student is added to that Batch
+      if (data.enrolledCourses && Array.isArray(data.enrolledCourses)) {
+        const Batch = require('../models/Batch');
+        
+        // First, remove this student from all batches to clear old assignments
+        await Batch.updateMany(
+          { students: student._id },
+          { $pull: { students: student._id } }
+        );
+
+        for (const ec of data.enrolledCourses) {
+          if (ec.batch) {
+            await Batch.findByIdAndUpdate(ec.batch, { $addToSet: { students: student._id } });
+          }
+        }
+      }
 
       // =========================
       // UPDATE USER DATA

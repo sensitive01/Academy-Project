@@ -7,10 +7,23 @@ const PendingApprovalsList = () => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [centers, setCenters] = useState([]);
+  const [selectedCenter, setSelectedCenter] = useState("all");
+  const [selectedMode, setSelectedMode] = useState("all");
 
   useEffect(() => {
     fetchPendingFees();
+    fetchCenters();
   }, []);
+
+  const fetchCenters = async () => {
+    try {
+      const res = await api.get("/centers");
+      setCenters(res.data || []);
+    } catch (err) {
+      console.error("Failed to load centers", err);
+    }
+  };
 
   const fetchPendingFees = async () => {
     try {
@@ -37,12 +50,18 @@ const PendingApprovalsList = () => {
 
   const filtered = fees.filter((f) => {
     const term = search.toLowerCase();
-    return (
+    const matchesSearch =
       f.student?.studentNameEnglish?.toLowerCase().includes(term) ||
       f.student?.studentId?.toLowerCase().includes(term) ||
       f.bankReference?.toLowerCase().includes(term) ||
-      f.center?.name?.toLowerCase().includes(term)
-    );
+      f.center?.name?.toLowerCase().includes(term);
+
+    const fCenterId = f.center?._id ? f.center._id.toString() : f.center ? f.center.toString() : "";
+    const matchesCenter = selectedCenter === "all" || fCenterId === selectedCenter;
+
+    const matchesMode = selectedMode === "all" || f.paymentMode === selectedMode;
+
+    return matchesSearch && matchesCenter && matchesMode;
   });
 
   const columns = [
@@ -89,14 +108,28 @@ const PendingApprovalsList = () => {
       }
     },
     {
-      name: "Bank Ref", width: "180px",
-      selector: row => row.bankReference,
+      name: "Reference / Proof", width: "200px",
+      selector: row => row.bankReference || row.proofOfPayment,
       sortable: true,
-      cell: row => (
-        <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">
-          {row.bankReference || 'N/A'}
-        </span>
-      )
+      cell: row => {
+        if (row.paymentMode === 'Online' && row.proofOfPayment) {
+          return (
+            <a 
+              href={row.proofOfPayment} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm whitespace-nowrap"
+            >
+              View Uploaded Proof
+            </a>
+          );
+        }
+        return (
+          <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">
+            {row.bankReference || 'N/A'}
+          </span>
+        );
+      }
     },
     {
       name: "Action",
@@ -134,6 +167,43 @@ const PendingApprovalsList = () => {
         setSearch={setSearch}
         searchPlaceholder="Search approvals by student, ID, bank ref..."
         pagination
+        additionalHeaderContent={
+          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
+            <select
+              value={selectedCenter}
+              onChange={(e) => setSelectedCenter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+            >
+              <option value="all">All Centers</option>
+              {centers.map(c => (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedMode}
+              onChange={(e) => setSelectedMode(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+            >
+              <option value="all">All Modes</option>
+              <option value="Cash">Cash</option>
+              <option value="Online">Online</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+
+            {(selectedCenter !== "all" || selectedMode !== "all") && (
+              <button
+                onClick={() => {
+                  setSelectedCenter("all");
+                  setSelectedMode("all");
+                }}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        }
       />
     </div>
   );

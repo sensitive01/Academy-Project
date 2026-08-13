@@ -38,7 +38,7 @@ const publicResultRoutes = require("./routes/publicResultRoutes");
 const vendorPaymentRoutes = require("./routes/vendorPaymentRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const reminderRoutes = require("./routes/reminderRoutes");
-
+const settingsRoutes = require("./routes/settingsRoutes");
 dotenv.config();
 connectDB();
 
@@ -91,7 +91,7 @@ app.use("/api/public-results", publicResultRoutes);
 app.use("/api/vendor-payments", vendorPaymentRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/reminders", reminderRoutes);
-
+app.use("/api/settings", settingsRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');
