@@ -255,7 +255,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
         // SEARCH: match name or role
         const matchSearch = searchTerm
           ? a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          a.role?.toLowerCase().includes(searchTerm.toLowerCase())
+            (!studentOnly && a.role?.toLowerCase().includes(searchTerm.toLowerCase()))
           : true;
 
         // DATE FILTER
@@ -346,7 +346,8 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
       cell: row => {
         let subText = row.role || "N/A";
         if (row.role?.toLowerCase() === "student") {
-           subText = (row.internships && row.internships.length > 0) ? "Intern" : "Student";
+           const sProfile = studentsMap[row.userId];
+           subText = (sProfile?.internships && sProfile.internships.length > 0) ? "Intern" : "Student";
         }
         return (
           <div className="flex flex-col">
@@ -622,7 +623,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
                       <input
                         id="search"
                         type="text"
-                        placeholder="Search by name or role..."
+                        placeholder={studentOnly ? "Search by name..." : "Search by name or role..."}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600 transition-all shadow-sm text-sm font-medium"

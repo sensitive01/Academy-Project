@@ -55,7 +55,7 @@ const StudentFilterBar = ({
         </div>
       )}
 
-      {showVendor && setFilterVendor && (
+      {showVendor && setFilterVendor && filterType?.includes("intern") && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
             options={vendors.map(v => ({ label: v.companyName || v.name, value: v._id }))}

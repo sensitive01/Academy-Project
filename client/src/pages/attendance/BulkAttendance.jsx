@@ -14,7 +14,8 @@ const BulkAttendance = () => {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
-  const [includeEmpty, setIncludeEmpty] = useState(false);
+  const [exportType, setExportType] = useState("student"); // student, intern, employee
+  const [includeEmpty, setIncludeEmpty] = useState(true);
   const [dateRange, setDateRange] = useState({
     startDate: new Date().toISOString().slice(0, 10),
     endDate: new Date().toISOString().slice(0, 10)
@@ -23,6 +24,16 @@ const BulkAttendance = () => {
   const [previewData, setPreviewData] = useState([]);
   const [studentsMap, setStudentsMap] = useState({});
   const [employees, setEmployees] = useState([]);
+
+  const formatDateLocal = (dateVal) => {
+    if (!dateVal) return "";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -56,9 +67,25 @@ const BulkAttendance = () => {
   
   // Combine users for export
   const allUsers = [
-    ...(employees || []).map(e => ({ _id: e._id, idDisplay: e.employeeId || e._id, name: e.name, role: e.role })),
-    ...(Object.values(studentsMap)).map(s => ({ _id: s.user?._id || s._id, idDisplay: s.studentId || s.user?._id || s._id, name: s.user?.name || s.name, role: "student" }))
+    ...(employees || []).map(e => ({ _id: e._id, idDisplay: e.employeeId || e._id, name: e.name, role: e.role, isIntern: false })),
+    ...(Object.values(studentsMap)).map(s => ({
+      _id: s.user?._id || s._id,
+      idDisplay: s.studentId || s.user?._id || s._id,
+      name: s.user?.name || s.name,
+      role: "student",
+      isIntern: s.internships && s.internships.length > 0
+    }))
   ].filter(u => u._id && u.name);
+
+  const getDatesInRange = (startDate, endDate) => {
+    const dates = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+  };
 
   // Step 1: Export
   const handleExport = async () => {
@@ -70,52 +97,113 @@ const BulkAttendance = () => {
       const allAtt = res.data;
       
       const filteredAtt = allAtt.filter(a => {
-        const d = new Date(a.date).toISOString().slice(0, 10);
+        const d = formatDateLocal(a.date);
         return d >= dateRange.startDate && d <= dateRange.endDate;
       });
 
       const rows = [];
       const start = new Date(dateRange.startDate);
       const end = new Date(dateRange.endDate);
-      
-      if (includeEmpty) {
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().slice(0, 10);
-          allUsers.forEach(u => {
-            const existing = filteredAtt.find(a => a.userId === u._id && new Date(a.date).toISOString().slice(0, 10) === dateStr);
-            rows.push({
-              "Student ID": u.idDisplay,
-              "Name": u.name,
-              "Date": dateStr,
-              "Login Time": existing?.loginTime || "",
-              "Logout Time": existing?.logoutTime || ""
-            });
+      const dates = getDatesInRange(dateRange.startDate, dateRange.endDate);
+
+      // Filter target users based on selected exportType
+      const targetUsers = exportType === "student"
+        ? allUsers.filter(u => u.role === "student" && !u.isIntern)
+        : exportType === "intern"
+          ? allUsers.filter(u => u.role === "student" && u.isIntern)
+          : allUsers.filter(u => u.role !== "student" && u.role !== "admin");
+
+      if (exportType === "intern") {
+        // Intern Summary: horizontal columns like total days, present, and absent
+        const totalDays = dates.length;
+        
+        targetUsers.forEach(u => {
+          const userAtt = filteredAtt.filter(a => a.userId === u._id);
+          const present = userAtt.length;
+          const absent = Math.max(0, totalDays - present);
+          
+          rows.push({
+            "Intern ID": u.idDisplay,
+            "Name": u.name,
+            "Total Days": totalDays,
+            "Present": present,
+            "Absent": absent
           });
-        }
-      } else {
-        // Only export existing records
-        filteredAtt.forEach(a => {
-           const u = allUsers.find(user => user._id === a.userId);
-           rows.push({
-              "Student ID": u ? u.idDisplay : a.userId,
-              "Name": u ? u.name : (a.name || "Unknown"),
-              "Date": new Date(a.date).toISOString().slice(0, 10),
-              "Login Time": a.loginTime || "",
-              "Logout Time": a.logoutTime || ""
-           });
         });
         
         if (rows.length === 0) {
-           toast.error("No data found in the selected period. Enable 'Template mode' to export an empty template.");
-           setLoading(false);
-           return;
+          toast.error("No active interns found to export.");
+          setLoading(false);
+          return;
         }
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Intern Summary");
+        XLSX.writeFile(wb, `Intern_Attendance_Summary_${dateRange.startDate}_to_${dateRange.endDate}.xlsx`);
+        
+        toast.success("Intern summary report exported!");
+        setStep(2);
+        return;
       }
 
-      const ws = XLSX.utils.json_to_sheet(rows);
+      // Students & Employees: Horizontal Date columns with double-decker merged headers
+      const aoa = [];
+      const idHeaderLabel = exportType === "student" ? "Student ID" : "Employee ID";
+      
+      // Header 1: Dates
+      const headerRow1 = [idHeaderLabel, "Name"];
+      // Header 2: Sub-labels
+      const headerRow2 = ["", ""];
+      
+      dates.forEach(dateStr => {
+        headerRow1.push(dateStr, ""); // Push date and empty cell for merging span
+        headerRow2.push("Login", "Logout");
+      });
+      
+      aoa.push(headerRow1);
+      aoa.push(headerRow2);
+      
+      // Select users to export based on template settings
+      const usersToExport = includeEmpty 
+        ? targetUsers 
+        : targetUsers.filter(u => filteredAtt.some(a => a.userId === u._id));
+
+      if (usersToExport.length === 0) {
+        toast.error("No data found in the selected period. Enable 'Template mode' to export an empty template.");
+        setLoading(false);
+        return;
+      }
+
+      usersToExport.forEach(u => {
+        const userRow = [u.idDisplay, u.name];
+        dates.forEach(dateStr => {
+          const existing = filteredAtt.find(a => a.userId === u._id && formatDateLocal(a.date) === dateStr);
+          userRow.push(existing?.loginTime || "");
+          userRow.push(existing?.logoutTime || "");
+        });
+        aoa.push(userRow);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      
+      // Apply cell merges
+      const merges = [];
+      merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }); // Merge Student/Employee ID vertically
+      merges.push({ s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }); // Merge Name vertically
+      
+      for (let i = 0; i < dates.length; i++) {
+        const startCol = 2 + i * 2;
+        const endCol = startCol + 1;
+        merges.push({ s: { r: 0, c: startCol }, e: { r: 0, c: endCol } }); // Merge Date horizontally
+      }
+      ws['!merges'] = merges;
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-      XLSX.writeFile(wb, `Attendance_Template_${dateRange.startDate}_to_${dateRange.endDate}.xlsx`);
+      
+      const filePrefix = exportType === "student" ? "Student" : "Employee";
+      XLSX.writeFile(wb, `${filePrefix}_Attendance_Template_${dateRange.startDate}_to_${dateRange.endDate}.xlsx`);
       
       toast.success("Template exported!");
       setStep(2);
@@ -139,7 +227,7 @@ const BulkAttendance = () => {
         const wb = XLSX.read(data, { type: "array" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const rows = XLSX.utils.sheet_to_json(ws, { raw: true, defval: "" });
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         
         const parseExcelDate = (val) => {
           if (!val) return null;
@@ -154,7 +242,7 @@ const BulkAttendance = () => {
               return `${p[2]}-${p[1]}-${p[0]}`;
             }
             const d = new Date(val);
-            if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+            if (!isNaN(d.getTime())) return formatDateLocal(d);
           }
           return null;
         };
@@ -198,82 +286,277 @@ const BulkAttendance = () => {
         });
         const allAtt = res.data;
 
-        const preview = rows.map((row, index) => {
-          const idDisplay = row["Student ID"] || row["ID"] || row["User ID"];
-          const matchedUser = allUsers.find(u => u.idDisplay === idDisplay || u._id === idDisplay);
-          const userId = matchedUser ? matchedUser._id : idDisplay;
-          
-          const date = parseExcelDate(row["Date"]);
-          const loginTime = parseExcelTime(row["Login Time"]);
-          const logoutTime = parseExcelTime(row["Logout Time"]);
-          
-          if (!userId || !date) return null;
-
-          const existing = allAtt.find(a => a.userId === userId && new Date(a.date).toISOString().slice(0, 10) === date);
-          const existingLogin = (existing?.loginTime || "").toString().trim();
-          const existingLogout = (existing?.logoutTime || "").toString().trim();
-          
-          const hasExistingTimes = existingLogin || existingLogout;
-          
-          let status = "New";
-          if (existing && hasExistingTimes) {
-            if (!loginTime && !logoutTime) {
-              // Both times were removed -> Delete the record
-              status = "Deleted";
-            } else if (existingLogin !== loginTime || existingLogout !== logoutTime) {
-              // Times are different -> Edited
-              status = "Edited";
-            } else {
-              // Exact same times -> Unedited
-              status = "Unedited";
-            }
-          } else if (!loginTime && !logoutTime) {
-            // No existing record and no times provided -> Skip
-            status = "Skip"; 
+        const parseHeaderDate = (str) => {
+          if (!str) return null;
+          let val = str.trim();
+          if (val.match(/^\d{4}-\d{2}-\d{2}$/)) return val;
+          if (val.match(/^\d{2}-\d{2}-\d{4}$/)) {
+            const p = val.split('-');
+            return `${p[2]}-${p[1]}-${p[0]}`;
           }
+          if (val.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+            const p = val.split('/');
+            return `${p[2]}-${p[1]}-${p[0]}`;
+          }
+          const d = new Date(val);
+          if (!isNaN(d.getTime())) return formatDateLocal(d);
+          return null;
+        };
+
+        if (rawRows.length === 0) {
+          toast.error("The uploaded file is empty.");
+          setLoading(false);
+          return;
+        }
+
+        const headers = (rawRows[0] || []).map(h => String(h || "").trim());
+        const isVertical = headers.includes("Date");
+        const isInternSummary = headers.includes("Intern ID") && headers.includes("Total Days");
+
+        // Validate that it is a valid template format
+        const subHeaderRow = rawRows[1] || [];
+        const hasLoginLogout = subHeaderRow.some(k => String(k).match(/(login|logout)/i));
+
+        if (!isVertical && !hasLoginLogout && !isInternSummary) {
+          toast.error("The uploaded file is not recognized. Please make sure to upload a valid exported template.");
+          setLoading(false);
+          return;
+        }
+
+        const previewItems = [];
+        let previewIndex = 0;
+
+        const targetUsers = exportType === "student"
+          ? allUsers.filter(u => u.role === "student" && !u.isIntern)
+          : exportType === "intern"
+            ? allUsers.filter(u => u.role === "student" && u.isIntern)
+            : allUsers.filter(u => u.role !== "student" && u.role !== "admin");
+
+        if (isInternSummary) {
+          // Parse Intern Summary AOA
+          const fileRowsMap = {};
+          rawRows.slice(1).forEach((r) => {
+            const idDisplay = String(r[0] || "").trim();
+            if (!idDisplay) return;
+            const matchedUser = allUsers.find(u => u.idDisplay === idDisplay || u._id === idDisplay);
+            const userId = matchedUser ? matchedUser._id : idDisplay;
+            
+            fileRowsMap[userId] = {
+              totalDays: Number(r[2]) || 0,
+              present: Number(r[3]) || 0,
+              absent: Number(r[4]) || 0
+            };
+          });
+
+          // Ensure ALL interns are listed in Step 3
+          const datesList = getDatesInRange(dateRange.startDate, dateRange.endDate);
+          const totalDays = datesList.length;
+
+          targetUsers.forEach(u => {
+            const fileData = fileRowsMap[u._id];
+            
+            if (fileData) {
+              previewItems.push({
+                id: previewIndex++,
+                userId: u._id,
+                name: u.name,
+                totalDays: fileData.totalDays || totalDays,
+                present: fileData.present,
+                absent: fileData.absent,
+                status: "Unedited",
+                isEditing: false
+              });
+            } else {
+              // Not in file -> fetch how many present days they currently have in DB
+              const userExisting = allAtt.filter(a => a.userId === u._id && datesList.includes(formatDateLocal(a.date)));
+              const present = userExisting.length;
+              
+              previewItems.push({
+                id: previewIndex++,
+                userId: u._id,
+                name: u.name,
+                totalDays: totalDays,
+                present: present,
+                absent: Math.max(0, totalDays - present),
+                status: "Unedited",
+                isEditing: false
+              });
+            }
+          });
           
-          return {
-            id: index,
-            userId,
-            name: row["Name"] || (existing ? existing.name : "Unknown"),
-            date,
-            loginTime: loginTime || "",
-            logoutTime: logoutTime || "",
-            existingLogin: existing?.loginTime || "",
-            existingLogout: existing?.logoutTime || "",
-            status,
-            isEditing: false
-          };
-        }).filter(Boolean);
+          setPreviewData(previewItems);
+          setStep(3);
+          return;
+        }
 
-        // Detect missing rows (deleted entirely from excel)
-        const startStr = dateRange.startDate;
-        const endStr = dateRange.endDate;
-        const missingRecords = [];
-        let missingIndex = rows.length;
+        const dates = isVertical 
+          ? [...new Set(rawRows.slice(1).map(rowArr => {
+              const row = {};
+              headers.forEach((h, i) => { row[h] = rowArr[i] !== undefined ? rowArr[i] : ""; });
+              return parseExcelDate(row["Date"]);
+            }).filter(Boolean))]
+          : (function() {
+              const dateRow = rawRows[0] || [];
+              const arr = [];
+              for (let c = 2; c < dateRow.length; c += 2) {
+                const dateStr = dateRow[c];
+                const d = parseHeaderDate(dateStr);
+                if (d) arr.push(d);
+              }
+              return arr;
+            })();
 
-        allAtt.forEach(a => {
-           const d = new Date(a.date).toISOString().slice(0, 10);
-           if (d >= startStr && d <= endStr) {
-               const found = preview.find(p => p.userId === a.userId && p.date === d);
-               if (!found) {
-                   missingRecords.push({
-                      id: missingIndex++,
-                      userId: a.userId,
-                      name: a.name || "Unknown",
-                      date: d,
-                      loginTime: "",
-                      logoutTime: "",
-                      existingLogin: (a.loginTime || "").toString().trim(),
-                      existingLogout: (a.logoutTime || "").toString().trim(),
-                      status: "Deleted",
-                      isEditing: false
-                   });
-               }
-           }
-        });
+        const activeDates = dates.length > 0 ? dates : getDatesInRange(dateRange.startDate, dateRange.endDate);
 
-        setPreviewData([...preview, ...missingRecords]);
+        if (isVertical) {
+          // Convert vertical rows array of arrays to a map for easy lookup: key = `${userId}_${date}`
+          const fileRowsMap = {};
+          rawRows.slice(1).forEach(rowArr => {
+            const row = {};
+            headers.forEach((h, i) => { row[h] = rowArr[i] !== undefined ? rowArr[i] : ""; });
+            const idDisplay = row["Student ID"] || row["ID"] || row["User ID"];
+            if (!idDisplay) return;
+            const matchedUser = allUsers.find(u => u.idDisplay === idDisplay || u._id === idDisplay);
+            const userId = matchedUser ? matchedUser._id : idDisplay;
+            const date = parseExcelDate(row["Date"]);
+            if (userId && date) {
+              fileRowsMap[`${userId}_${date}`] = {
+                loginTime: parseExcelTime(row["Login Time"]),
+                logoutTime: parseExcelTime(row["Logout Time"])
+              };
+            }
+          });
+
+          // Build previewData for all target users and all active dates
+          targetUsers.forEach(u => {
+            activeDates.forEach(date => {
+              const fileData = fileRowsMap[`${u._id}_${date}`];
+              const existing = allAtt.find(a => a.userId === u._id && formatDateLocal(a.date) === date);
+              const existingLogin = (existing?.loginTime || "").toString().trim();
+              const existingLogout = (existing?.logoutTime || "").toString().trim();
+              const hasExistingTimes = existingLogin || existingLogout;
+
+              let loginTime = "";
+              let logoutTime = "";
+              let status = "Skip";
+
+              if (fileData) {
+                // User was present in uploaded sheet for this date
+                loginTime = fileData.loginTime;
+                logoutTime = fileData.logoutTime;
+
+                if (hasExistingTimes) {
+                  if (!loginTime && !logoutTime) {
+                    status = "Deleted";
+                  } else if (loginTime !== existingLogin || logoutTime !== existingLogout) {
+                    status = "Edited";
+                  } else {
+                    status = "Unedited";
+                  }
+                } else if (loginTime || logoutTime) {
+                  status = "New";
+                }
+              } else {
+                // User was NOT present in uploaded sheet for this date -> Fallback to database record
+                if (hasExistingTimes) {
+                  loginTime = existingLogin;
+                  logoutTime = existingLogout;
+                  status = "Unedited";
+                }
+              }
+
+              previewItems.push({
+                id: previewIndex++,
+                userId: u._id,
+                name: u.name,
+                date,
+                loginTime,
+                logoutTime,
+                existingLogin,
+                existingLogout,
+                status,
+                isEditing: false
+              });
+            });
+          });
+        } else {
+          // Horizontal layout: Convert to lookup map: key = `${userId}_${date}`
+          const fileRowsMap = {};
+          const dateRow = rawRows[0] || [];
+          
+          rawRows.slice(2).forEach(r => {
+            const idDisplay = String(r[0] || "").trim();
+            if (!idDisplay) return;
+            const matchedUser = allUsers.find(u => u.idDisplay === idDisplay || u._id === idDisplay);
+            const userId = matchedUser ? matchedUser._id : idDisplay;
+            
+            for (let c = 2; c < dateRow.length; c += 2) {
+              const dateStr = dateRow[c];
+              const date = parseHeaderDate(dateStr);
+              if (date) {
+                fileRowsMap[`${userId}_${date}`] = {
+                  loginTime: parseExcelTime(r[c]),
+                  logoutTime: parseExcelTime(r[c + 1])
+                };
+              }
+            }
+          });
+
+          // Build previewData for all target users and all active dates
+          targetUsers.forEach(u => {
+            activeDates.forEach(date => {
+              const fileData = fileRowsMap[`${u._id}_${date}`];
+              const existing = allAtt.find(a => a.userId === u._id && formatDateLocal(a.date) === date);
+              const existingLogin = (existing?.loginTime || "").toString().trim();
+              const existingLogout = (existing?.logoutTime || "").toString().trim();
+              const hasExistingTimes = existingLogin || existingLogout;
+
+              let loginTime = "";
+              let logoutTime = "";
+              let status = "Skip";
+
+              if (fileData) {
+                // User was present in uploaded sheet for this date
+                loginTime = fileData.loginTime;
+                logoutTime = fileData.logoutTime;
+
+                if (hasExistingTimes) {
+                  if (!loginTime && !logoutTime) {
+                    status = "Deleted";
+                  } else if (loginTime !== existingLogin || logoutTime !== existingLogout) {
+                    status = "Edited";
+                  } else {
+                    status = "Unedited";
+                  }
+                } else if (loginTime || logoutTime) {
+                  status = "New";
+                }
+              } else {
+                // User was NOT present in uploaded sheet for this date -> Fallback to database record
+                if (hasExistingTimes) {
+                  loginTime = existingLogin;
+                  logoutTime = existingLogout;
+                  status = "Unedited";
+                }
+              }
+
+              previewItems.push({
+                id: previewIndex++,
+                userId: u._id,
+                name: u.name,
+                date,
+                loginTime,
+                logoutTime,
+                existingLogin,
+                existingLogout,
+                status,
+                isEditing: false
+              });
+            });
+          });
+        }
+
+        setPreviewData(previewItems);
         setStep(3);
       } catch (err) {
         toast.error("Error parsing file");
@@ -286,18 +569,78 @@ const BulkAttendance = () => {
 
   // Step 3: Save
   const handleSave = async () => {
-    const recordsToSave = previewData
-      .filter(r => r.status === "New" || r.status === "Edited" || r.status === "Deleted")
-      .map(r => ({
-        userId: r.userId,
-        date: r.date,
-        loginTime: r.loginTime,
-        logoutTime: r.logoutTime,
-        isDelete: r.status === "Deleted"
-      }));
+    let recordsToSave = [];
+    const isInternSummary = previewData.length > 0 && "present" in previewData[0];
+    
+    if (isInternSummary) {
+      try {
+        setLoading(true);
+        // Generate daily records to match the summary counts
+        const dates = getDatesInRange(dateRange.startDate, dateRange.endDate);
+        const res = await api.get(`${API_URL}/attendance`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const currentAtt = res.data;
+        
+        previewData.forEach(r => {
+          if (r.status !== "Edited") return;
+          
+          const userExisting = currentAtt.filter(a => a.userId === r.userId && dates.includes(formatDateLocal(a.date)));
+          const existingCount = userExisting.length;
+          const targetCount = r.present;
+          
+          if (existingCount < targetCount) {
+            let added = 0;
+            const toAdd = targetCount - existingCount;
+            for (let i = 0; i < dates.length; i++) {
+              if (added >= toAdd) break;
+              const dateStr = dates[i];
+              const hasRecord = userExisting.some(a => formatDateLocal(a.date) === dateStr);
+              if (!hasRecord) {
+                recordsToSave.push({
+                  userId: r.userId,
+                  date: dateStr,
+                  loginTime: "09:30:00",
+                  logoutTime: "18:00:00",
+                  isDelete: false
+                });
+                added++;
+              }
+            }
+          } else if (existingCount > targetCount) {
+            const toDelete = existingCount - targetCount;
+            for (let i = 0; i < toDelete; i++) {
+              const record = userExisting[i];
+              recordsToSave.push({
+                userId: r.userId,
+                date: formatDateLocal(record.date),
+                loginTime: "",
+                logoutTime: "",
+                isDelete: true
+              });
+            }
+          }
+        });
+      } catch (err) {
+        toast.error("Failed to generate summary attendance records");
+        setLoading(false);
+        return;
+      }
+    } else {
+      recordsToSave = previewData
+        .filter(r => r.status === "New" || r.status === "Edited" || r.status === "Deleted")
+        .map(r => ({
+          userId: r.userId,
+          date: r.date,
+          loginTime: r.loginTime,
+          logoutTime: r.logoutTime,
+          isDelete: r.status === "Deleted"
+        }));
+    }
 
     if (recordsToSave.length === 0) {
       toast.error("No new or modified records to save");
+      setLoading(false);
       return;
     }
 
@@ -319,6 +662,12 @@ const BulkAttendance = () => {
     setPreviewData(prev => prev.map(row => {
       if (row.id === id) {
         const newRow = { ...row, [field]: value };
+        if (field === "present") {
+          newRow.absent = Math.max(0, newRow.totalDays - Number(value || 0));
+          newRow.status = "Edited";
+          return newRow;
+        }
+
         // Recalculate status
         if (newRow.existingLogin || newRow.existingLogout) {
            const currentLogin = (newRow.loginTime || "").toString().trim();
@@ -334,7 +683,7 @@ const BulkAttendance = () => {
              newRow.status = "Unedited";
            }
         } else {
-          newRow.status = newRow.loginTime ? "New" : "Skip";
+          newRow.status = (newRow.loginTime || newRow.logoutTime) ? "New" : "Skip";
         }
         return newRow;
       }
@@ -366,12 +715,38 @@ const BulkAttendance = () => {
     }));
   };
 
-  const validPreviewData = previewData.filter(r => r.status !== "Skip");
-  const totalPages = Math.ceil(validPreviewData.length / rowsPerPage);
-  const currentTableData = validPreviewData.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
-  );
+  const isInternSummary = previewData.length > 0 && "present" in previewData[0];
+
+  const getHorizontalPreviewData = () => {
+    const userGroups = {};
+    validPreviewData.forEach(item => {
+      if (!userGroups[item.userId]) {
+        userGroups[item.userId] = {
+          userId: item.userId,
+          name: item.name,
+          dates: {}
+        };
+      }
+      userGroups[item.userId].dates[item.date] = item;
+    });
+    return Object.values(userGroups);
+  };
+
+  const validPreviewData = previewData;
+  const uniqueDates = [...new Set(validPreviewData.map(item => item.date))].sort();
+  const horizontalRows = getHorizontalPreviewData();
+
+  const totalPages = isInternSummary
+    ? Math.ceil(validPreviewData.length / rowsPerPage)
+    : Math.ceil(horizontalRows.length / rowsPerPage);
+
+  const currentTableData = isInternSummary
+    ? validPreviewData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+    : [];
+
+  const currentHorizontalRows = isInternSummary
+    ? []
+    : horizontalRows.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   return (
     <div className="p-4 sm:p-6 animate-in fade-in duration-500 max-w-7xl mx-auto space-y-6">
@@ -420,6 +795,26 @@ const BulkAttendance = () => {
                <h3 className="text-3xl font-black text-slate-800 mb-3 tracking-tight">Export Template</h3>
                <p className="text-slate-500 mb-10 text-center max-w-md text-lg">Select a date range to generate an Excel template. You can then fill in or modify the login/logout times for all users.</p>
                
+               <div className="flex flex-col mb-10 w-full max-w-md">
+                 <label className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-widest text-center">Export Type</label>
+                 <div className="grid grid-cols-2 gap-3">
+                   {[
+                     { value: "student", label: "Student", desc: "Daily details horizontally" },
+                     { value: "intern", label: "Intern", desc: "Total / Present / Absent summary" }
+                   ].map(opt => (
+                     <button
+                       key={opt.value}
+                       type="button"
+                       onClick={() => setExportType(opt.value)}
+                       className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all text-center ${exportType === opt.value ? "bg-indigo-50 border-indigo-600 text-indigo-900 shadow-md shadow-indigo-600/5" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                     >
+                       <span className="font-bold text-sm">{opt.label}</span>
+                       <span className="text-[9px] text-slate-400 font-medium mt-1 leading-tight">{opt.desc}</span>
+                     </button>
+                   ))}
+                 </div>
+               </div>
+
                <div className="flex flex-wrap justify-center gap-6 mb-10">
                  <div className="flex flex-col">
                    <label className="text-sm font-bold text-slate-600 mb-2 uppercase tracking-widest">Start Date</label>
@@ -431,12 +826,18 @@ const BulkAttendance = () => {
                  </div>
                </div>
                
-               <label className="flex items-center gap-3 mt-6 cursor-pointer">
-                 <input type="checkbox" checked={includeEmpty} onChange={e => setIncludeEmpty(e.target.checked)} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
-                 <span className="text-sm font-bold text-slate-600 select-none">Include empty rows for missing attendance (Template mode)</span>
-               </label>
+               {exportType !== "intern" ? (
+                 <label className="flex items-center gap-3 mt-4 cursor-pointer mb-6">
+                   <input type="checkbox" checked={includeEmpty} onChange={e => setIncludeEmpty(e.target.checked)} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
+                   <span className="text-sm font-bold text-slate-600 select-none">Include empty rows for missing attendance (Template mode)</span>
+                 </label>
+               ) : (
+                 <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl max-w-md text-amber-800 text-xs font-semibold text-center leading-relaxed">
+                   <strong>Note:</strong> Intern exports are summary reports (Total Days, Present, Absent) and cannot be uploaded back.
+                 </div>
+               )}
                
-               <div className="mt-10 flex gap-4">
+               <div className="mt-6 flex gap-4">
                   <button onClick={() => setStep(2)} className="px-8 py-3.5 rounded-2xl font-bold bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">Skip to Upload</button>
                   <button onClick={handleExport} disabled={loading} className="px-8 py-3.5 rounded-2xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 flex items-center gap-2 transition-all active:scale-95">
                     {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Download size={20} />}
@@ -482,75 +883,138 @@ const BulkAttendance = () => {
                     <h3 className="text-2xl font-black text-slate-800 tracking-tight">Preview Changes</h3>
                     <p className="text-slate-500 font-medium">Review and edit records before finalizing.</p>
                   </div>
-                  <div className="flex gap-3">
-                    <span className="px-4 py-1.5 rounded-xl bg-green-50 text-green-700 text-sm font-bold border border-green-200/50 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span> New: {previewData.filter(r => r.status === "New").length}
-                    </span>
-                    <span className="px-4 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-sm font-bold border border-amber-200/50 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> Edited: {previewData.filter(r => r.status === "Edited").length}
-                    </span>
-                    <span className="px-4 py-1.5 rounded-xl bg-red-50 text-red-700 text-sm font-bold border border-red-200/50 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-red-500"></span> Deleted: {previewData.filter(r => r.status === "Deleted").length}
-                    </span>
-                  </div>
+                  {!isInternSummary && (
+                    <div className="flex gap-3">
+                      <span className="px-4 py-1.5 rounded-xl bg-green-50 text-green-700 text-sm font-bold border border-green-200/50 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span> New: {previewData.filter(r => r.status === "New").length}
+                      </span>
+                      <span className="px-4 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-sm font-bold border border-amber-200/50 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span> Edited: {previewData.filter(r => r.status === "Edited").length}
+                      </span>
+                      <span className="px-4 py-1.5 rounded-xl bg-red-50 text-red-700 text-sm font-bold border border-red-200/50 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span> Deleted: {previewData.filter(r => r.status === "Deleted").length}
+                      </span>
+                    </div>
+                  )}
                </div>
 
                <div className="flex-1 overflow-auto bg-white border border-slate-200 rounded-3xl shadow-sm">
-                  <table className="w-full text-sm text-left">
-                     <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 shadow-sm z-10 text-[11px] uppercase tracking-wider">
-                       <tr>
-                         <th className="px-6 py-4 rounded-tl-3xl">S.No</th>
-                         <th className="px-6 py-4">Name</th>
-                         <th className="px-6 py-4">Date</th>
-                         <th className="px-6 py-4 w-48">Login Time</th>
-                         <th className="px-6 py-4 w-48">Logout Time</th>
-                         <th className="px-6 py-4 text-center">Status</th>
-                         <th className="px-6 py-4 text-center rounded-tr-3xl">Action</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-100">
-                       {currentTableData.length === 0 ? (
-                         <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-500 font-medium text-lg">No valid records found in the uploaded file.</td></tr>
-                       ) : currentTableData.map((row, index) => (
-                         <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-6 py-4 font-bold text-slate-500">{(currentPage - 1) * rowsPerPage + index + 1}</td>
-                           <td className="px-6 py-4 font-bold text-slate-800">{row.name}</td>
-                           <td className="px-6 py-4 font-semibold text-slate-600">{row.date}</td>
-                           <td className="px-6 py-4">
-                             <input type="time" step="1" disabled={!row.isEditing || row.status === "Deleted"} className={`px-4 py-2 border border-slate-200 rounded-xl w-full font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow ${!row.isEditing || row.status === "Deleted" ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "bg-white"}`} value={row.loginTime} onChange={e => updatePreviewRow(row.id, "loginTime", e.target.value)} />
-                             {row.existingLogin && row.loginTime !== row.existingLogin && <div className="text-[10px] font-black text-slate-400 mt-1.5 line-through ml-1 uppercase tracking-widest">Was: {row.existingLogin}</div>}
-                           </td>
-                           <td className="px-6 py-4">
-                             <input type="time" step="1" disabled={!row.isEditing || row.status === "Deleted"} className={`px-4 py-2 border border-slate-200 rounded-xl w-full font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow ${!row.isEditing || row.status === "Deleted" ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "bg-white"}`} value={row.logoutTime} onChange={e => updatePreviewRow(row.id, "logoutTime", e.target.value)} />
-                             {row.existingLogout && row.logoutTime !== row.existingLogout && <div className="text-[10px] font-black text-slate-400 mt-1.5 line-through ml-1 uppercase tracking-widest">Was: {row.existingLogout}</div>}
-                           </td>
-                           <td className="px-6 py-4 text-center">
-                              {row.status === "New" && <span className="inline-flex items-center px-3 py-1 bg-green-50 text-green-700 text-xs rounded-lg font-black uppercase tracking-wider border border-green-200/50">New</span>}
-                              {row.status === "Edited" && <span className="inline-flex items-center px-3 py-1 bg-amber-50 text-amber-700 text-xs rounded-lg font-black uppercase tracking-wider border border-amber-200/50">Edited</span>}
-                              {row.status === "Deleted" && <span className="inline-flex items-center px-3 py-1 bg-red-50 text-red-700 text-xs rounded-lg font-black uppercase tracking-wider border border-red-200/50">Deleted</span>}
-                              {row.status === "Unedited" && <span className="inline-flex items-center px-3 py-1 bg-slate-50 text-slate-500 text-xs rounded-lg font-black uppercase tracking-wider border border-slate-200">Unedited</span>}
-                           </td>
-                           <td className="px-6 py-4 text-center">
-                              {row.status === "Deleted" ? (
-                                <button onClick={() => undoDelete(row.id)} title="Recover Data" className="p-2 text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center justify-center w-full">
-                                  <RefreshCw size={16} />
-                                </button>
-                              ) : (
-                                <button onClick={() => toggleEdit(row.id)} title={row.isEditing ? "Save / Done" : "Edit Row"} className={`p-2 rounded-lg transition-colors flex items-center justify-center w-full ${row.isEditing ? "bg-green-50 text-green-600 hover:bg-green-100" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"}`}>
-                                  {row.isEditing ? <CheckCircle size={16} /> : <Edit2 size={16} />}
-                                </button>
-                              )}
-                           </td>
+                  {isInternSummary ? (
+                    // Intern Summary Preview Table
+                    <table className="w-full text-sm text-left">
+                       <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 shadow-sm z-10 text-[11px] uppercase tracking-wider">
+                         <tr>
+                           <th className="px-6 py-4 rounded-tl-3xl">S.No</th>
+                           <th className="px-6 py-4">Name</th>
+                           <th className="px-6 py-4">Total Days</th>
+                           <th className="px-6 py-4">Present</th>
+                           <th className="px-6 py-4">Absent</th>
+                           <th className="px-6 py-4 text-center">Status</th>
+                           <th className="px-6 py-4 text-center rounded-tr-3xl">Action</th>
                          </tr>
-                       ))}
-                     </tbody>
-                  </table>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                         {currentTableData.length === 0 ? (
+                           <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-500 font-medium text-lg">No records found.</td></tr>
+                         ) : currentTableData.map((row, index) => (
+                           <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                             <td className="px-6 py-4 font-bold text-slate-500">{(currentPage - 1) * rowsPerPage + index + 1}</td>
+                             <td className="px-6 py-4 font-bold text-slate-800">{row.name}</td>
+                             <td className="px-6 py-4 font-semibold text-slate-600">{row.totalDays}</td>
+                             <td className="px-6 py-4">
+                               <input type="number" min="0" max={row.totalDays} disabled={!row.isEditing} className={`px-4 py-2 border border-slate-200 rounded-xl w-32 font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow ${!row.isEditing ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "bg-white"}`} value={row.present} onChange={e => updatePreviewRow(row.id, "present", e.target.value)} />
+                             </td>
+                             <td className="px-6 py-4 font-semibold text-slate-600">{row.absent}</td>
+                             <td className="px-6 py-4 text-center">
+                                {row.status === "Edited" && <span className="inline-flex items-center px-3 py-1 bg-amber-50 text-amber-700 text-xs rounded-lg font-black uppercase tracking-wider border border-amber-200/50">Edited</span>}
+                                {row.status === "Unedited" && <span className="inline-flex items-center px-3 py-1 bg-slate-50 text-slate-500 text-xs rounded-lg font-black uppercase tracking-wider border border-slate-200">Unedited</span>}
+                             </td>
+                             <td className="px-6 py-4 text-center">
+                                 <button onClick={() => toggleEdit(row.id)} title={row.isEditing ? "Save / Done" : "Edit Row"} className={`p-2 rounded-lg transition-colors flex items-center justify-center w-full ${row.isEditing ? "bg-green-50 text-green-600 hover:bg-green-100" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"}`}>
+                                   {row.isEditing ? <CheckCircle size={16} /> : <Edit2 size={16} />}
+                                 </button>
+                             </td>
+                           </tr>
+                         ))}
+                       </tbody>
+                    </table>
+                  ) : (
+                    // Student / Employee Horizontal Preview Table
+                    <table className="w-full text-sm text-left">
+                       <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 shadow-sm z-10 text-[11px] uppercase tracking-wider">
+                         <tr className="divide-x divide-slate-200">
+                           <th rowSpan="2" className="px-6 py-4 rounded-tl-3xl align-middle text-center w-16">S.No</th>
+                           <th rowSpan="2" className="px-6 py-4 align-middle text-left min-w-[250px]">Name</th>
+                           {uniqueDates.map(d => (
+                             <th key={d} colSpan="2" className="px-6 py-2 text-center border-b border-slate-200 font-bold text-[10px] tracking-wider">{d}</th>
+                           ))}
+                         </tr>
+                         <tr className="divide-x divide-slate-100">
+                           {uniqueDates.map(d => (
+                             <React.Fragment key={d}>
+                               <th className="px-3 py-2 text-center text-[9px]">Login</th>
+                               <th className="px-3 py-2 text-center text-[9px]">Logout</th>
+                             </React.Fragment>
+                           ))}
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                         {currentHorizontalRows.length === 0 ? (
+                           <tr><td colSpan={2 + uniqueDates.length * 2} className="px-6 py-12 text-center text-slate-500 font-medium text-lg">No valid records found.</td></tr>
+                         ) : currentHorizontalRows.map((userRow, userIndex) => (
+                           <tr key={userRow.userId} className="hover:bg-slate-50 transition-colors divide-x divide-slate-100">
+                             <td className="px-6 py-4 font-bold text-slate-500 text-center">{(currentPage - 1) * rowsPerPage + userIndex + 1}</td>
+                             <td className="px-6 py-4 font-bold text-slate-800">{userRow.name}</td>
+                             {uniqueDates.map(dateStr => {
+                               const item = userRow.dates[dateStr];
+                               if (!item) {
+                                 return (
+                                   <React.Fragment key={dateStr}>
+                                     <td className="px-3 py-2 text-center text-slate-300">-</td>
+                                     <td className="px-3 py-2 text-center text-slate-300">-</td>
+                                   </React.Fragment>
+                                 );
+                               }
+                               const getStatusClasses = (status) => 
+                                 status === "New" ? "bg-green-50 text-green-700 border-green-300 focus:ring-green-500" :
+                                 status === "Edited" ? "bg-amber-50 text-amber-700 border-amber-300 focus:ring-amber-500" :
+                                 status === "Deleted" ? "bg-red-50 text-red-700 border-red-300 focus:ring-red-500" :
+                                 "bg-white text-slate-700 border-slate-200 focus:ring-indigo-500";
+                               
+                               return (
+                                 <React.Fragment key={dateStr}>
+                                   <td className="px-3 py-2 text-center">
+                                     <input
+                                       type="time"
+                                       step="1"
+                                       className={`px-2 py-1.5 border rounded-xl w-28 text-xs font-semibold text-center focus:ring-2 outline-none transition-shadow ${getStatusClasses(item.status)}`}
+                                       value={item.loginTime}
+                                       onChange={e => updatePreviewRow(item.id, "loginTime", e.target.value)}
+                                     />
+                                   </td>
+                                   <td className="px-3 py-2 text-center">
+                                     <input
+                                       type="time"
+                                       step="1"
+                                       className={`px-2 py-1.5 border rounded-xl w-28 text-xs font-semibold text-center focus:ring-2 outline-none transition-shadow ${getStatusClasses(item.status)}`}
+                                       value={item.logoutTime}
+                                       onChange={e => updatePreviewRow(item.id, "logoutTime", e.target.value)}
+                                     />
+                                   </td>
+                                 </React.Fragment>
+                               );
+                             })}
+                           </tr>
+                         ))}
+                       </tbody>
+                    </table>
+                  )}
                </div>
                
                {totalPages > 1 && (
                  <div className="pt-4 flex justify-between items-center px-2">
                    <div className="text-sm font-semibold text-slate-500">
-                     Showing {(currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, validPreviewData.length)} of {validPreviewData.length} records
+                     Showing {(currentPage - 1) * rowsPerPage + 1} to {Math.min(currentPage * rowsPerPage, isInternSummary ? validPreviewData.length : horizontalRows.length)} of {isInternSummary ? validPreviewData.length : horizontalRows.length} records
                    </div>
                    <div className="flex gap-2">
                      <button
