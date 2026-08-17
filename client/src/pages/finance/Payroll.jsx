@@ -8,7 +8,7 @@ import CustomDataTable from "../../components/common/DataTable";
 import ReactDOM from "react-dom";
 import StudentFilterBar from "../../components/common/StudentFilterBar";
 
-const Payroll = ({ hideHeader = false, internOnly = false }) => {
+const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) => {
 const { user } = useAuth();
 const [payrolls, setPayrolls] = useState([]);
 const [loading, setLoading] = useState(true);
@@ -350,6 +350,17 @@ const generatePayslip = async (payrollId, employeeName) => {
         const currentStatus = row.status || "process";
         const hasBeenActedUpon = currentStatus === "processed" || currentStatus === "hold" || currentStatus === "paid";
         
+        if (paidOnly) {
+           return (
+             <div className="flex flex-col gap-1.5 w-full items-center">
+               <span className="bg-blue-100 border border-blue-300 text-blue-700 px-2 py-1 rounded text-[11px] font-bold w-full text-center">Paid</span>
+               {row._id && (
+                 <button className="text-brand-600 hover:text-brand-800 transition text-[10px] font-bold underline" onClick={() => generatePayslip(row._id, row.name)}>Payslip</button>
+               )}
+             </div>
+           );
+        }
+
         return (
           <div className="flex flex-col gap-1.5 w-full items-center">
             <select 
@@ -381,6 +392,8 @@ const generatePayslip = async (payrollId, employeeName) => {
 
   const filteredPayrolls = React.useMemo(() => {
     return payrolls.filter(p => {
+      if (paidOnly && p.status !== "paid") return false;
+
       const matchSearch = searchPayroll
         ? p.name?.toLowerCase().includes(searchPayroll.toLowerCase()) || p.department?.toLowerCase().includes(searchPayroll.toLowerCase())
         : true;
@@ -525,7 +538,7 @@ const generatePayslip = async (payrollId, employeeName) => {
         </div>
 
         <div className="flex items-center gap-3">
-          {selectedTableRows.length > 0 && (
+          {!paidOnly && selectedTableRows.length > 0 && (
             <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 px-3 py-2 rounded-lg">
               <span className="text-sm font-semibold text-orange-700 mr-2">
                 {selectedTableRows.length} selected
@@ -589,7 +602,7 @@ const generatePayslip = async (payrollId, employeeName) => {
       )}
       <div
         ref={tableRef}
-        className="bg-white border rounded-xl shadow-sm overflow-hidden"
+        className="bg-white border rounded-xl shadow-sm overflow-x-auto"
       >
             <CustomDataTable 
               columns={payrollColumns} 
@@ -600,7 +613,7 @@ const generatePayslip = async (payrollId, employeeName) => {
               progressPending={loading}
               pointerOnHover={false}
               paginationPerPage={15}
-              selectableRows={true}
+              selectableRows={!paidOnly}
               onSelectedRowsChange={handleRowSelected}
               clearSelectedRows={toggleClearRows} // resets selection after bulk action
             />

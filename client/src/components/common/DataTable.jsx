@@ -59,9 +59,32 @@ const customStyles = {
       minHeight: '60px',
       borderBottomColor: '#f1f5f9',
       transition: 'all 0.2s',
+      overflow: 'visible !important',
       '&:hover': {
         backgroundColor: '#f8fafc',
       },
+    },
+  },
+  pagination: {
+    style: {
+      zIndex: 0,
+    },
+  },
+  tableWrapper: {
+    style: {
+      zIndex: 10,
+      overflow: 'visible',
+    },
+  },
+  table: {
+    style: {
+      zIndex: 10,
+      overflow: 'visible',
+    },
+  },
+  responsiveWrapper: {
+    style: {
+      overflow: 'visible !important',
     },
   },
 };
@@ -77,7 +100,7 @@ const CustomDataTable = ({
   ...props 
 }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col w-full h-full">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible flex flex-col w-full h-full">
       {/* Header section with search and export built-in if provided */}
       {(setSearch || exportButton || additionalHeaderContent) && (
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">

@@ -300,6 +300,7 @@ const Students = () => {
   const [filterBatch, setFilterBatch] = useState([]);
   const [filterYears, setFilterYears] = useState([]);
   const [filterStatus, setFilterStatus] = useState([]);
+  const [filterVendor, setFilterVendor] = useState([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
@@ -412,6 +413,14 @@ const Students = () => {
           return (filterType.includes("intern") && isIntern) || (filterType.includes("inhouse") && !isIntern);
         });
       }
+      if (filterVendor && filterVendor.length > 0) {
+        result = result.filter(s => {
+          if (!s.internships || s.internships.length === 0) return false;
+          const latest = s.internships[s.internships.length - 1];
+          const vendorId = String(latest.vendor?._id || latest.vendor || "");
+          return filterVendor.map(v => String(v)).includes(vendorId);
+        });
+      }
       if (filterCenter && filterCenter.length > 0) {
         result = result.filter(s => filterCenter.includes(s.center) || filterCenter.includes(s.center?._id));
       }
@@ -448,7 +457,7 @@ const Students = () => {
       );
     }
     setFiltered(result);
-  }, [search, students, activeTab, filterType, filterCenter, filterCourse, filterBatch, filterYears, filterStatus]);
+  }, [search, students, activeTab, filterType, filterCenter, filterCourse, filterBatch, filterYears, filterStatus, filterVendor]);
 
   const handleDelete = (id) => {
     setConfirmConfig({ isOpen: true, id });
@@ -763,10 +772,14 @@ const Students = () => {
               setFilterYears={setFilterYears}
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
+              filterVendor={filterVendor}
+              setFilterVendor={setFilterVendor}
               centers={centers}
               courses={courses.filter(c => c.type === "Center Courses")}
               batches={batches}
+              vendors={vendors}
               showType={true}
+              showVendor={true}
             />
           )}
 

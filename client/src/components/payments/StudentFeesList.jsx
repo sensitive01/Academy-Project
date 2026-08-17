@@ -67,7 +67,13 @@ const StudentFeesList = ({ feeType }) => {
       setLoading(true);
       const res = await api.get("/student-fees");
       // Filter by feeType prop
-      const filteredData = res.data.filter(f => feeType === 'All' ? true : f.feeType === feeType);
+      const filteredData = res.data.filter(f => {
+        if (feeType === 'All') return true;
+        if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
+        if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
+        if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees';
+        return f.feeType === feeType;
+      });
       setFees(filteredData);
     } catch (err) {
       console.error(err);
@@ -185,6 +191,9 @@ const StudentFeesList = ({ feeType }) => {
           <div className="flex flex-col gap-1.5 py-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-slate-800">₹{totalDue?.toLocaleString("en-IN")}</span>
+              <span className="px-2 py-0.5 bg-brand-50 text-brand-600 rounded-md border border-brand-100 text-[9px] font-bold tracking-widest uppercase shadow-sm">
+                {row.feeType === 'Other' && row.otherFeeType ? row.otherFeeType : row.feeType}
+              </span>
             </div>
             
             <div className="flex flex-wrap items-center gap-1.5">
@@ -373,6 +382,7 @@ const StudentFeesList = ({ feeType }) => {
           centers={centers}
           courses={courses}
           batches={batches}
+          initialFeeType={feeType}
         />
       )}
       {showCollectModal && selectedFee && (

@@ -16,6 +16,7 @@ import {
   Filter,
   Coins,
   Home,
+  LayoutDashboard,
 } from "lucide-react";
 import Expenses from "./Expenses";
 import Payroll from "./Payroll";
@@ -23,6 +24,7 @@ import OnlineCoursePayments from "../../components/payments/OnlineCoursePayments
 import StudentFeesList from "../../components/payments/StudentFeesList";
 import VendorPaymentsList from "../../components/payments/VendorPaymentsList";
 import PendingApprovalsList from "../../components/payments/PendingApprovalsList";
+import OutwardDashboard from "../../components/payments/OutwardDashboard";
 import { CheckSquare } from "lucide-react";
 
 const PlaceholderTable = ({ title, description }) => {
@@ -57,7 +59,7 @@ const PaymentsHub = () => {
   const initialMainTab = location.pathname.includes("outward") ? "outward" : "inward";
   const [mainTab, setMainTab] = useState(initialMainTab);
   const [inwardTab, setInwardTab] = useState("online_course");
-  const [outwardTab, setOutwardTab] = useState("expense");
+  const [outwardTab, setOutwardTab] = useState("dashboard");
 
   // Fetch cash balance if center
   useEffect(() => {
@@ -95,15 +97,15 @@ const PaymentsHub = () => {
 
   const inwardTabs = {
     online_course: { label: "Online Course", icon: <MonitorPlay size={18} /> },
-    sem_fees: { label: "Sem Fees", icon: <FileText size={18} /> },
-    term_fees: { label: "Term Fees", icon: <CalendarDays size={18} /> },
-    monthly_fees: { label: "Monthly Fees", icon: <CalendarDays size={18} /> },
+    course_fees: { label: "Course Fees", icon: <FileText size={18} /> },
+    council_fees: { label: "Council Fees", icon: <FileText size={18} /> },
     vendor_payments: { label: "Vendor Payments", icon: <Building size={18} /> },
     approvals: { label: "Pending Approvals", icon: <CheckSquare size={18} /> },
     others: { label: "Others", icon: <MoreHorizontal size={18} /> },
   };
 
   const outwardTabs = {
+    dashboard: { label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     expense: { label: "Expense", icon: <Receipt size={18} /> },
     salary: { label: "Salary", icon: <WalletCards size={18} /> },
     stipend: { label: "Stipend", icon: <Coins size={18} /> },
@@ -111,7 +113,7 @@ const PaymentsHub = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-500 max-w-full overflow-hidden">
+    <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-500 max-w-full">
       {/* HEADER & MAIN TOGGLE */}
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-6 relative z-10">
         <div>
@@ -191,9 +193,8 @@ const PaymentsHub = () => {
         {mainTab === "inward" ? (
           <>
             {inwardTab === "online_course" && <OnlineCoursePayments />}
-            {inwardTab === "sem_fees" && <StudentFeesList feeType="Sem" />}
-            {inwardTab === "term_fees" && <StudentFeesList feeType="Term" />}
-            {inwardTab === "monthly_fees" && <StudentFeesList feeType="Monthly" />}
+            {inwardTab === "course_fees" && <StudentFeesList feeType="Course" />}
+            {inwardTab === "council_fees" && <StudentFeesList feeType="Council" />}
             {inwardTab === "vendor_payments" && (
               <VendorPaymentsList />
             )}
@@ -202,23 +203,24 @@ const PaymentsHub = () => {
           </>
         ) : (
           <>
+            {outwardTab === "dashboard" && <OutwardDashboard />}
             {outwardTab === "expense" && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-x-auto">
                 <Expenses />
               </div>
             )}
             {outwardTab === "salary" && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-x-auto">
                 <Payroll />
               </div>
             )}
             {outwardTab === "stipend" && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
-                <Payroll internOnly={true} />
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-x-auto">
+                <Payroll internOnly={true} paidOnly={true} />
               </div>
             )}
             {outwardTab === "rent" && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-x-auto">
                 <Expenses categoryFilter="Rent" />
               </div>
             )}

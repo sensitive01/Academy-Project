@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Save, DollarSign } from 'lucide-react';
 
-const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batches }) => {
+const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batches, initialFeeType = "Sem" }) => {
   const [formData, setFormData] = useState({
     student: "",
     center: "",
     course: "",
     batch: "",
-    feeType: "Term",
+    feeType: initialFeeType === "Council" ? "Council" : 
+             (initialFeeType === "Other" ? "Other" : 
+             (initialFeeType === "Course" ? "Sem" : initialFeeType)),
     otherFeeType: "",
     terms: [],
     amount: 0,
@@ -118,15 +120,16 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
                 {batches?.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Fee Type</label>
-              <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.feeType} onChange={e => setFormData({...formData, feeType: e.target.value})}>
-                <option value="Sem">Sem Fee</option>
-                <option value="Term">Term Fee</option>
-                <option value="Monthly">Monthly Fee</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+            {initialFeeType !== 'Council' && initialFeeType !== 'Other' && (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Fee Type</label>
+                <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.feeType} onChange={e => setFormData({...formData, feeType: e.target.value})}>
+                  <option value="Sem">Sem Fee</option>
+                  <option value="Term">Term Fee</option>
+                  <option value="Monthly">Monthly Fee</option>
+                </select>
+              </div>
+            )}
             {formData.feeType === 'Other' && (
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Specify Other Fee</label>

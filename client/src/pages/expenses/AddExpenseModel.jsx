@@ -156,21 +156,22 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
           />
 
           {/* Category */}
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-            required
-          >
-            <option value="">Select Category</option>
-            <option value="Travel">Travel</option>
-            <option value="Food">Food</option>
-            <option value="Accommodation">Accommodation</option>
-            <option value="Rent">Rent</option>
-            <option value="Office Supplies">Office Supplies</option>
-            <option value="Medical">Medical</option>
-            <option value="Other">Other</option>
-          </select>
+          {defaultCategory !== "Rent" && (
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              required
+            >
+              <option value="">Select Category</option>
+              <option value="Travel">Travel</option>
+              <option value="Food">Food</option>
+              <option value="Accommodation">Accommodation</option>
+              <option value="Office Supplies">Office Supplies</option>
+              <option value="Medical">Medical</option>
+              <option value="Other">Other</option>
+            </select>
+          )}
 
           {/* Assign to Employee (Admin/Finance Only) */}
           {isPrivileged && (
@@ -179,7 +180,7 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
               onChange={(e) => setSubmittedBy(e.target.value)}
               className="border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
             >
-              <option value="">-- Assign to Employee (Optional) --</option>
+              <option value="">-- Assign to Employee --</option>
               {employees.map((emp) => (
                 <option key={emp.user?._id || emp._id} value={emp.user?._id || emp.user}>
                   {emp.firstName} {emp.lastName} ({emp.department})

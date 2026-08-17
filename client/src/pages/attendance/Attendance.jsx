@@ -339,7 +339,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
 
   const columns = [
     { name: 'S.no', selector: (row, i) => i + 1, width: '70px', center: true },
-    { 
+    {
       name: employeeOnly ? 'Employee' : 'Student', 
       selector: row => row.name, 
       sortable: true, 

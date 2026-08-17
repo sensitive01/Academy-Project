@@ -131,7 +131,7 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
     { name: 'Date', selector: row => row.date, sortable: true, cell: row => <span className="text-gray-600 font-mono">{new Date(row.date).toLocaleDateString("en-IN")}</span> },
     { name: 'Status', selector: row => row.status, sortable: true, center: true, width: '120px', cell: row => <StatusBadge status={row.status} /> },
     { name: 'Action', center: true, width: '100px', cell: row => (
-        <div className="relative flex justify-center w-full">
+        <div className="relative flex justify-center w-full" style={{ zIndex: openMenuId === row._id ? 9999 : 'auto' }}>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -143,7 +143,7 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
           </button>
           
           {openMenuId === row._id && (
-            <div className="absolute right-full top-0 mr-2 w-44 bg-white border border-gray-100 rounded-xl shadow-xl z-[9999] text-left overflow-hidden action-menu-content">
+            <div className="absolute right-full top-auto bottom-0 mr-2 w-48 whitespace-nowrap bg-white border border-gray-100 rounded-xl shadow-xl z-[9999] text-left overflow-hidden action-menu-content">
               {user.role === "admin" && row.status === "pending" && (
                 <>
                   <button onClick={() => handleStatusUpdate(row._id, "approved")} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-green-600 hover:bg-green-50 transition"><CheckCircle size={16} /> Approve</button>
