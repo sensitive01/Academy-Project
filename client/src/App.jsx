@@ -52,6 +52,7 @@ import Finance from "./pages/finance/Finance";
 import Announcement from "./pages/dashboard/Announcement";
 import DiscussionForum from "./pages/dashboard/DiscussionForum";
 import Expenses from "./pages/finance/Expenses";
+import FeesCollection from "./pages/finance/FeesCollection";
 import MyCourses from "./pages/lms/MyCourses";
 import Subscription from "./pages/dashboard/Subscription";
 import Notifications from "./pages/dashboard/Notifications";
@@ -294,6 +295,7 @@ function App() {
             <Route path="subscription" element={<PrivateRoute> <Subscription /> </PrivateRoute>} />
             {/* Finance & Payments */}
             <Route path="payments/*" element={<PaymentsHub />} />
+            <Route path="fees-collection" element={<FeesCollection />} />
 
             {/* Admin */}
             <Route path="admin/search" element={<GlobalSearch />} />

@@ -49,15 +49,15 @@ const CoursesTab = ({ courseType }) => {
     title: "",
     description: "",
     price: "",
-    category: "Development",
+    category: courseType === "Center Courses" ? "Center Courses" : "Development",
     type: courseType,
     level: "Beginner",
     duration: "",
-    durationUnit: "week",
+    durationUnit: courseType === "Center Courses" ? "year" : "week",
     instructor: "",
     subjects: [],
     thumbnail: null,
-    syllabus: [{ week: "Week 1", topic: "", description: "", projectName: "" }],
+    syllabus: [{ week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" }],
   });
   const [preview, setPreview] = useState(null);
 
@@ -120,14 +120,14 @@ const CoursesTab = ({ courseType }) => {
       type: course.type || courseType,
       level: course.level,
       duration: course.duration,
-      durationUnit: course.durationUnit || "week",
+      durationUnit: course.durationUnit || (courseType === "Center Courses" ? "year" : "week"),
       instructor: course.instructor?._id || course.instructor || "",
       subjects: course.subjects ? course.subjects.map(s => s._id || s) : [],
       thumbnail: null,
       syllabus:
         course.syllabus && course.syllabus.length > 0
           ? course.syllabus
-          : [{ week: "Week 1", topic: "", description: "", projectName: "" }],
+          : [{ week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" }],
     });
     setPreview(course.thumbnail?.url || null);
     setShowModal(true);
@@ -144,14 +144,14 @@ const CoursesTab = ({ courseType }) => {
       type: course.type || courseType,
       level: course.level,
       duration: course.duration,
-      durationUnit: course.durationUnit || "week",
+      durationUnit: course.durationUnit || (courseType === "Center Courses" ? "year" : "week"),
       instructor: course.instructor?._id || course.instructor || "",
       subjects: course.subjects ? course.subjects.map(s => s._id || s) : [],
       thumbnail: null,
       syllabus:
         course.syllabus && course.syllabus.length > 0
           ? course.syllabus
-          : [{ week: "Week 1", topic: "", description: "", projectName: "" }],
+          : [{ week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" }],
     });
     setPreview(course.thumbnail?.url || null);
     setShowModal(true);
@@ -235,7 +235,7 @@ const CoursesTab = ({ courseType }) => {
       syllabus: [
         ...prev.syllabus,
         {
-          week: `${prev.durationUnit === "week" ? "Week" : "Month"} ${prev.syllabus.length + 1}`,
+          week: `${prev.durationUnit === "week" ? "Week" : (prev.durationUnit === "month" ? "Month" : "Year")} ${prev.syllabus.length + 1}`,
           topic: "",
           description: "",
           projectName: "",
@@ -252,7 +252,7 @@ const CoursesTab = ({ courseType }) => {
       if (num > newSyllabus.length) {
         for (let i = newSyllabus.length; i < num; i++) {
           newSyllabus.push({
-            week: `${prev.durationUnit === "week" ? "Week" : "Month"} ${i + 1}`,
+            week: `${prev.durationUnit === "week" ? "Week" : (prev.durationUnit === "month" ? "Month" : "Year")} ${i + 1}`,
             topic: "",
             description: "",
             projectName: "",
@@ -333,12 +333,12 @@ const CoursesTab = ({ courseType }) => {
       type: courseType,
       level: "Beginner",
       duration: "",
-      durationUnit: "week",
+      durationUnit: courseType === "Center Courses" ? "year" : "week",
       instructor: "",
       subjects: [],
       thumbnail: null,
       syllabus: [
-        { week: "Week 1", topic: "", description: "", projectName: "" },
+        { week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" },
       ],
     });
     setPreview(null);
@@ -361,7 +361,7 @@ const CoursesTab = ({ courseType }) => {
           <div className="ml-4">
             <div className="text-sm font-bold text-gray-900">{row.title}</div>
             <div className="text-xs font-semibold text-slate-500">
-              {row.duration ? `${row.duration} ${row.durationUnit || 'week'}s` : ''}
+              {row.duration ? `${row.duration} ${row.durationUnit || (courseType === 'Center Courses' ? 'year' : 'week')}s` : ''}
               {courseType !== "Center Courses" && row.level ? ` • ${row.level}` : ''}
             </div>
           </div>
@@ -782,7 +782,7 @@ const CoursesTab = ({ courseType }) => {
                               const unit = e.target.value;
                               const updatedSyllabus = formData.syllabus.map((s, idx) => ({
                                 ...s,
-                                week: `${unit === "week" ? "Week" : "Month"} ${idx + 1}`
+                                week: `${unit === "week" ? "Week" : (unit === "month" ? "Month" : "Year")} ${idx + 1}`
                               }));
                               setFormData(prev => ({ 
                                 ...prev, 
@@ -791,11 +791,18 @@ const CoursesTab = ({ courseType }) => {
                               }));
                             }}
                           >
-                            <option value="week">Weeks</option>
-                            <option value="month">Months</option>
+                            {courseType === "Center Courses" ? (
+                              <option value="year">Years</option>
+                            ) : (
+                              <>
+                                <option value="week">Weeks</option>
+                                <option value="month">Months</option>
+                              </>
+                            )}
                           </select>
                         </div>
                       </div>
+
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
                         Course Instructor / Coach

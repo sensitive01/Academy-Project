@@ -115,8 +115,8 @@ const StudentRegistration = () => {
           });
         }
       } else if (scheme === 'sem') {
-        const semAmt = Math.round(crsFee / 6);
-        for (let i = 1; i <= 6; i++) {
+        const semAmt = Math.round(crsFee / 2);
+        for (let i = 1; i <= 2; i++) {
           generatedFees.push({
             feeType: 'Sem',
             otherFeeType: `Semester ${i}`,
@@ -166,7 +166,8 @@ const StudentRegistration = () => {
       }
     };
     const fetchAdminData = async () => {
-      if (user?.role === 'admin') {
+      const activeRole = user?.role || storedUser?.role;
+      if (['admin', 'center', 'hr'].includes(activeRole)) {
         try {
           const [courseRes, batchRes] = await Promise.all([
             api.get("/courses"),
@@ -247,10 +248,28 @@ const StudentRegistration = () => {
       ...prev,
       [name]: value,
     }));
+    if (name === "center") {
+      setAdminEnrollment(prev => ({ ...prev, batch: "", course: "", courseFee: "", selectedScheme: "", fees: [] }));
+    }
+  };
+
+  const getFilteredBatches = () => {
+    const selectedCenterId = (user?.role === 'center' || user?.role === 'hr') ? user.center : formData.center;
+    if (!selectedCenterId) return [];
+    
+    const centerIdStr = typeof selectedCenterId === 'object' 
+      ? (selectedCenterId._id?.toString() || selectedCenterId.toString()) 
+      : selectedCenterId.toString();
+
+    return batches.filter(b => {
+      if (!b.center) return false;
+      const bCenterId = b.center._id ? b.center._id.toString() : b.center.toString();
+      return bCenterId === centerIdStr;
+    });
   };
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = (user?.role === 'admin') || (storedUser?.role === 'admin');
+  const isAdmin = ['admin', 'center', 'hr'].includes(user?.role) || ['admin', 'center', 'hr'].includes(storedUser?.role);
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
@@ -266,12 +285,23 @@ const StudentRegistration = () => {
   };
 
   const validateStep = (step) => {
+    if (isAdmin && step === 6) {
+      if (Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
+        toast.error("Please select a course fee payment scheme!");
+        return false;
+      }
+    }
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitAttempted(true);
+
+    if (isAdmin && Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
+      toast.error("Please select a course fee payment scheme!");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -902,19 +932,33 @@ const StudentRegistration = () => {
                 {/* Course & Batch Selection */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50/70 rounded-2xl border border-slate-100 shadow-sm">
                   <SelectBox 
-                    label="Assign Course" 
-                    value={adminEnrollment.course} 
-                    onChange={(e) => setAdminEnrollment(prev => ({...prev, course: e.target.value}))} 
-                    options={[{value: '', label: 'Select a Course'}, ...courses.filter(c => c.type === 'Center Courses' || c.category === 'Center Courses').map(c => ({value: c._id, label: c.title}))]} 
-                    isObjectOptions 
-                  />
-                  <SelectBox 
                     label="Assign Batch" 
                     value={adminEnrollment.batch} 
-                    onChange={(e) => setAdminEnrollment(prev => ({...prev, batch: e.target.value}))} 
-                    options={[{value: '', label: 'Select a Batch'}, ...batches.map(b => ({value: b._id, label: b.name}))]} 
+                    onChange={(e) => {
+                      const batchId = e.target.value;
+                      const selectedBatchObj = batches.find(b => b._id === batchId);
+                      const courseIdForBatch = selectedBatchObj ? (selectedBatchObj.course?._id || selectedBatchObj.course) : "";
+                      const finalCourseId = courseIdForBatch ? (typeof courseIdForBatch === 'object' ? courseIdForBatch.toString() : courseIdForBatch) : "";
+
+                      setAdminEnrollment(prev => ({
+                        ...prev,
+                        batch: batchId,
+                        course: finalCourseId
+                      }));
+                    }} 
+                    options={[{value: '', label: 'Select a Batch'}, ...getFilteredBatches().map(b => ({value: b._id, label: b.name}))]} 
                     isObjectOptions 
                   />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-black tracking-widest text-slate-700 ml-1">
+                      Assign Course
+                    </label>
+                    <div className="w-full px-3 py-2 bg-slate-100 border-2 border-transparent rounded-lg text-[12px] font-bold text-slate-500 min-h-[36px] flex items-center cursor-not-allowed">
+                      {adminEnrollment.course 
+                        ? (courses.find(c => c._id === adminEnrollment.course)?.title || adminEnrollment.course)
+                        : "Select a batch to auto-assign course"}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Fees Input Section */}
@@ -985,12 +1029,12 @@ const StudentRegistration = () => {
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-black uppercase tracking-wider text-brand-700">Semester</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">6 Split</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">2 Split</span>
                           </div>
                           <div className="text-lg font-black text-slate-900">
-                            ₹{Math.round(Number(adminEnrollment.courseFee) / 6).toLocaleString("en-IN")} <span className="text-xs font-normal text-slate-500">/ sem</span>
+                            ₹{Math.round(Number(adminEnrollment.courseFee) / 2).toLocaleString("en-IN")} <span className="text-xs font-normal text-slate-500">/ sem</span>
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1 font-medium">6 Semester Payments (amount / 6)</p>
+                          <p className="text-[11px] text-slate-500 mt-1 font-medium">2 Semester Payments (amount / 2)</p>
                         </div>
 
                         {/* 3 Terms Scheme */}

@@ -386,6 +386,50 @@ router.put(
       }
 
       // =========================
+      // UPDATE FEES DATA
+      // =========================
+      if (req.body.fees && Array.isArray(req.body.fees)) {
+        const StudentFee = require('../models/StudentFee');
+        const incomingFees = req.body.fees;
+        
+        // 1. Delete fees that are no longer in the list
+        const incomingFeeIds = incomingFees.filter(f => f._id).map(f => f._id);
+        await StudentFee.deleteMany({
+          student: student._id,
+          _id: { $nin: incomingFeeIds }
+        });
+
+        // 2. Update existing fees or create new ones
+        for (const fee of incomingFees) {
+          if (fee.amount && Number(fee.amount) > 0) {
+            const validFeeType = ['Term', 'Sem', 'Exam', 'Other', 'Monthly'].includes(fee.feeType) ? fee.feeType : 'Other';
+            
+            const feeData = {
+              student: student._id,
+              center: student.center,
+              feeType: validFeeType,
+              otherFeeType: fee.otherFeeType || fee.name,
+              name: fee.name || fee.otherFeeType,
+              amount: Number(fee.amount),
+              status: fee.status || "pending",
+              dueDate: fee.dueDate
+            };
+
+            if (data.enrolledCourses && data.enrolledCourses.length > 0) {
+               feeData.course = data.enrolledCourses[0].course || undefined;
+               feeData.batch = data.enrolledCourses[0].batch || undefined;
+            }
+
+            if (fee._id) {
+              await StudentFee.findByIdAndUpdate(fee._id, feeData);
+            } else {
+              await StudentFee.create(feeData);
+            }
+          }
+        }
+      }
+
+      // =========================
       // UPDATE USER DATA
       // =========================
 
@@ -452,7 +496,15 @@ router.put(
 // ======================================================
 // DELETE STUDENT (Deletes BOTH User + Student)
 // ======================================================
-router.delete("/:id", protect, admin, async (req, res) => {
+const adminOrCenter = (req, res, next) => {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'center')) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized: Access denied' });
+  }
+};
+
+router.delete("/:id", protect, adminOrCenter, async (req, res) => {
   try {
     // 1️⃣ Find student first
     const student = await Student.findById(req.params.id);
@@ -467,8 +519,11 @@ router.delete("/:id", protect, admin, async (req, res) => {
     // 3️⃣ Delete student document
     await Student.findByIdAndDelete(req.params.id);
 
+    // 4️⃣ Delete all linked student fees
+    await StudentFee.deleteMany({ student: req.params.id });
+
     res.json({
-      message: "Student and linked user deleted successfully",
+      message: "Student, linked user and fee records deleted successfully",
     });
 
   } catch (error) {
@@ -479,7 +534,7 @@ router.delete("/:id", protect, admin, async (req, res) => {
 // ======================================================
 // TOGGLE STATUS
 // ======================================================
-router.patch('/:id/status', protect, admin, async (req, res) => {
+router.patch('/:id/status', protect, adminOrCenter, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
 

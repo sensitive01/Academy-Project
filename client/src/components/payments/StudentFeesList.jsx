@@ -5,9 +5,14 @@ import toast from "react-hot-toast";
 import AddStudentFeeModal from "../modals/AddStudentFeeModal";
 import CollectPaymentModal from "./CollectPaymentModal";
 import { downloadReceipt } from "../../utils/downloadReceipt";
-import { Download } from "lucide-react";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import ReactDOM from "react-dom";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { saveAs } from "file-saver";
 
-const StudentFeesList = ({ feeType }) => {
+const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
   const [fees, setFees] = useState([]);
   const [students, setStudents] = useState([]);
   const [centers, setCenters] = useState([]);
@@ -24,6 +29,98 @@ const StudentFeesList = ({ feeType }) => {
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedBatch, setSelectedBatch] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState("excel");
+
+  const getAmountForMonth = (row, targetMonthName) => {
+    const monthMap = {
+      "July": 6, "August": 7, "September": 8, "October": 9, "November": 10, "December": 11,
+      "January": 0, "February": 1, "March": 2, "April": 3, "May": 4, "June": 5
+    };
+    const targetMonthIndex = monthMap[targetMonthName];
+
+    let totalForMonth = 0;
+
+    if (row.payments && row.payments.length > 0) {
+      row.payments.forEach(p => {
+        if (p.status === 'Approved' && p.paidAt) {
+          const pDate = new Date(p.paidAt);
+          if (pDate.getMonth() === targetMonthIndex) {
+            totalForMonth += p.amount;
+          }
+        }
+      });
+    } else if (row.status === 'paid') {
+      const pDate = row.paidAt ? new Date(row.paidAt) : new Date(row.createdAt);
+      if (pDate.getMonth() === targetMonthIndex) {
+        totalForMonth = row.amount;
+      }
+    }
+
+    return totalForMonth;
+  };
+
+  const getRemainingBalance = (row) => {
+    const totalDue = row.amount + 
+      (row.isPenaltyApplied ? row.penaltyAmount : 0) + 
+      (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
+    
+    const totalApprovedPaid = row.payments
+      ? row.payments
+          .filter(p => p.status === 'Approved')
+          .reduce((sum, p) => sum + p.amount, 0)
+      : (row.status === 'paid' ? row.amount : 0);
+
+    return Math.max(0, totalDue - totalApprovedPaid);
+  };
+
+  const getSelectedSchemeName = (group) => {
+    if (!group.originalFees || group.originalFees.length === 0) return "";
+    
+    // Check if there are any Monthly fee records
+    const hasMonthly = group.originalFees.some(f => f.feeType === 'Monthly');
+    if (hasMonthly) {
+      return "Monthly (12 Split)";
+    }
+
+    // Check if there are any Sem fee records
+    const hasSem = group.originalFees.some(f => f.feeType === 'Sem');
+    if (hasSem) {
+      return "Semester (2 Split)";
+    }
+
+    // Check if there are any Term fee records
+    const termFees = group.originalFees.filter(f => f.feeType === 'Term');
+    if (termFees.length > 0) {
+      let maxTerm = 0;
+      termFees.forEach(tf => {
+        if (tf.terms && tf.terms[0]) {
+          maxTerm = Math.max(maxTerm, tf.terms[0]);
+        }
+        if (tf.otherFeeType) {
+          const match = tf.otherFeeType.match(/Term\s*(\d+)/i);
+          if (match) {
+            maxTerm = Math.max(maxTerm, parseInt(match[1]));
+          }
+        }
+      });
+
+      if (maxTerm === 4 || termFees.length === 4) {
+        return "Term (4 Split)";
+      }
+      return "Term (3 Split)";
+    }
+
+    return "";
+  };
+
+  const getSchemeBadgeLabel = (group) => {
+    if (feeType === 'Council') return "Council Fees";
+    if (feeType === 'Other') return group.otherFeeType || "Other Fees";
+    
+    const schemeName = getSelectedSchemeName(group);
+    return schemeName || group.feeType || "Course Fees";
+  };
 
   useEffect(() => {
     fetchFees();
@@ -33,7 +130,7 @@ const StudentFeesList = ({ feeType }) => {
     setSelectedCourse("all");
     setSelectedBatch("all");
     setSelectedStatus("all");
-  }, [feeType]);
+  }, [feeType, excludePaid]);
 
   const fetchDropdownData = async () => {
     try {
@@ -67,14 +164,161 @@ const StudentFeesList = ({ feeType }) => {
       setLoading(true);
       const res = await api.get("/student-fees");
       // Filter by feeType prop
-      const filteredData = res.data.filter(f => {
+      let filteredData = res.data.filter(f => {
+        if (!f.student) return false;
         if (feeType === 'All') return true;
         if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
         if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
         if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees';
         return f.feeType === feeType;
       });
-      setFees(filteredData);
+
+      if (paidOnly) {
+        // Flatten all approved payments into distinct transaction rows
+        const transactions = [];
+        filteredData.forEach(f => {
+          const approvedPayments = f.payments ? f.payments.filter(p => p.status === 'Approved') : [];
+          if (approvedPayments.length > 0) {
+            approvedPayments.forEach(p => {
+              transactions.push({
+                _id: `${f._id}_${p._id || Math.random()}`,
+                student: f.student,
+                course: f.course,
+                batch: f.batch,
+                center: f.center,
+                feeType: f.feeType,
+                otherFeeType: f.otherFeeType,
+                paymentMode: p.paymentMode,
+                amount: p.amount, // specific payment amount
+                paidAt: p.paidAt,
+                proofOfPayment: p.proofOfPayment,
+                bankReference: p.bankReference,
+                status: 'paid',
+                originalFeeId: f._id,
+                paymentId: p._id
+              });
+            });
+          } else if (f.status === 'paid') {
+            // Legacy paid record
+            transactions.push({
+              _id: f._id,
+              student: f.student,
+              course: f.course,
+              batch: f.batch,
+              center: f.center,
+              feeType: f.feeType,
+              otherFeeType: f.otherFeeType,
+              paymentMode: f.paymentMode,
+              amount: f.amount,
+              paidAt: f.paidAt || f.createdAt,
+              proofOfPayment: f.proofOfPayment,
+              bankReference: f.bankReference,
+              status: 'paid',
+              originalFeeId: f._id
+            });
+          }
+        });
+
+        // Sort transactions by date descending (newest first)
+        transactions.sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt));
+        setFees(transactions);
+      } else {
+        // Group by student for Fees Collection (excludePaid)
+        const grouped = [];
+        const studentMap = {};
+
+        filteredData.forEach(f => {
+          const studentId = f.student?._id?.toString();
+          if (!studentId) return;
+
+          if (!studentMap[studentId]) {
+            studentMap[studentId] = {
+              _id: studentId, // Use student ID as row ID for selection / modal
+              student: f.student,
+              course: f.course,
+              batch: f.batch,
+              center: f.center,
+              feeType: feeType === 'Course' ? 'Course' : f.feeType,
+              otherFeeType: f.otherFeeType,
+              amount: 0,
+              penaltyAmount: 0,
+              finalPenaltyAmount: 0,
+              isPenaltyApplied: false,
+              isFinalPenaltyApplied: false,
+              payments: [],
+              status: 'paid', // default, calculated below
+              createdAt: f.createdAt,
+              originalFees: []
+            };
+            grouped.push(studentMap[studentId]);
+          }
+
+          const group = studentMap[studentId];
+          group.originalFees.push(f);
+          group.amount += f.amount || 0;
+          
+          if (f.isPenaltyApplied) {
+            group.isPenaltyApplied = true;
+            group.penaltyAmount += f.penaltyAmount || 0;
+          }
+          if (f.isFinalPenaltyApplied) {
+            group.isFinalPenaltyApplied = true;
+            group.finalPenaltyAmount += f.finalPenaltyAmount || 0;
+          }
+
+          // Combine payments
+          if (f.payments && f.payments.length > 0) {
+            f.payments.forEach(p => {
+              group.payments.push(p);
+            });
+          } else if (f.status === 'paid') {
+            // Legacy paid record: simulate a payment to make the math work
+            group.payments.push({
+              amount: f.amount,
+              status: 'Approved',
+              paidAt: f.paidAt || f.createdAt
+            });
+          }
+        });
+
+        // Recalculate status for each group
+        grouped.forEach(group => {
+          const totalDue = group.amount + group.penaltyAmount + group.finalPenaltyAmount;
+          const totalApprovedPaid = group.payments
+            .filter(p => p.status === 'Approved')
+            .reduce((sum, p) => sum + p.amount, 0);
+          
+          const remaining = totalDue - totalApprovedPaid;
+          
+          if (remaining <= 0) {
+            group.status = 'paid';
+          } else {
+            // Check if there is any pending payment awaiting approval
+            const hasPendingApproval = group.originalFees.some(f => f.status === 'pending_approval');
+            if (hasPendingApproval) {
+              group.status = 'pending_approval';
+            } else {
+              group.status = 'pending';
+            }
+          }
+        });
+
+        // Filter groups according to paidOnly / excludePaid filters
+        let finalGroups = grouped;
+        if (excludePaid) {
+          // Show students who still have a pending remaining balance
+          finalGroups = grouped.filter(group => {
+            const totalDue = group.amount + group.penaltyAmount + group.finalPenaltyAmount;
+            const totalApprovedPaid = group.payments
+              .filter(p => p.status === 'Approved')
+              .reduce((sum, p) => sum + p.amount, 0);
+            const remaining = totalDue - totalApprovedPaid;
+            return remaining > 0;
+          });
+        }
+
+        setFees(finalGroups);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -92,10 +336,14 @@ const StudentFeesList = ({ feeType }) => {
     }
   };
 
-  const handleCollectPayment = async (id, data) => {
+  const handleCollectPayment = async (studentId, data) => {
     try {
-      const res = await api.post(`/student-fees/${id}/collect`, data);
-      setFees(fees.map(f => f._id === id ? res.data : f));
+      await api.post(`/student-fees/collect-cascade`, {
+        studentId,
+        feeType,
+        ...data
+      });
+      fetchFees();
       setShowCollectModal(false);
       setSelectedFee(null);
       toast.success("Payment processed successfully");
@@ -148,7 +396,297 @@ const StudentFeesList = ({ feeType }) => {
     return matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesStatus;
   });
 
-  const columns = [
+  const handleExport = () => {
+    setShowExportModal(false);
+    if (paidOnly) {
+      if (exportFormat === "excel") {
+        const data = filtered.map((f, i) => {
+          let lbl = f.feeType;
+          if (f.feeType === 'Other' && f.otherFeeType) {
+            lbl = f.otherFeeType;
+          } else if (f.feeType === 'Sem') {
+            lbl = f.otherFeeType || 'Semester Fee';
+          } else if (f.feeType === 'Term') {
+            lbl = f.otherFeeType || 'Term Fee';
+          } else if (f.feeType === 'Monthly') {
+            lbl = f.otherFeeType || 'Monthly Fee';
+          }
+
+          return {
+            "S.No": i + 1,
+            "Student Name": f.student?.studentNameEnglish || "N/A",
+            "Student ID": f.student?.studentId || "-",
+            "Course": f.course?.title || "-",
+            "Batch": f.batch?.name || "-",
+            "Center": f.center?.name || "-",
+            "Fee Type": lbl,
+            "Amount Paid": f.amount || 0,
+            "Payment Mode": f.paymentMode || "-",
+            "Reference": f.bankReference || "-",
+            "Paid Date": f.paidAt ? new Date(f.paidAt).toLocaleDateString("en-IN") : "-"
+          };
+        });
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Inward Payments");
+        XLSX.writeFile(workbook, `${feeType}_Inward_Payments_Report.xlsx`);
+        toast.success("Excel exported successfully!");
+      } else {
+        const doc = new jsPDF({ orientation: "landscape" });
+        doc.text(`${feeType} Inward Payments Report`, 14, 15);
+        
+        const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Type", "Amount Paid", "Mode", "Reference", "Paid Date"];
+        const tableRows = [];
+        filtered.forEach((f, index) => {
+          let lbl = f.feeType;
+          if (f.feeType === 'Other' && f.otherFeeType) {
+            lbl = f.otherFeeType;
+          } else if (f.feeType === 'Sem') {
+            lbl = f.otherFeeType || 'Semester Fee';
+          } else if (f.feeType === 'Term') {
+            lbl = f.otherFeeType || 'Term Fee';
+          } else if (f.feeType === 'Monthly') {
+            lbl = f.otherFeeType || 'Monthly Fee';
+          }
+
+          const rowData = [
+            index + 1,
+            `${f.student?.studentNameEnglish || "N/A"} (${f.student?.studentId || "-"})`,
+            `${f.course?.title || "-"} / ${f.batch?.name || "-"}`,
+            f.center?.name || "-",
+            lbl,
+            `Rs. ${f.amount.toLocaleString("en-IN")}`,
+            f.paymentMode || "-",
+            f.bankReference || "-",
+            f.paidAt ? new Date(f.paidAt).toLocaleDateString("en-IN") : "-"
+          ];
+          tableRows.push(rowData);
+        });
+        
+        autoTable(doc, {
+          head: [tableColumn],
+          body: tableRows,
+          startY: 20,
+          theme: "striped",
+          styles: { fontSize: 8, cellPadding: 2 }
+        });
+        
+        const pdfBlob = doc.output("blob");
+        saveAs(pdfBlob, `${feeType}_Inward_Payments_Report.pdf`);
+        toast.success("PDF exported successfully!");
+      }
+      return;
+    }
+
+    if (exportFormat === "excel") {
+      const data = filtered.map((f, i) => {
+        const totalDue = f.amount + 
+          (f.isPenaltyApplied ? f.penaltyAmount : 0) + 
+          (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
+          
+        const exportRow = {
+          "S.No": i + 1,
+          "Student Name": f.student?.studentNameEnglish || "N/A",
+          "Student ID": f.student?.studentId || "-",
+          "Course": f.course?.title || "-",
+          "Batch": f.batch?.name || "-",
+          "Center": f.center?.name || "-",
+          "Fee Type": f.feeType === 'Other' && f.otherFeeType ? f.otherFeeType : f.feeType,
+          "Total Fee": totalDue || 0,
+        };
+
+        ["July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June"].forEach(month => {
+          exportRow[month] = getAmountForMonth(f, month);
+        });
+
+        exportRow["Balance"] = getRemainingBalance(f);
+        exportRow["Status"] = f.status || "-";
+        exportRow["Created Date"] = f.createdAt ? new Date(f.createdAt).toLocaleDateString("en-IN") : "-";
+
+        return exportRow;
+      });
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Fees");
+      XLSX.writeFile(workbook, `${feeType}_Fees_Report.xlsx`);
+      toast.success("Excel exported successfully!");
+    } else {
+      const doc = new jsPDF({ orientation: "landscape" });
+      doc.text(`${feeType} Fees Report`, 14, 15);
+      
+      const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Total Fee", "July", "August", "Sept", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "June", "Balance", "Status"];
+      const tableRows = [];
+      filtered.forEach((f, index) => {
+        const totalDue = f.amount + 
+          (f.isPenaltyApplied ? f.penaltyAmount : 0) + 
+          (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
+          
+        const rowData = [
+          index + 1,
+          `${f.student?.studentNameEnglish || "N/A"} (${f.student?.studentId || "-"})`,
+          `${f.course?.title || "-"} / ${f.batch?.name || "-"}`,
+          f.center?.name || "-",
+          `Rs. ${totalDue.toLocaleString("en-IN")}`,
+          getAmountForMonth(f, "July"),
+          getAmountForMonth(f, "August"),
+          getAmountForMonth(f, "September"),
+          getAmountForMonth(f, "October"),
+          getAmountForMonth(f, "November"),
+          getAmountForMonth(f, "December"),
+          getAmountForMonth(f, "January"),
+          getAmountForMonth(f, "February"),
+          getAmountForMonth(f, "March"),
+          getAmountForMonth(f, "April"),
+          getAmountForMonth(f, "May"),
+          getAmountForMonth(f, "June"),
+          `Rs. ${getRemainingBalance(f).toLocaleString("en-IN")}`,
+          f.status || "-"
+        ];
+        tableRows.push(rowData);
+      });
+      
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 20,
+        theme: "striped",
+        styles: { fontSize: 8, cellPadding: 2 }
+      });
+      
+      const pdfBlob = doc.output("blob");
+      saveAs(pdfBlob, `${feeType}_Fees_Report.pdf`);
+      toast.success("PDF exported successfully!");
+    }
+  };
+
+  const monthColumns = [
+    "July", "August", "September", "October", "November", "December",
+    "January", "February", "March", "April", "May", "June"
+  ].map(monthName => ({
+    name: monthName,
+    width: "90px",
+    selector: row => getAmountForMonth(row, monthName),
+    cell: row => {
+      const amt = getAmountForMonth(row, monthName);
+      return amt > 0 ? (
+        <span className="font-bold text-slate-800">₹{amt.toLocaleString('en-IN')}</span>
+      ) : (
+        <span className="text-slate-350">-</span>
+      );
+    }
+  }));
+
+  const columns = paidOnly ? [
+    { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
+    { 
+      name: "Student", width:"180px", 
+      selector: row => row.student?.studentNameEnglish, 
+      sortable: true,
+      cell: row => (
+        <div>
+          <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
+          <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
+        </div>
+      )
+    },
+    { 
+      name: "Course & Batch", 
+      selector: row => row.course?.title, 
+      sortable: true, width:"250px",
+      cell: row => (
+        <div>
+          <div className="font-medium text-gray-700 truncate max-w-[200px]">{row.course?.title || "-"}</div>
+          <div className="text-[10px] text-gray-500 truncate max-w-[200px]">{row.batch?.name || "-"}</div>
+        </div>
+      )
+    },
+    { 
+      name: "Center", 
+      selector: row => row.center?.name, 
+      sortable: true,
+      cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
+    },
+    { 
+      name: "Fee Type", 
+      selector: row => row.feeType, 
+      sortable: true,
+      cell: row => {
+        let lbl = row.feeType;
+        if (row.feeType === 'Other' && row.otherFeeType) {
+          lbl = row.otherFeeType;
+        } else if (row.feeType === 'Sem') {
+          lbl = row.otherFeeType || 'Semester Fee';
+        } else if (row.feeType === 'Term') {
+          lbl = row.otherFeeType || 'Term Fee';
+        } else if (row.feeType === 'Monthly') {
+          lbl = row.otherFeeType || 'Monthly Fee';
+        }
+        return (
+          <span className="px-2 py-0.5 bg-brand-50 text-brand-600 rounded border border-brand-100 text-[10px] font-bold uppercase tracking-wider">
+            {lbl}
+          </span>
+        );
+      }
+    },
+    { 
+      name: "Amount Paid", 
+      selector: row => row.amount, 
+      sortable: true, 
+      cell: row => <span className="text-sm font-black text-slate-800">₹{row.amount?.toLocaleString("en-IN")}</span>
+    },
+    { 
+      name: "Mode", 
+      selector: row => row.paymentMode, 
+      sortable: true,
+      cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.paymentMode || "-"}</span>
+    },
+    { 
+      name: "Reference / Proof", 
+      selector: row => row.bankReference || row.proofOfPayment,
+      cell: row => {
+        if (row.paymentMode === 'Online' && row.proofOfPayment) {
+          return (
+            <a 
+              href={row.proofOfPayment} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap"
+            >
+              View Proof
+            </a>
+          );
+        }
+        return <span className="font-mono text-xs text-slate-600">{row.bankReference || '-'}</span>;
+      }
+    },
+    { 
+      name: "Date", width:"110px",
+      selector: row => row.paidAt, 
+      sortable: true, 
+      cell: row => <span className="text-gray-600 font-medium">{new Date(row.paidAt).toLocaleDateString("en-GB")}</span> 
+    },
+    {
+      name: "Action",
+      center: true,
+      width: "100px",
+      cell: row => (
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => {
+              const url = row.paymentId 
+                ? `/student-fees/${row.originalFeeId}/receipt?paymentId=${row.paymentId}` 
+                : `/student-fees/${row.originalFeeId || row._id}/receipt`;
+              downloadReceipt(url, `FeeReceipt_${row.originalFeeId || row._id}.pdf`);
+            }}
+            className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
+            title="Download Receipt"
+          >
+            <Download size={16} />
+          </button>
+        </div>
+      )
+    }
+  ] : [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     { 
       name: "Student",width:"150px", 
@@ -164,7 +702,7 @@ const StudentFeesList = ({ feeType }) => {
     { 
       name: "Course & Batch", 
       selector: row => row.course?.title, 
-      sortable: true, width:"350px",
+      sortable: true, width:"200px",
       cell: row => (
         <div>
           <div className="font-medium text-gray-700 truncate max-w-[200px]">{row.course?.title || "-"}</div>
@@ -179,7 +717,7 @@ const StudentFeesList = ({ feeType }) => {
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
     { 
-      name: "Fee Details", width:"260px",
+      name: "Fee Details", width:"180px",
       selector: row => row.amount, 
       sortable: true, 
       cell: row => {
@@ -188,38 +726,36 @@ const StudentFeesList = ({ feeType }) => {
           (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
           
         return (
-          <div className="flex flex-col gap-1.5 py-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-slate-800">₹{totalDue?.toLocaleString("en-IN")}</span>
-              <span className="px-2 py-0.5 bg-brand-50 text-brand-600 rounded-md border border-brand-100 text-[9px] font-bold tracking-widest uppercase shadow-sm">
-                {row.feeType === 'Other' && row.otherFeeType ? row.otherFeeType : row.feeType}
+          <div className="flex flex-col gap-1 py-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-black text-slate-800">Total: ₹{totalDue?.toLocaleString("en-IN")}</span>
+              <span className="px-1.5 py-0.5 bg-brand-50 text-brand-600 rounded border border-brand-100 text-[8px] font-bold uppercase tracking-wider">
+                {getSchemeBadgeLabel(row)}
               </span>
             </div>
             
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200 text-[9px] font-bold tracking-wider uppercase">
-                Base: ₹{row.amount?.toLocaleString("en-IN")}
-              </span>
-              {(row.penaltyAmount > 0 || row.finalPenaltyAmount > 0) && (
-                <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded border border-red-100 text-[9px] font-bold tracking-wider uppercase">
-                  Penalties: ₹{((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}
-                </span>
-              )}
+            <div className="text-[9px] text-slate-500">
+              Base: ₹{row.amount?.toLocaleString("en-IN")}
+              {((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)) > 0 && 
+                ` + Penalty: ₹${((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}`
+              }
             </div>
-
-            {row.dueDate && (
-              <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1.5">
-                <span className="text-[10px] text-slate-500 font-medium flex items-center justify-between">
-                  <span><span className="text-orange-500 font-bold">Due:</span> {new Date(row.dueDate).toLocaleDateString("en-GB")}</span>
-                </span>
-                {row.finalDueDate && (
-                  <span className="text-[10px] text-slate-500 font-medium flex items-center justify-between">
-                    <span><span className="text-red-500 font-bold">Final:</span> {new Date(row.finalDueDate).toLocaleDateString("en-GB")}</span>
-                  </span>
-                )}
-              </div>
-            )}
           </div>
+        );
+      }
+    },
+    ...monthColumns,
+    {
+      name: "Balance",
+      width: "110px",
+      selector: row => getRemainingBalance(row),
+      sortable: true,
+      cell: row => {
+        const bal = getRemainingBalance(row);
+        return (
+          <span className={`font-black ${bal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+            ₹{bal.toLocaleString('en-IN')}
+          </span>
         );
       }
     },
@@ -229,10 +765,17 @@ const StudentFeesList = ({ feeType }) => {
       sortable: true, 
       center: true,
       cell: row => {
-        if (row.status === 'paid') {
+        const bal = getRemainingBalance(row);
+        if (row.status === 'paid' || bal === 0) {
           return (
             <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-green-100 text-green-700">
               PAID {row.paymentMode ? `(${row.paymentMode})` : ''}
+            </span>
+          );
+        } else if (paidOnly) {
+          return (
+            <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 animate-pulse-subtle">
+              PARTIALLY PAID
             </span>
           );
         } else if (row.status === 'pending_approval') {
@@ -275,7 +818,7 @@ const StudentFeesList = ({ feeType }) => {
       width: "100px",
       cell: row => (
         <div className="flex items-center gap-1">
-          {row.status === "paid" && (
+          {(row.status === "paid" || getRemainingBalance(row) === 0) && (
             <button 
               onClick={() => downloadReceipt(`/student-fees/${row._id}/receipt`, `FeeReceipt_${row._id}.pdf`)}
               className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
@@ -284,9 +827,11 @@ const StudentFeesList = ({ feeType }) => {
               <Download size={16} />
             </button>
           )}
-          <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-          </button>
+          {!paidOnly && (
+            <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+            </button>
+          )}
         </div>
       )
     }
@@ -296,13 +841,15 @@ const StudentFeesList = ({ feeType }) => {
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-slate-800">{feeType === 'All' ? 'All' : feeType} Fees</h2>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Add Fee
-        </button>
+        {!paidOnly && (
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add Fee
+          </button>
+        )}
       </div>
       <CustomDataTable
         columns={columns}
@@ -312,6 +859,14 @@ const StudentFeesList = ({ feeType }) => {
         setSearch={setSearch}
         searchPlaceholder={`Search ${feeType} fees by student, ID, course...`}
         pagination
+        exportButton={
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-200 transition-colors cursor-pointer"
+          >
+            <Download size={14} /> Export
+          </button>
+        }
         additionalHeaderContent={
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
             <select
@@ -347,16 +902,18 @@ const StudentFeesList = ({ feeType }) => {
               ))}
             </select>
 
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
-            >
-              <option value="all">All Statuses</option>
-              <option value="paid">Paid</option>
-              <option value="pending_approval">Pending Approval</option>
-              <option value="unpaid">Unpaid</option>
-            </select>
+            {!paidOnly && (
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+              >
+                <option value="all">All Statuses</option>
+                {!excludePaid && <option value="paid">Paid</option>}
+                <option value="pending_approval">Pending Approval</option>
+                <option value="unpaid">Unpaid</option>
+              </select>
+            )}
 
             {(selectedCenter !== "all" || selectedCourse !== "all" || selectedBatch !== "all" || selectedStatus !== "all") && (
               <button
@@ -388,12 +945,69 @@ const StudentFeesList = ({ feeType }) => {
       {showCollectModal && selectedFee && (
         <CollectPaymentModal
           fee={selectedFee}
+          schemeLabel={getSchemeBadgeLabel(selectedFee)}
           onClose={() => {
             setShowCollectModal(false);
             setSelectedFee(null);
           }}
           onSave={handleCollectPayment}
         />
+      )}
+
+      {/* EXPORT MODAL */}
+      {showExportModal && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Export Data</h3>
+            <p className="text-slate-500 text-xs mb-6">Choose your preferred format to export the filtered list.</p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                onClick={() => setExportFormat("excel")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "excel"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="text-xs font-bold">Excel (.xlsx)</span>
+              </button>
+
+              <button
+                onClick={() => setExportFormat("pdf")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "pdf"
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileText size={20} />
+                </div>
+                <span className="text-xs font-bold">PDF Document</span>
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-200 transition-all cursor-pointer"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -18,18 +18,26 @@ const AssignStudentsModal = ({ batch, onClose, onAssignSuccess }) => {
       try {
         const response = await api.get('/students');
         const studentsList = response.data.students || [];
-        // Filter students enrolled in the same course as the batch AND at the same center
+        // Filter students enrolled at the same center.
+        // Show students who are not assigned to any batch, or are assigned to THIS batch.
+        // Hide students who are already assigned to a DIFFERENT batch.
         const filteredStudents = studentsList.filter(st => {
           const studentCenterId = st.center?._id ? st.center._id.toString() : st.center ? st.center.toString() : "";
           const batchCenterId = batch.center?._id ? batch.center._id.toString() : batch.center ? batch.center.toString() : "";
-          if (studentCenterId !== batchCenterId) return false;
+          
+          if (batchCenterId && studentCenterId && studentCenterId !== batchCenterId) return false;
 
-          if (!st.enrolledCourses) return false;
-          return st.enrolledCourses.some(ec => 
-            ec.course && 
-            (typeof ec.course === 'object' ? ec.course._id : ec.course) === 
-            (typeof batch.course === 'object' ? batch.course._id : batch.course)
-          );
+          if (!st.enrolledCourses || st.enrolledCourses.length === 0) return true;
+
+          const isAssignedToAnotherBatch = st.enrolledCourses.some(ec => {
+            if (!ec.batch) return false;
+            const ecBatchId = typeof ec.batch === 'object' ? ec.batch._id : ec.batch;
+            return ecBatchId !== batch._id.toString();
+          });
+
+          if (isAssignedToAnotherBatch) return false;
+
+          return true;
         });
         setStudents(filteredStudents);
       } catch (error) {

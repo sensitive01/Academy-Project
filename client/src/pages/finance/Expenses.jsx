@@ -11,6 +11,8 @@ import {
   Trash2,
   Banknote,
   Download,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -18,6 +20,11 @@ import AddExpenseModal from "../expenses/AddExpenseModel";
 import CustomDataTable from "../../components/common/DataTable";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import { downloadReceipt } from "../../utils/downloadReceipt";
+import ReactDOM from "react-dom";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { saveAs } from "file-saver";
 
 const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const [expenses, setExpenses] = useState([]);
@@ -26,6 +33,10 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchExpense, setSearchExpense] = useState("");
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, id: null });
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState("excel");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const user = JSON.parse(localStorage.getItem("user")) || { role: "employee" };
 
@@ -180,8 +191,72 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const displayedExpenses = expenses.filter((e) => {
     if (categoryFilter && e.category !== categoryFilter) return false;
     if (searchExpense && !e.category?.toLowerCase().includes(searchExpense.toLowerCase()) && !e.submittedBy?.name?.toLowerCase().includes(searchExpense.toLowerCase())) return false;
+    
+    if (fromDate || toDate) {
+      if (!e.date) return false;
+      const expenseDate = new Date(e.date).setHours(0,0,0,0);
+      if (fromDate) {
+        const from = new Date(fromDate).setHours(0,0,0,0);
+        if (expenseDate < from) return false;
+      }
+      if (toDate) {
+        const to = new Date(toDate).setHours(23,59,59,999);
+        if (expenseDate > to) return false;
+      }
+    }
     return true;
   });
+
+  const handleExport = () => {
+    setShowExportModal(false);
+    if (exportFormat === "excel") {
+      const data = displayedExpenses.map((e, i) => ({
+        "S.No": i + 1,
+        "Employee": e.submittedBy?.name || "Unknown",
+        "Category": e.category || "-",
+        "Amount": e.amount || 0,
+        "Date": e.date ? new Date(e.date).toLocaleDateString("en-IN") : "-",
+        "Status": e.status || "-"
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Expenses");
+      const title = categoryFilter ? `${categoryFilter}_Expenses.xlsx` : "Expenses_Report.xlsx";
+      XLSX.writeFile(workbook, title);
+      toast.success("Excel exported successfully!");
+    } else {
+      const doc = new jsPDF({ orientation: "landscape" });
+      const title = categoryFilter ? `${categoryFilter} Expenses Report` : "Expenses Report";
+      doc.text(title, 14, 15);
+      
+      const tableColumn = ["S.No", "Employee", "Category", "Amount", "Date", "Status"];
+      const tableRows = [];
+      displayedExpenses.forEach((e, index) => {
+        const rowData = [
+          index + 1,
+          e.submittedBy?.name || "Unknown",
+          e.category || "-",
+          e.amount ? `Rs. ${e.amount.toLocaleString("en-IN")}` : "Rs. 0",
+          e.date ? new Date(e.date).toLocaleDateString("en-IN") : "-",
+          e.status || "-"
+        ];
+        tableRows.push(rowData);
+      });
+      
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 20,
+        theme: "striped",
+        styles: { fontSize: 8, cellPadding: 2 }
+      });
+      
+      const pdfBlob = doc.output("blob");
+      const pdfTitle = categoryFilter ? `${categoryFilter}_Expenses.pdf` : "Expenses_Report.pdf";
+      saveAs(pdfBlob, pdfTitle);
+      toast.success("PDF exported successfully!");
+    }
+  };
 
   /* ================= STATS ================= */
   const totalAmount = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -235,6 +310,47 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
           search={searchExpense}
           setSearch={setSearchExpense}
           searchPlaceholder="Search by employee or category..."
+          exportButton={
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-200 transition-colors cursor-pointer"
+            >
+              <Download size={14} /> Export
+            </button>
+          }
+          additionalHeaderContent={
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap py-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">From:</span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">To:</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+                />
+              </div>
+              {(fromDate || toDate) && (
+                <button
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          }
         />
       </div>
 
@@ -247,9 +363,66 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
         onClose={() => setConfirmConfig({ isOpen: false, id: null })}
         type="danger"
       />
+
+      {/* EXPORT MODAL */}
+      {showExportModal && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Export Data</h3>
+            <p className="text-slate-500 text-xs mb-6">Choose your preferred format to export the filtered list.</p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                onClick={() => setExportFormat("excel")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "excel"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="text-xs font-bold">Excel (.xlsx)</span>
+              </button>
+
+              <button
+                onClick={() => setExportFormat("pdf")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "pdf"
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileText size={20} />
+                </div>
+                <span className="text-xs font-bold">PDF Document</span>
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-200 transition-all cursor-pointer"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
+
 
 /* ================= STATUS BADGE ================= */
 const StatusBadge = ({ status }) => {

@@ -125,8 +125,19 @@ router.post("/:id/assign-students", protect, async (req, res) => {
     batch.numberOfStudents = studentIds.length;
     await batch.save();
 
-    // Also update the enrolledCourses for each student
-    // For simplicity, we just set the batch field in their enrolled course if the course matches
+    // 1. Find students who were removed from this batch and clear their batch field
+    const removedStudents = await Student.find({ "enrolledCourses.batch": batch._id, _id: { $nin: studentIds } });
+    for (const st of removedStudents) {
+      st.enrolledCourses = st.enrolledCourses.map(ec => {
+        if (ec.batch && ec.batch.toString() === batch._id.toString()) {
+          ec.batch = null;
+        }
+        return ec;
+      });
+      await st.save();
+    }
+
+    // 2. Update or add enrolledCourses for newly assigned students
     for (const studentId of studentIds) {
       const student = await Student.findById(studentId);
       if (student) {
@@ -138,9 +149,16 @@ router.post("/:id/assign-students", protect, async (req, res) => {
           }
           return ec;
         });
-        if (updated) {
-          await student.save();
+
+        if (!updated) {
+          student.enrolledCourses.push({
+            course: batch.course,
+            batch: batch._id,
+            completed: false,
+            progress: 0
+          });
         }
+        await student.save();
       }
     }
 

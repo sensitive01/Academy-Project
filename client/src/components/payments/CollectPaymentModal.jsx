@@ -4,12 +4,26 @@ import { X, CheckCircle, CreditCard, Banknote, UploadCloud, Check, Trash2 } from
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../../services/api';
 
-const CollectPaymentModal = ({ onClose, onSave, fee }) => {
+const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [bankReference, setBankReference] = useState('');
   const [proofOfPayment, setProofOfPayment] = useState(null);
   
   const totalAmount = (fee.amount || 0) + (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+
+  const totalApprovedPaid = fee.payments
+    ? fee.payments
+        .filter(p => p.status === 'Approved')
+        .reduce((sum, p) => sum + p.amount, 0)
+    : (fee.status === 'paid' ? fee.amount : 0);
+
+  const remainingBalance = Math.max(0, totalAmount - totalApprovedPaid);
+
+  const [collectAmount, setCollectAmount] = useState(remainingBalance);
+
+  useEffect(() => {
+    setCollectAmount(remainingBalance);
+  }, [remainingBalance]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -23,7 +37,7 @@ const CollectPaymentModal = ({ onClose, onSave, fee }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const data = { paymentMode };
+    const data = { paymentMode, amount: Number(collectAmount) };
     if (paymentMode === 'Bank') {
       data.bankReference = bankReference;
     } else if (paymentMode === 'Online') {
@@ -51,7 +65,7 @@ const CollectPaymentModal = ({ onClose, onSave, fee }) => {
   const hasUpiId = Boolean(globalBank?.upiId);
 
   // Generate UPI URI
-  const upiUri = hasUpiId ? `upi://pay?pa=${globalBank.upiId}&pn=${encodeURIComponent(globalBank.accountName || fee.center?.name || "Center")}&am=${totalAmount}&cu=INR` : "";
+  const upiUri = hasUpiId ? `upi://pay?pa=${globalBank.upiId}&pn=${encodeURIComponent(globalBank.accountName || fee.center?.name || "Center")}&am=${collectAmount}&cu=INR` : "";
 
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -77,13 +91,33 @@ const CollectPaymentModal = ({ onClose, onSave, fee }) => {
             </svg>
           </div>
           <div className="relative z-10">
-            <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Total Due</p>
-            <p className="text-3xl font-black tracking-tight">₹{totalAmount.toLocaleString('en-IN')}</p>
+            <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Remaining Balance / Total Fee</p>
+            <p className="text-3xl font-black tracking-tight">₹{remainingBalance.toLocaleString('en-IN')} <span className="text-xs font-normal text-indigo-200/70">/ ₹{totalAmount.toLocaleString('en-IN')}</span></p>
           </div>
-          <div className="text-right relative z-10">
+          <div className="text-right relative z-10 flex flex-col items-end">
             <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Student</p>
-            <p className="text-base font-bold">{fee.student?.studentNameEnglish}</p>
+            <p className="text-base font-bold leading-tight">{fee.student?.studentNameEnglish}</p>
+            {schemeLabel && (
+              <span className="mt-1.5 px-2 py-0.5 bg-indigo-900/60 text-indigo-200 rounded border border-indigo-700/50 text-[9px] font-bold uppercase tracking-wider">
+                {schemeLabel}
+              </span>
+            )}
           </div>
+        </div>
+
+        {/* Collection Amount Input */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Amount to Collect *</label>
+          <input 
+            type="number" 
+            required 
+            min="1" 
+            max={remainingBalance}
+            className="w-full rounded-2xl border border-slate-200 p-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 font-bold text-slate-800" 
+            value={collectAmount} 
+            onChange={(e) => setCollectAmount(parseFloat(e.target.value) || 0)} 
+            placeholder="Enter manual collection amount" 
+          />
         </div>
 
         {/* Payment Mode Selection */}

@@ -145,10 +145,100 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
+// Cascade collection for a student's grouped fees (Course, Council, or Other)
+router.post('/collect-cascade', protect, async (req, res) => {
+  try {
+    const { studentId, feeType, paymentMode, proofOfPayment, bankReference, amount } = req.body;
+    
+    // Find all student fee records for this student that are not fully paid
+    let feeRecords = await StudentFee.find({
+      student: studentId,
+      status: { $ne: 'paid' }
+    });
+
+    // Filter by feeType matching logic
+    feeRecords = feeRecords.filter(f => {
+      if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
+      if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
+      if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees';
+      return f.feeType === feeType;
+    });
+
+    if (feeRecords.length === 0) {
+      return res.status(400).json({ message: 'No pending fees found for this student and category' });
+    }
+
+    let remainingAmountToAllocate = Number(amount);
+    if (isNaN(remainingAmountToAllocate) || remainingAmountToAllocate <= 0) {
+      return res.status(400).json({ message: 'Valid collection amount is required' });
+    }
+
+    // Sort records oldest first (createdAt)
+    feeRecords.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    const modifiedFees = [];
+
+    for (const fee of feeRecords) {
+      if (remainingAmountToAllocate <= 0) break;
+
+      const totalApprovedPaid = fee.payments
+        ? fee.payments.filter(p => p.status === 'Approved').reduce((sum, p) => sum + p.amount, 0)
+        : 0;
+
+      const totalDue = fee.amount + 
+        (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + 
+        (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+
+      const balance = Math.max(0, totalDue - totalApprovedPaid);
+      if (balance <= 0) continue;
+
+      const allocate = Math.min(remainingAmountToAllocate, balance);
+
+      if (!fee.payments) {
+        fee.payments = [];
+      }
+
+      fee.payments.push({
+        amount: allocate,
+        paymentMode,
+        proofOfPayment,
+        bankReference,
+        status: 'Pending',
+        paidAt: new Date()
+      });
+
+      fee.paymentMode = paymentMode;
+
+      if (paymentMode === 'Cash') {
+        fee.status = 'pending_approval';
+        fee.approvalStatus = 'Pending';
+      } else if (paymentMode === 'Online') {
+        fee.status = 'pending_approval';
+        fee.proofOfPayment = proofOfPayment;
+        fee.approvalStatus = 'Pending';
+      } else if (paymentMode === 'Bank') {
+        fee.status = 'pending_approval';
+        fee.bankReference = bankReference;
+        fee.approvalStatus = 'Pending';
+      }
+
+      fee.markModified('payments');
+      await fee.save();
+      modifiedFees.push(fee);
+
+      remainingAmountToAllocate -= allocate;
+    }
+
+    res.json({ message: 'Allocated successfully', modifiedFees });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Collect student fee
 router.post('/:id/collect', protect, async (req, res) => {
   try {
-    const { paymentMode, proofOfPayment, bankReference } = req.body;
+    const { paymentMode, proofOfPayment, bankReference, amount } = req.body;
     const fee = await StudentFee.findById(req.params.id);
     
     if (!fee) {
@@ -158,6 +248,35 @@ router.post('/:id/collect', protect, async (req, res) => {
     if (fee.status === 'paid') {
       return res.status(400).json({ message: 'Fee is already paid' });
     }
+
+    // Determine collection amount (default to remaining balance if not provided)
+    const totalApprovedPaid = fee.payments
+      ? fee.payments.filter(p => p.status === 'Approved').reduce((sum, p) => sum + p.amount, 0)
+      : 0;
+
+    const totalDue = fee.amount + 
+      (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + 
+      (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+
+    const remainingBalance = Math.max(0, totalDue - totalApprovedPaid);
+    const collectAmount = amount !== undefined ? Number(amount) : remainingBalance;
+
+    if (collectAmount <= 0) {
+      return res.status(400).json({ message: 'Collection amount must be greater than zero' });
+    }
+
+    if (!fee.payments) {
+      fee.payments = [];
+    }
+
+    fee.payments.push({
+      amount: collectAmount,
+      paymentMode,
+      proofOfPayment,
+      bankReference,
+      status: 'Pending',
+      paidAt: new Date()
+    });
 
     fee.paymentMode = paymentMode;
 
@@ -176,6 +295,7 @@ router.post('/:id/collect', protect, async (req, res) => {
       return res.status(400).json({ message: 'Invalid payment mode' });
     }
 
+    fee.markModified('payments');
     await fee.save();
 
     await fee.populate('student', 'studentNameEnglish studentId');
@@ -205,19 +325,45 @@ router.patch('/:id/approve', protect, async (req, res) => {
 
     fee.approvalStatus = approvalStatus;
 
+    if (!fee.payments) {
+      fee.payments = [];
+    }
+    const pendingPayment = fee.payments.find(p => p.status === 'Pending');
+
+    if (pendingPayment) {
+      pendingPayment.status = approvalStatus === 'Approved' ? 'Approved' : 'Rejected';
+      pendingPayment.paidAt = new Date();
+      fee.markModified('payments');
+    }
+
     if (approvalStatus === 'Approved') {
-      fee.status = 'paid';
-      fee.paidAt = new Date();
+      const approvedAmount = pendingPayment ? pendingPayment.amount : fee.amount;
+      
       if (fee.paymentMode === 'Cash') {
         const center = await Center.findById(fee.center);
         if (center) {
-          center.cashBalance = (center.cashBalance || 0) + fee.amount + fee.penaltyAmount + fee.finalPenaltyAmount;
+          center.cashBalance = (center.cashBalance || 0) + approvedAmount;
           await center.save();
         }
       }
+
+      // Check if fully paid
+      const totalApprovedPaid = fee.payments
+        .filter(p => p.status === 'Approved')
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      const totalDue = fee.amount + 
+        (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + 
+        (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+
+      if (totalApprovedPaid >= totalDue) {
+        fee.status = 'paid';
+        fee.paidAt = new Date();
+      } else {
+        fee.status = 'pending'; // revert to pending for next collections
+      }
     } else if (approvalStatus === 'Rejected') {
       fee.status = 'pending';
-      // Reset payment details so they can try again if needed, or leave it for history
     } else {
       return res.status(400).json({ message: 'Invalid approval status' });
     }
@@ -250,44 +396,66 @@ router.get('/:id/receipt', protect, async (req, res) => {
 
     const { generateReceiptPDF } = require('../utils/receiptGenerator');
 
-    const totalDue = fee.amount + 
-      (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + 
-      (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+    const { paymentId } = req.query;
+    let paymentAmount = fee.amount;
+    let paymentDate = fee.paidAt || fee.createdAt;
+    let paymentMode = fee.paymentMode;
+    let paymentReference = fee.bankReference || fee.proofOfPayment || (fee.paymentMode === 'Cash' ? 'CASH' : 'N/A');
+    let paymentStatus = fee.status;
+    let isPartialPayment = false;
 
     let feeDescription = `${fee.course?.title || 'Course'} - ${fee.feeType} Fee`;
     if (fee.feeType === 'Term' && fee.terms && fee.terms.length > 0) {
       feeDescription += ` (Term ${fee.terms.join(', ')})`;
     }
-    
+
+    if (paymentId && fee.payments && fee.payments.length > 0) {
+      const p = fee.payments.id(paymentId) || fee.payments.find(x => x._id?.toString() === paymentId.toString());
+      if (p) {
+        paymentAmount = p.amount;
+        paymentDate = p.paidAt || paymentDate;
+        paymentMode = p.paymentMode || paymentMode;
+        paymentReference = p.bankReference || p.proofOfPayment || (p.paymentMode === 'Cash' ? 'CASH' : 'N/A');
+        paymentStatus = p.status;
+        isPartialPayment = true;
+      }
+    }
+
     const items = [
       {
-        description: feeDescription,
+        description: isPartialPayment ? `${feeDescription} (Installment Payment)` : feeDescription,
         qty: 1,
-        amount: fee.amount
+        amount: paymentAmount
       }
     ];
 
-    if (fee.isPenaltyApplied && fee.penaltyAmount > 0) {
-      items.push({
-        description: "Late Fee Penalty",
-        qty: 1,
-        amount: fee.penaltyAmount
-      });
+    if (!isPartialPayment) {
+      if (fee.isPenaltyApplied && fee.penaltyAmount > 0) {
+        items.push({
+          description: "Late Fee Penalty",
+          qty: 1,
+          amount: fee.penaltyAmount
+        });
+      }
+
+      if (fee.isFinalPenaltyApplied && fee.finalPenaltyAmount > 0) {
+        items.push({
+          description: "Final Late Fee Penalty",
+          qty: 1,
+          amount: fee.finalPenaltyAmount
+        });
+      }
     }
 
-    if (fee.isFinalPenaltyApplied && fee.finalPenaltyAmount > 0) {
-      items.push({
-        description: "Final Late Fee Penalty",
-        qty: 1,
-        amount: fee.finalPenaltyAmount
-      });
-    }
+    const totalDue = items.reduce((sum, item) => sum + item.amount, 0);
 
     const data = {
       documentTitle: "FEE RECEIPT",
-      receiptNo: fee._id.toString().substring(0, 8).toUpperCase(),
-      date: fee.paidAt || fee.createdAt,
-      transactionId: fee.bankReference || fee.proofOfPayment || (fee.paymentMode === 'Cash' ? 'CASH' : 'N/A'),
+      receiptNo: paymentId 
+        ? `${fee._id.toString().substring(0, 4)}-${paymentId.toString().substring(0, 4)}`.toUpperCase() 
+        : fee._id.toString().substring(0, 8).toUpperCase(),
+      date: paymentDate,
+      transactionId: paymentReference,
       billedTo: {
         name: fee.student?.studentNameEnglish || "Student",
         id: fee.student?.studentId || fee.student?._id?.toString().substring(0, 8).toUpperCase() || "",
@@ -302,7 +470,7 @@ router.get('/:id/receipt', protect, async (req, res) => {
       },
       items,
       totalAmount: totalDue,
-      status: fee.status
+      status: paymentStatus
     };
 
     generateReceiptPDF(res, data);

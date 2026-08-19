@@ -144,6 +144,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
     { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
+    { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
       label: "Payments",
@@ -198,6 +199,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const financeItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     { icon: <UserCheck size={22} />, label: "Leave Request", path: "/dashboard/leave-request" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
@@ -209,6 +211,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
     { icon: <CalendarCheck size={22} />, label: "Attendance", path: "/dashboard/attendance" },
+    { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
       label: "Payments",
@@ -234,6 +237,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const centerFinanceItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
       label: "Payments",
@@ -259,6 +263,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },
+    { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
       label: "Payments",

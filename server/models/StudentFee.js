@@ -78,7 +78,17 @@ const studentFeeSchema = new mongoose.Schema({
   isFinalPenaltyApplied: {
     type: Boolean,
     default: false
-  }
+  },
+  payments: [
+    {
+      amount: { type: Number, required: true },
+      paymentMode: { type: String, enum: ['Cash', 'Online', 'Bank'], required: true },
+      proofOfPayment: String,
+      bankReference: String,
+      status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+      paidAt: { type: Date, default: Date.now }
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model('StudentFee', studentFeeSchema);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Plus, ChevronDown } from "lucide-react";
+import { Plus, ChevronDown, Download, FileSpreadsheet, FileText } from "lucide-react";
 import Loading from "../../components/common/Loading";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -7,6 +7,10 @@ import { useAuth } from "../../context/AuthContext";
 import CustomDataTable from "../../components/common/DataTable";
 import ReactDOM from "react-dom";
 import StudentFilterBar from "../../components/common/StudentFilterBar";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { saveAs } from "file-saver";
 
 const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) => {
 const { user } = useAuth();
@@ -49,6 +53,10 @@ const [currentPayslipName, setCurrentPayslipName] = useState("");
 
 const [selectedTableRows, setSelectedTableRows] = useState([]);
 const [toggleClearRows, setToggleClearRows] = useState(false);
+const [showExportModal, setShowExportModal] = useState(false);
+const [exportFormat, setExportFormat] = useState("excel");
+const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
 
 const [filterType, setFilterType] = useState([]);
 const [filterCenter, setFilterCenter] = useState([]);
@@ -316,6 +324,109 @@ const generatePayslip = async (payrollId, employeeName) => {
   }
 };
 
+  const handleExport = () => {
+    setShowExportModal(false);
+    if (exportFormat === "excel") {
+      const data = filteredPayrolls.map((p, i) => ({
+        "S.No": i + 1,
+        [internOnly ? "Intern Name" : "Employee Name"]: p.name || "-",
+        Department: p.department || "-",
+        "Basic Salary": p.basic || 0,
+        "Total Days": p.totalDays || 0,
+        "Present": p.present || 0,
+        "Leave": p.absent || 0,
+        "Late Days": p.lateDays || 0,
+        "Allowances": p.allowances || 0,
+        "Deductions": p.deductions || 0,
+        "Advance": p.advance || 0,
+        "Net Salary": p.netSalary || 0,
+        Status: p.status || "process"
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll");
+      
+      const fileName = internOnly 
+        ? `Intern_Payroll_${selectedMonth}.xlsx`
+        : `Employee_Payroll_${selectedMonth}.xlsx`;
+        
+      XLSX.writeFile(workbook, fileName);
+      toast.success("Excel exported successfully!");
+    } else {
+      const doc = new jsPDF({ orientation: "landscape" });
+      const title = internOnly 
+        ? `Intern Payroll - ${selectedMonth}`
+        : `Employee Payroll - ${selectedMonth}`;
+      doc.text(title, 14, 15);
+      
+      const tableColumn = [
+        "S.No",
+        internOnly ? "Intern Name" : "Employee Name",
+        "Dept",
+        "Basic",
+        "Days",
+        "Present",
+        "Leave",
+        "Late Info",
+        "Allowances",
+        "Deductions",
+        "Advance",
+        "Net Salary",
+        "Status"
+      ];
+      
+      const tableRows = [];
+      filteredPayrolls.forEach((p, index) => {
+        const rowData = [
+          index + 1,
+          p.name || "-",
+          p.department || "-",
+          p.basic ? `Rs. ${p.basic.toLocaleString("en-IN")}` : "Rs. 0",
+          p.totalDays || 0,
+          p.present || 0,
+          p.absent || 0,
+          p.lateDays || 0,
+          p.allowances ? `Rs. ${p.allowances.toLocaleString("en-IN")}` : "Rs. 0",
+          p.deductions ? `Rs. ${p.deductions.toLocaleString("en-IN")}` : "Rs. 0",
+          p.advance ? `Rs. ${p.advance.toLocaleString("en-IN")}` : "Rs. 0",
+          p.netSalary ? `Rs. ${p.netSalary.toLocaleString("en-IN")}` : "Rs. 0",
+          p.status || "process"
+        ];
+        tableRows.push(rowData);
+      });
+      
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 20,
+        theme: "striped",
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 15 }, // S.No
+          1: { cellWidth: 35 }, // Name
+          2: { cellWidth: 20 }, // Dept
+          3: { cellWidth: 18 }, // Basic
+          4: { cellWidth: 12 }, // Days
+          5: { cellWidth: 15 }, // Present
+          6: { cellWidth: 15 }, // Leave
+          7: { cellWidth: 15 }, // Late Info
+          8: { cellWidth: 20 }, // Allowances
+          9: { cellWidth: 20 }, // Deductions
+          10: { cellWidth: 18 }, // Advance
+          11: { cellWidth: 22 }, // Net Salary
+          12: { cellWidth: 18 }  // Status
+        }
+      });
+      
+      const pdfBlob = doc.output("blob");
+      const fileName = internOnly 
+        ? `Intern_Payroll_${selectedMonth}.pdf`
+        : `Employee_Payroll_${selectedMonth}.pdf`;
+      saveAs(pdfBlob, fileName);
+      toast.success("PDF exported successfully!");
+    }
+  };
+
   // --- COLUMN DEFINITIONS ---
   const payrollColumns = [
     { name: 'S.No', selector: (row, i) => i + 1, width: '70px', center: "true" },
@@ -398,6 +509,22 @@ const generatePayslip = async (payrollId, employeeName) => {
         ? p.name?.toLowerCase().includes(searchPayroll.toLowerCase()) || p.department?.toLowerCase().includes(searchPayroll.toLowerCase())
         : true;
       if (!matchSearch) return false;
+
+      if (fromDate || toDate) {
+        const pDate = p.createdAt ? new Date(p.createdAt).setHours(0,0,0,0) : null;
+        if (pDate) {
+          if (fromDate) {
+            const from = new Date(fromDate).setHours(0,0,0,0);
+            if (pDate < from) return false;
+          }
+          if (toDate) {
+            const to = new Date(toDate).setHours(23,59,59,999);
+            if (pDate > to) return false;
+          }
+        } else {
+          return false;
+        }
+      }
 
       const sProfile = studentsMap[p.employeeId] || Object.values(studentsMap).find(s => s._id === p.employeeId || s.user?._id === p.employeeId);
 
@@ -616,6 +743,47 @@ const generatePayslip = async (payrollId, employeeName) => {
               selectableRows={!paidOnly}
               onSelectedRowsChange={handleRowSelected}
               clearSelectedRows={toggleClearRows} // resets selection after bulk action
+              exportButton={
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-200 transition-colors cursor-pointer"
+                >
+                  <Download size={14} /> Export
+                </button>
+              }
+              additionalHeaderContent={
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap py-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">From:</span>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">To:</span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors"
+                    />
+                  </div>
+                  {(fromDate || toDate) && (
+                    <button
+                      onClick={() => {
+                        setFromDate("");
+                        setToDate("");
+                      }}
+                      className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              }
             />
       </div>
 
@@ -849,6 +1017,62 @@ const generatePayslip = async (payrollId, employeeName) => {
                 className="w-full h-full border-none"
                 title="Payslip PDF"
               />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* EXPORT MODAL */}
+      {showExportModal && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Export Payroll Data</h3>
+            <p className="text-slate-500 text-xs mb-6">Choose your preferred format to export the filtered payroll list.</p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                onClick={() => setExportFormat("excel")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "excel"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileSpreadsheet size={20} />
+                </div>
+                <span className="text-xs font-bold">Excel (.xlsx)</span>
+              </button>
+
+              <button
+                onClick={() => setExportFormat("pdf")}
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  exportFormat === "pdf"
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>
+                  <FileText size={20} />
+                </div>
+                <span className="text-xs font-bold">PDF Document</span>
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-200 transition-all cursor-pointer"
+              >
+                Export
+              </button>
             </div>
           </div>
         </div>,

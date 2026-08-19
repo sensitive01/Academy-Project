@@ -84,6 +84,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
       const selectedBatch = batches.find(b => b._id === value);
       const courseIdForBatch = selectedBatch ? (selectedBatch.course?._id || selectedBatch.course) : "";
       const centerIdForBatch = selectedBatch ? (selectedBatch.center?._id || selectedBatch.center) : "";
+      
       setFormData(prev => ({ 
         ...prev, 
         batch: value, 
@@ -131,8 +132,8 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
           });
         }
       } else if (scheme === 'sem') {
-        const semAmt = Math.round(crsFee / 6);
-        for (let i = 1; i <= 6; i++) {
+        const semAmt = Math.round(crsFee / 2);
+        for (let i = 1; i <= 2; i++) {
           generatedFees.push({
             feeType: 'Sem',
             otherFeeType: `Semester ${i}`,
@@ -168,6 +169,12 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
+    
+    if (Number(feeForm.courseFee) > 0 && !feeForm.selectedScheme) {
+      toast.error("Please select a course fee payment scheme!");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = { ...formData, fees: feeForm.fees };
@@ -612,7 +619,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                       isObjectOptions
                       options={[
                         { value: "monthly", label: "Monthly Scheme (Total / 12 Months)" },
-                        { value: "sem", label: "Semester Scheme (Total / 6 Semesters)" },
+                        { value: "sem", label: "Semester Scheme (Total / 2 Semesters)" },
                         { value: "term3", label: "Term Scheme (Total / 3 Terms)" },
                         { value: "term4", label: "Term Scheme (Total / 4 Terms)" },
                       ]}
