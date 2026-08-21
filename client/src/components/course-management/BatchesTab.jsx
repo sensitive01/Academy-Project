@@ -38,6 +38,8 @@ const BatchesTab = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [batchStep, setBatchStep] = useState(1);
+  const [showViewCentersModal, setShowViewCentersModal] = useState(false);
+  const [selectedBatchCenters, setSelectedBatchCenters] = useState([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -254,46 +256,16 @@ const BatchesTab = () => {
             return;
           }
 
-          const originalBatch = data.find(item => item._id === currentId);
-          const originalCenterId = (originalBatch?.center?._id || originalBatch?.center || "").toString();
-
-          let centerToUpdate = "";
-          let centersToCreate = [];
-
-          if (targetCenters.includes(originalCenterId)) {
-            centerToUpdate = originalCenterId;
-            centersToCreate = targetCenters.filter(cid => cid !== originalCenterId);
-          } else {
-            centerToUpdate = targetCenters[0];
-            centersToCreate = targetCenters.slice(1);
-          }
-
-          const loadToast = toast.loading("Updating batches...");
+          const loadToast = toast.loading("Updating batch...");
           try {
             const { data: updatedItem } = await api.put(
               `${config[activeTab].endpoint}/${currentId}`,
-              { ...formattedData, center: centerToUpdate },
+              { ...formattedData, centers: targetCenters },
             );
-
-            const createPromises = centersToCreate.map(centerId => {
-              return api.post(config[activeTab].endpoint, {
-                ...formattedData,
-                center: centerId
-              });
-            });
-
-            const createResponses = await Promise.all(createPromises);
-            const newBatches = createResponses.map(res => res.data);
-
-            setData(prevData => {
-              const updatedList = prevData.map(item => item._id === currentId ? updatedItem : item);
-              return [...updatedList, ...newBatches];
-            });
-
-            toast.success("Batch updated and saved to all selected centers");
+            setData(prevData => prevData.map(item => item._id === currentId ? updatedItem : item));
+            toast.success("Batch updated successfully");
           } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to update batches");
-            fetchData();
+            toast.error(err.response?.data?.message || "Failed to update batch");
           } finally {
             toast.dismiss(loadToast);
           }
@@ -318,21 +290,16 @@ const BatchesTab = () => {
             return;
           }
 
-          const loadToast = toast.loading("Creating batches...");
+          const loadToast = toast.loading("Creating batch...");
           try {
-            const promises = centersToCreate.map(centerId => {
-              return api.post(config[activeTab].endpoint, {
-                ...formattedData,
-                center: centerId
-              });
+            const { data: newItem } = await api.post(config[activeTab].endpoint, {
+              ...formattedData,
+              centers: centersToCreate
             });
-            const responses = await Promise.all(promises);
-            const newBatches = responses.map(res => res.data);
-            setData([...data, ...newBatches]);
-            toast.success(`${newBatches.length} batch(es) created successfully`);
+            setData([...data, newItem]);
+            toast.success("Batch created successfully");
           } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to create batches");
-            fetchData();
+            toast.error(err.response?.data?.message || "Failed to create batch");
           } finally {
             toast.dismiss(loadToast);
           }
@@ -582,10 +549,22 @@ const BatchesTab = () => {
           sortable: true,
         },
         {
-          name: "Center",
-          selector: r => r.center?.name || "N/A",
+          name: "Centers",
+          selector: r => r.centers?.length || 0,
           sortable: true,
           width: "120px",
+          center: true,
+          cell: r => (
+            <button
+              onClick={() => {
+                setSelectedBatchCenters(r.centers || []);
+                setShowViewCentersModal(true);
+              }}
+              className="text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors border border-brand-200 shadow-sm"
+            >
+              View ({r.centers?.length || 0})
+            </button>
+          )
         },
         {
           name: "Semesters",
@@ -666,13 +645,9 @@ const BatchesTab = () => {
     }
     const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === "batches") {
-      const itemCenterId = item.center?._id
-        ? item.center._id.toString()
-        : item.center
-        ? item.center.toString()
-        : "";
+      const itemCenterIds = item.centers?.map(c => typeof c === 'object' ? c._id?.toString() : c.toString()) || [];
       const matchesCenter = selectedCenterFilters.includes("all") || 
-                            selectedCenterFilters.includes(itemCenterId);
+                            selectedCenterFilters.some(filterId => itemCenterIds.includes(filterId));
       return matchesSearch && matchesCenter;
     }
     return matchesSearch;
@@ -1151,6 +1126,38 @@ const BatchesTab = () => {
           onAssignSuccess={handleAssignStudentsSuccess}
         />
       )}
+      {showViewCentersModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Assigned Centers</h2>
+              <button
+                onClick={() => setShowViewCentersModal(false)}
+                className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 max-h-[300px] overflow-y-auto">
+              {selectedBatchCenters.length > 0 ? (
+                <ul className="space-y-2">
+                  {selectedBatchCenters.map(center => (
+                    <li key={center._id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+                      <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-sm">
+                        {center.name?.charAt(0) || "C"}
+                      </div>
+                      <span className="font-semibold text-slate-700">{center.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-slate-500 font-medium py-4">No centers assigned.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

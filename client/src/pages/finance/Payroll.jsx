@@ -57,6 +57,7 @@ const [showExportModal, setShowExportModal] = useState(false);
 const [exportFormat, setExportFormat] = useState("excel");
 const [fromDate, setFromDate] = useState("");
 const [toDate, setToDate] = useState("");
+const fileInputRef = useRef(null);
 
 const [filterType, setFilterType] = useState([]);
 const [filterCenter, setFilterCenter] = useState([]);
@@ -266,6 +267,138 @@ adjustmentNote: ""
 console.error(err);
 toast.error("Failed to save adjustment");
 }
+};
+
+const handleBulkUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const loadToast = toast.loading("Processing bulk upload...");
+
+  try {
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (!data || data.length === 0) {
+          toast.error("Spreadsheet is empty", { id: loadToast });
+          return;
+        }
+
+        const adjustments = [];
+        const [year, month] = selectedMonth.split("-");
+
+        data.forEach(row => {
+          const empId = row["Intern ID"] || row["Employee ID"] || row["ID"];
+          if (!empId) return;
+
+          const allowance = Number(row["Allowance"]) || 0;
+          const allowanceReason = row["Allowance Reason"] || "";
+          
+          const deduction = Number(row["Deduction"]) || 0;
+          const deductionReason = row["Deduction Reason"] || "";
+
+          // find the intern in filteredPayrolls to attach internshipId if available
+          const currentPayroll = filteredPayrolls.find(p => p.employeeId === String(empId) || p._id === String(empId));
+          const internshipId = currentPayroll?.internshipId || null;
+
+          if (allowance > 0) {
+            adjustments.push({
+              employeeId: empId,
+              month: Number(month),
+              year: Number(year),
+              type: "allowance",
+              amount: allowance,
+              note: allowanceReason,
+              internshipId
+            });
+          }
+
+          if (deduction > 0) {
+            adjustments.push({
+              employeeId: empId,
+              month: Number(month),
+              year: Number(year),
+              type: "deduction",
+              amount: deduction,
+              note: deductionReason,
+              internshipId
+            });
+          }
+        });
+
+        if (adjustments.length === 0) {
+          toast.error("No valid allowances or deductions found in the spreadsheet.", { id: loadToast });
+          return;
+        }
+
+        const res = await api.post("/payroll/bulk-adjustment", { adjustments });
+        toast.success(res.data.message || "Bulk upload successful", { id: loadToast });
+        await fetchPayrolls();
+      } catch (err) {
+        console.error("Bulk upload processing error:", err);
+        toast.error("Failed to process bulk upload.", { id: loadToast });
+      }
+    };
+    reader.readAsBinaryString(file);
+  } catch (err) {
+    toast.error("Failed to read file.", { id: loadToast });
+  } finally {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+};
+
+const handleDownloadTemplate = () => {
+  try {
+    const templateData = filteredPayrolls.map(p => ({
+      "Intern ID": p.employeeId || p._id,
+      "Intern Name": p.name || "",
+      "Allowance": 0,
+      "Allowance Reason": "",
+      "Deduction": 0,
+      "Deduction Reason": ""
+    }));
+
+    if (templateData.length === 0) {
+      templateData.push({
+        "Intern ID": "e.g., STU001",
+        "Intern Name": "e.g., John Doe",
+        "Allowance": 500,
+        "Allowance Reason": "Travel",
+        "Deduction": 0,
+        "Deduction Reason": ""
+      });
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    const colWidths = [
+      { wch: 25 },
+      { wch: 30 },
+      { wch: 12 },
+      { wch: 25 },
+      { wch: 12 },
+      { wch: 25 }
+    ];
+    worksheet['!cols'] = colWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+
+    const fileName = `Intern_Payroll_Template_${selectedMonth || "Latest"}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    toast.success("Template downloaded successfully");
+  } catch (error) {
+    console.error("Template generation error:", error);
+    toast.error("Failed to generate template");
+  }
 };
 
 /* ==============================
@@ -700,6 +833,28 @@ const generatePayslip = async (payrollId, employeeName) => {
             <Plus size={18} />
             Add Adjustment
           </button>
+          <input 
+            type="file" 
+            accept=".xlsx, .xls, .csv" 
+            className="hidden" 
+            ref={fileInputRef} 
+            onChange={handleBulkUpload} 
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200"
+          >
+            <FileSpreadsheet size={18} className="text-emerald-600" />
+            Bulk Upload
+          </button>
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200"
+          >
+            <Download size={18} className="text-blue-600" />
+            Template
+          </button>
+
         </div>
       </div>
       )}

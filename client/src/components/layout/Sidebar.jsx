@@ -143,7 +143,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
-    { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
     { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
@@ -155,6 +154,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     },
     { icon: <FileText size={22} />, label: "Examination", path: "/dashboard/exams" },
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
+    { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
     { icon: <Briefcase size={22} />, label: "Vendor Mgmt", path: "/dashboard/admin/vendors" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },

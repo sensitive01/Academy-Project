@@ -25,6 +25,7 @@ import StudentFeesList from "../../components/payments/StudentFeesList";
 import VendorPaymentsList from "../../components/payments/VendorPaymentsList";
 import PendingApprovalsList from "../../components/payments/PendingApprovalsList";
 import OutwardDashboard from "../../components/payments/OutwardDashboard";
+import InwardDashboard from "../../components/payments/InwardDashboard";
 import { CheckSquare } from "lucide-react";
 
 const PlaceholderTable = ({ title, description }) => {
@@ -58,7 +59,7 @@ const PaymentsHub = () => {
   // Initialize mainTab from URL if present
   const initialMainTab = location.pathname.includes("outward") ? "outward" : "inward";
   const [mainTab, setMainTab] = useState(initialMainTab);
-  const [inwardTab, setInwardTab] = useState("online_course");
+  const [inwardTab, setInwardTab] = useState("dashboard");
   const [outwardTab, setOutwardTab] = useState("dashboard");
 
   // Fetch cash balance if center
@@ -96,6 +97,7 @@ const PaymentsHub = () => {
   };
 
   const inwardTabs = {
+    dashboard: { label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     online_course: { label: "Online Course", icon: <MonitorPlay size={18} /> },
     course_fees: { label: "Course Fees", icon: <FileText size={18} /> },
     council_fees: { label: "Council Fees", icon: <FileText size={18} /> },
@@ -191,6 +193,7 @@ const PaymentsHub = () => {
       <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
         {mainTab === "inward" ? (
           <>
+            {inwardTab === "dashboard" && <InwardDashboard />}
             {inwardTab === "online_course" && <OnlineCoursePayments />}
             {inwardTab === "course_fees" && <StudentFeesList feeType="Course" paidOnly={true} />}
             {inwardTab === "council_fees" && <StudentFeesList feeType="Council" paidOnly={true} />}

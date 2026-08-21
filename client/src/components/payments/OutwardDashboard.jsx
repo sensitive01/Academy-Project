@@ -11,10 +11,17 @@ const OutwardDashboard = () => {
     totalStipend: 0,
   });
 
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        const [year, month] = selectedMonth.split("-");
+        
         // Fetch expenses
         const expensesRes = await api.get("/expenses");
         const expenses = expensesRes.data?.data || [];
@@ -23,6 +30,8 @@ const OutwardDashboard = () => {
         let totalRent = 0;
 
         expenses.forEach(exp => {
+          const d = new Date(exp.createdAt);
+          if (d.getMonth() + 1 === parseInt(month) && d.getFullYear() === parseInt(year)) {
           if (exp.status === "paid" || exp.status === "reimbursed") {
             if (exp.category === "Rent") {
               totalRent += Number(exp.amount) || 0;
@@ -30,13 +39,9 @@ const OutwardDashboard = () => {
               totalExpense += Number(exp.amount) || 0;
             }
           }
+          }
         });
 
-        // Fetch payroll for current month
-        const now = new Date();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const year = now.getFullYear();
-        
         let totalSalary = 0;
         let totalStipend = 0;
         
@@ -74,8 +79,10 @@ const OutwardDashboard = () => {
         setLoading(false);
       }
     };
-    fetchData();
-  }, []);
+    if (selectedMonth) {
+      fetchData();
+    }
+  }, [selectedMonth]);
 
   const StatCard = ({ title, value, icon, colorClass, bgClass }) => (
     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 animate-in fade-in zoom-in duration-500">
@@ -95,6 +102,15 @@ const OutwardDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-3 bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-sm">
+        <label className="text-sm font-semibold text-slate-600 ml-2">Filter Month:</label>
+        <input
+          type="month"
+          className="border-none focus:ring-0 text-slate-700 font-medium cursor-pointer"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+        />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Total Expense" 

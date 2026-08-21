@@ -374,13 +374,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
       f.batch?.name?.toLowerCase().includes(term);
 
     const fCenterId = f.center?._id ? f.center._id.toString() : f.center ? f.center.toString() : "";
-    const matchesCenter = selectedCenter === "all" || fCenterId === selectedCenter;
+    const matchesCenter = selectedCenter === "all" || fCenterId === selectedCenter || f.center?.name === selectedCenter;
 
     const fCourseId = f.course?._id ? f.course._id.toString() : f.course ? f.course.toString() : "";
-    const matchesCourse = selectedCourse === "all" || fCourseId === selectedCourse;
+    const matchesCourse = selectedCourse === "all" || fCourseId === selectedCourse || f.course?.title === selectedCourse;
 
     const fBatchId = f.batch?._id ? f.batch._id.toString() : f.batch ? f.batch.toString() : "";
-    const matchesBatch = selectedBatch === "all" || fBatchId === selectedBatch;
+    const matchesBatch = selectedBatch === "all" || fBatchId === selectedBatch || (f.batch?.name || f.batch?.batchId) === selectedBatch;
 
     let matchesStatus = true;
     if (selectedStatus !== "all") {
@@ -875,8 +875,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
             >
               <option value="all">All Centers</option>
-              {centers.map(c => (
-                <option key={c._id} value={c._id}>{c.name}</option>
+              {Array.from(new Map(centers.map(c => [c.name, { label: c.name, value: c._id }])).values()).map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
 
@@ -886,8 +886,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
             >
               <option value="all">All Courses</option>
-              {courses.map(c => (
-                <option key={c._id} value={c._id}>{c.title}</option>
+              {Array.from(new Map(courses.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values()).map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
 
@@ -897,8 +897,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
             >
               <option value="all">All Batches</option>
-              {batches.map(b => (
-                <option key={b._id} value={b._id}>{b.name}</option>
+              {Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values()).map(b => (
+                <option key={b.value} value={b.value}>{b.label}</option>
               ))}
             </select>
 

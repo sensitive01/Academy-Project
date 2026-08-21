@@ -131,9 +131,15 @@ const [stats, setStats] = React.useState({
   loading: true,
 });
 
+const [selectedMonth, setSelectedMonth] = React.useState(() => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+});
+
   const fetchStats = async () => {
     try {
-      const { data } = await api.get("/dashboard-stats");
+      const [year, month] = selectedMonth.split("-");
+      const { data } = await api.get(`/dashboard-stats?month=${month}&year=${year}`);
       setStats({
         totalStudents: data.totalStudents,
         activeCourses: data.activeCourses,
@@ -194,7 +200,7 @@ const [stats, setStats] = React.useState({
       fetchEnrollments();
       fetchRecentAnnouncements();
     }
-  }, [user]);
+  }, [user, selectedMonth]);
 
 
   const studentActivityData = studentActivity;
@@ -638,26 +644,36 @@ const [stats, setStats] = React.useState({
 
   // Default (Admin/Other) Dashboard content
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 min-h-screen bg-slate-50 relative overflow-hidden animate-in fade-in duration-500">
       <AnnouncementTicker announcements={recentAnnouncements} user={user} />
-      {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            {user?.role === "center" ? "Center Overview" : "Executive Overview"}
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-br from-indigo-50 via-white to-transparent rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+
+      <div className="flex justify-between flex-col md:flex-row md:items-end gap-6 relative z-10">
+        <div className="space-y-2">
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight">
+            Welcome back, <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-2xl inline-block -ml-2">{user?.name}</span>
           </h1>
-          <p className="text-slate-500 mt-1">
-            Welcome back, {user?.name || (user?.role === "center" ? "Center Admin" : "Admin")}. Here's what's happening today.
-          </p>
+          <p className="text-slate-500 mt-1">Here's what's happening today.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            System Online
-          </span>
-          <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20">
-            Generate Report
-          </button>
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+            <label className="text-sm font-semibold text-slate-600 ml-2">Filter Month:</label>
+            <input
+              type="month"
+              className="border-none focus:ring-0 text-slate-700 font-medium cursor-pointer"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              System Online
+            </span>
+            <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20">
+              Generate Report
+            </button>
+          </div>
         </div>
       </div>
 

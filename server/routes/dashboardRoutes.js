@@ -15,6 +15,15 @@ router.get("/", protect, async (req, res) => {
     let courseQuery = { isActive: true };
     let revenueQuery = { type: "inward" };
 
+    if (req.query.month && req.query.year) {
+      const m = parseInt(req.query.month);
+      const y = parseInt(req.query.year);
+      const startDate = new Date(y, m - 1, 1);
+      const endDate = new Date(y, m, 0, 23, 59, 59, 999);
+      studentQuery.createdAt = { $gte: startDate, $lte: endDate };
+      revenueQuery.createdAt = { $gte: startDate, $lte: endDate };
+    }
+
     if (req.user.role === "center") {
       studentQuery.center = req.user.center;
     } else if (req.user.role === "coach") {

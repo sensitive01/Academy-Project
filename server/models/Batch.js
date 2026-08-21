@@ -16,11 +16,12 @@ const batchSchema = new mongoose.Schema(
       ref: 'Course',
       required: true,
     },
-    center: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Center',
-      required: true,
-    },
+    centers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Center',
+      }
+    ],
     numberOfSemesters: {
       type: Number,
       required: true,

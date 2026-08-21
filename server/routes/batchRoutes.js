@@ -9,18 +9,18 @@ const { protect } = require("../middleware/authMiddleware");
 //////////////////////////////////////////////////////
 router.post("/", protect, async (req, res) => {
   try {
-    const { name, batchId, course, center, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
+    const { name, batchId, course, centers, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
 
-    const exists = await Batch.findOne({ center, $or: [{ name }, { batchId }] });
+    const exists = await Batch.findOne({ centers: { $in: centers }, course, $or: [{ name }, { batchId }] });
     if (exists) {
-      return res.status(400).json({ message: "Batch name or ID already exists for this center" });
+      return res.status(400).json({ message: "Batch name or ID already exists for one of the selected centers and course" });
     }
 
     const batch = await Batch.create({
       name,
       batchId,
       course,
-      center,
+      centers,
       numberOfSemesters,
       period,
       numberOfStudents,
@@ -29,7 +29,7 @@ router.post("/", protect, async (req, res) => {
     });
 
     await batch.populate("course");
-    await batch.populate("center");
+    await batch.populate("centers");
     await batch.populate("semesters.subjects");
 
     res.status(201).json(batch);
@@ -46,7 +46,7 @@ router.get("/", protect, async (req, res) => {
   try {
     const batches = await Batch.find()
       .populate("course")
-      .populate("center")
+      .populate("centers")
       .populate("semesters.subjects")
       .lean();
     res.json(batches);
@@ -60,7 +60,7 @@ router.get("/", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.put("/:id", protect, async (req, res) => {
   try {
-    const { name, batchId, course, center, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
+    const { name, batchId, course, centers, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
@@ -70,7 +70,7 @@ router.put("/:id", protect, async (req, res) => {
     if (name) batch.name = name;
     if (batchId) batch.batchId = batchId;
     if (course) batch.course = course;
-    if (center) batch.center = center;
+    if (centers) batch.centers = centers;
     if (numberOfSemesters !== undefined) batch.numberOfSemesters = numberOfSemesters;
     if (period) batch.period = period;
     if (numberOfStudents !== undefined) batch.numberOfStudents = numberOfStudents;
@@ -81,7 +81,7 @@ router.put("/:id", protect, async (req, res) => {
 
     const populatedBatch = await Batch.findById(batch._id)
       .populate("course")
-      .populate("center")
+      .populate("centers")
       .populate("semesters.subjects");
 
     res.json(populatedBatch);
@@ -163,7 +163,7 @@ router.post("/:id/assign-students", protect, async (req, res) => {
     }
 
     await batch.populate("course");
-    await batch.populate("center");
+    await batch.populate("centers");
     await batch.populate("semesters.subjects");
     await batch.populate("students", "studentNameEnglish studentId");
 

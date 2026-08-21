@@ -23,9 +23,9 @@ const AssignStudentsModal = ({ batch, onClose, onAssignSuccess }) => {
         // Hide students who are already assigned to a DIFFERENT batch.
         const filteredStudents = studentsList.filter(st => {
           const studentCenterId = st.center?._id ? st.center._id.toString() : st.center ? st.center.toString() : "";
-          const batchCenterId = batch.center?._id ? batch.center._id.toString() : batch.center ? batch.center.toString() : "";
+          const batchCenterIds = batch.centers?.map(c => c._id ? c._id.toString() : c.toString()) || [];
           
-          if (batchCenterId && studentCenterId && studentCenterId !== batchCenterId) return false;
+          if (batchCenterIds.length > 0 && studentCenterId && !batchCenterIds.includes(studentCenterId)) return false;
 
           if (!st.enrolledCourses || st.enrolledCourses.length === 0) return true;
 

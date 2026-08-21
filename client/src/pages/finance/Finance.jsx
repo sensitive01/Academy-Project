@@ -6,7 +6,7 @@ import { saveAs } from "file-saver";
 import CustomDataTable from "../../components/common/DataTable";
 import { Search } from "lucide-react";
 import StudentFilterBar from "../../components/common/StudentFilterBar";
-
+import InwardDashboard from "../../components/payments/InwardDashboard";
 const Finance = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -256,7 +256,8 @@ return (
 
     {/* ===================== INWARD SECTION ===================== */}
 
-    <h2 className="text-2xl font-semibold">Inward Transactions</h2>
+    <h2 className="text-2xl font-semibold mb-2">Inward Transactions</h2>
+    <InwardDashboard inwardPayments={inwardPayments} />
 
     <div className="flex flex-col md:flex-row justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-100 items-start md:items-center gap-4">
       <div className="relative flex flex-col max-w-md w-full group">

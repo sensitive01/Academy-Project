@@ -83,7 +83,9 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
     if (name === "batch") {
       const selectedBatch = batches.find(b => b._id === value);
       const courseIdForBatch = selectedBatch ? (selectedBatch.course?._id || selectedBatch.course) : "";
-      const centerIdForBatch = selectedBatch ? (selectedBatch.center?._id || selectedBatch.center) : "";
+      const centerIdForBatch = selectedBatch && selectedBatch.centers && selectedBatch.centers.length > 0 
+        ? (selectedBatch.centers[0]?._id || selectedBatch.centers[0]) 
+        : "";
       
       setFormData(prev => ({ 
         ...prev, 

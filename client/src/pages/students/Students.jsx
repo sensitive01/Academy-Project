@@ -60,7 +60,7 @@ import ParentManagement from "../admin/ParentManagement";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onView, onPromote, onSendReminder, search, setSearch }) => {
+const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onView, onPromote, onSendReminder, search, setSearch, selectableRows, onSelectedRowsChange, clearSelectedRows, tableHeaderActions, selectableRowDisabled }) => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
@@ -238,10 +238,10 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
                     ) : (
                       <>
                         <button onClick={() => { onPromote(row, false); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                          <Edit2 size={16} className="text-amber-500" /> Edit Current Internship
+                          <Settings size={16} className="text-blue-500" /> Intern Settings
                         </button>
                         <button onClick={() => { onPromote(row, true); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                          <Settings size={16} className="text-blue-500" /> Intern Settings
+                          <Plus size={16} className="text-emerald-500" /> Add New Period
                         </button>
                       </>
                     )}
@@ -278,6 +278,11 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
         search={search}
         setSearch={setSearch}
         searchPlaceholder="Search by ID, name, email..."
+        selectableRows={selectableRows}
+        selectableRowDisabled={selectableRowDisabled}
+        onSelectedRowsChange={onSelectedRowsChange}
+        clearSelectedRows={clearSelectedRows}
+        additionalHeaderContent={tableHeaderActions}
       />
     </div>
   );
@@ -305,7 +310,10 @@ const Students = () => {
   const [exportFormat, setExportFormat] = useState("excel");
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, id: null });
-  const [promoteConfig, setPromoteConfig] = useState({ isOpen: false, student: null });
+  const [promoteConfig, setPromoteConfig] = useState({ isOpen: false, student: null, isBulk: false });
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [clearSelectedRows, setClearSelectedRows] = useState(false);
+  const [isBulkMode, setIsBulkMode] = useState(false);
   const [reminderConfig, setReminderConfig] = useState({ isOpen: false, student: null });
   const [vendors, setVendors] = useState([]);
   const [promoteForm, setPromoteForm] = useState({
@@ -428,7 +436,7 @@ const Students = () => {
         result = result.filter(s => s.enrolledCourses?.some(ec => filterCourse.includes(ec.course?._id) || filterCourse.includes(ec.course)));
       }
       if (filterBatch && filterBatch.length > 0) {
-        const selectedBatches = batches.filter(b => filterBatch.includes(b._id));
+        const selectedBatches = batches.filter(b => filterBatch.includes(b.name || b.batchId || b._id));
         if (selectedBatches.length > 0) {
           result = result.filter(s => selectedBatches.some(b => b.students?.some(bs => bs === s._id || bs?._id === s._id)));
         } else {
@@ -606,23 +614,6 @@ const Students = () => {
         </div>
 
         <div className="flex gap-3">
-          {["online_students", "center_students"].includes(activeTab) && (
-            <>
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 font-bold text-brand-700 bg-brand-50 rounded-2xl hover:bg-brand-100 transition-all active:scale-95 cursor-pointer"
-              >
-                <Download size={18} /> Export
-              </button>
-              <button
-                onClick={() => window.open("/student-registration", "_blank")}
-                className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
-              >
-                <UserPlus size={18} /> Add Student
-              </button>
-            </>
-          )}
-
           {(activeTab === "student_attendance") && (
             <>
               {["admin", "hr", "center"].includes(user?.role) && (
@@ -820,6 +811,63 @@ const Students = () => {
               onSendReminder={(student) => setReminderConfig({ isOpen: true, student })}
               search={search}
               setSearch={setSearch}
+              selectableRows={isBulkMode}
+              selectableRowDisabled={row => row.internships && row.internships.length > 0}
+              onSelectedRowsChange={({ selectedRows }) => setSelectedStudents(selectedRows)}
+              clearSelectedRows={clearSelectedRows}
+              tableHeaderActions={
+                <div className="flex gap-3">
+                  {!isBulkMode ? (
+                    <button
+                      onClick={() => setIsBulkMode(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-2xl hover:bg-indigo-100 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Briefcase size={18} /> Bulk Promote
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setIsBulkMode(false);
+                          setSelectedStudents([]);
+                          setClearSelectedRows(!clearSelectedRows);
+                        }}
+                        className="flex items-center gap-2 px-5 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                      >
+                        Cancel Selection
+                      </button>
+                      <button
+                        disabled={selectedStudents.length === 0}
+                        onClick={() => {
+                          setPromoteForm({
+                            vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false
+                          });
+                          setPromoteConfig({ isOpen: true, student: null, isBulk: true });
+                        }}
+                        className={`flex items-center gap-2 px-5 py-2.5 font-bold rounded-2xl transition-all ${
+                          selectedStudents.length > 0 
+                            ? "text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer" 
+                            : "text-slate-400 bg-slate-50 border border-slate-100 cursor-not-allowed"
+                        }`}
+                      >
+                        <Briefcase size={18} /> Proceed to Promote {selectedStudents.length > 0 && `(${selectedStudents.length})`}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 font-bold text-brand-700 bg-brand-50 rounded-2xl hover:bg-brand-100 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Download size={18} /> Export
+                  </button>
+                  <button
+                    onClick={() => window.open("/student-registration", "_blank")}
+                    className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
+                  >
+                    <UserPlus size={18} /> Add Student
+                  </button>
+                </div>
+              }
             />
           </div>
         </>
@@ -849,9 +897,11 @@ const Students = () => {
             <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
               <div>
                 <h2 className="text-xl font-black text-slate-800 tracking-tight">
-                  {promoteForm.isNewPeriod ? "Add New Internship Period" : "Internship Portal"}
+                  {promoteConfig.isBulk ? "Bulk Promote to Intern" : (promoteForm.isNewPeriod ? "Add New Internship Period" : "Internship Portal")}
                 </h2>
-                <p className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">{promoteConfig.student?.user?.name}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">
+                  {promoteConfig.isBulk ? `Promoting ${selectedStudents.length} Students` : promoteConfig.student?.user?.name}
+                </p>
               </div>
               <button onClick={() => setPromoteConfig({ isOpen: false, student: null })} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">✕</button>
             </div>
@@ -859,10 +909,19 @@ const Students = () => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const { data } = await api.post(`/students/${promoteConfig.student._id}/promote-intern`, promoteForm);
-                setStudents(prev => prev.map(s => s._id === data.student._id ? data.student : s));
-                setPromoteConfig({ isOpen: false, student: null });
-                toast.success("Student updated as intern!");
+                if (promoteConfig.isBulk) {
+                  const studentIds = selectedStudents.map(s => s._id);
+                  const { data } = await api.post(`/students/bulk-promote-intern`, { studentIds, ...promoteForm });
+                  toast.success(data.message || "Students promoted successfully!");
+                  setSelectedStudents([]);
+                  setClearSelectedRows(!clearSelectedRows);
+                  fetchStudents();
+                } else {
+                  const { data } = await api.post(`/students/${promoteConfig.student._id}/promote-intern`, promoteForm);
+                  setStudents(prev => prev.map(s => s._id === data.student._id ? data.student : s));
+                  toast.success("Student updated as intern!");
+                }
+                setPromoteConfig({ isOpen: false, student: null, isBulk: false });
               } catch (err) {
                 toast.error(err.response?.data?.message || "Failed to update");
               }
@@ -925,7 +984,7 @@ const Students = () => {
                 </div>
               </div>
               <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-50">
-                <button type="button" onClick={() => setPromoteConfig({ isOpen: false, student: null })} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
+                <button type="button" onClick={() => setPromoteConfig({ isOpen: false, student: null, isBulk: false })} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all">Cancel</button>
                 <button type="submit" className="px-10 py-3 bg-brand-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">Save Details</button>
               </div>
             </form>

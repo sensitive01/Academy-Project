@@ -50,7 +50,7 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
       if (studentBatch) {
         batchId = studentBatch._id;
         courseId = studentBatch.course?._id || studentBatch.course;
-        centerId = studentBatch.center?._id || studentBatch.center;
+        centerId = selectedStudent.center?._id || selectedStudent.center || "";
       } else {
         // Fallback to student's profile settings if they have no assigned batch
         centerId = selectedStudent.center?._id || selectedStudent.center || "";

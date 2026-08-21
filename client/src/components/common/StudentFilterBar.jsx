@@ -55,10 +55,10 @@ const StudentFilterBar = ({
         </div>
       )}
 
-      {showVendor && setFilterVendor && filterType?.includes("intern") && (
+      {showVendor && setFilterVendor && (!showType || filterType?.includes("intern")) && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
-            options={vendors.map(v => ({ label: v.companyName || v.name, value: v._id }))}
+            options={Array.from(new Map(vendors.map(v => [v.companyName || v.name, { label: v.companyName || v.name, value: v._id }])).values())}
             selected={filterVendor}
             onChange={setFilterVendor}
             placeholder="All Vendors"
@@ -69,7 +69,7 @@ const StudentFilterBar = ({
       {setFilterCenter && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
-            options={centers.map(c => ({ label: c.name, value: c._id }))}
+            options={Array.from(new Map(centers.map(c => [c.name, { label: c.name, value: c._id }])).values())}
             selected={filterCenter}
             onChange={setFilterCenter}
             placeholder="All Centers"
@@ -80,7 +80,7 @@ const StudentFilterBar = ({
       {setFilterCourse && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
-            options={courses.map(c => ({ label: c.title || c.name, value: c._id || c.title }))}
+            options={Array.from(new Map(courses.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values())}
             selected={filterCourse}
             onChange={setFilterCourse}
             placeholder="All Courses"
@@ -91,7 +91,7 @@ const StudentFilterBar = ({
       {setFilterBatch && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
-            options={batches.map(b => ({ label: b.name || b.batchId, value: b._id || b.name }))}
+            options={Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values())}
             selected={filterBatch}
             onChange={setFilterBatch}
             placeholder="All Batches"

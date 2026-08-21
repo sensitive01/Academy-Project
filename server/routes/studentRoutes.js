@@ -632,4 +632,72 @@ router.post("/:id/promote-intern", protect, async (req, res) => {
   }
 });
 
+//////////////////////////////////////////////////////
+// BULK PROMOTE STUDENTS AS INTERNS (HR/Admin)
+//////////////////////////////////////////////////////
+router.post("/bulk-promote-intern", protect, async (req, res) => {
+  try {
+    const { studentIds, vendorId, location, startDate, endDate, paymentBy, salary, vendorPayment, referralCharge, isNewPeriod } = req.body;
+
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
+      return res.status(403).json({ message: "Only admin or HR can promote students" });
+    }
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ message: "No students provided" });
+    }
+
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    const internshipData = {
+      vendor: vendor._id,
+      vendorName: vendor.companyName,
+      location,
+      startDate,
+      endDate,
+      paymentBy,
+      salary,
+      vendorPayment,
+      referralCharge,
+      status: 'active'
+    };
+
+    const students = await Student.find({ _id: { $in: studentIds } });
+
+    for (const student of students) {
+      if (student.internships && student.internships.length > 0 && !isNewPeriod) {
+        // Update the last internship
+        const lastIndex = student.internships.length - 1;
+        student.internships.set(lastIndex, internshipData);
+      } else {
+        // Add as new internship period
+        if (student.internships && student.internships.length > 0) {
+          // Safely close out the old period
+          const lastIndex = student.internships.length - 1;
+          const prevInternship = student.internships[lastIndex];
+          prevInternship.status = 'completed';
+          
+          if (!prevInternship.endDate && startDate) {
+            const newStart = new Date(startDate);
+            const prevEnd = new Date(newStart);
+            prevEnd.setDate(newStart.getDate() - 1);
+            prevInternship.endDate = prevEnd;
+          }
+          student.internships.set(lastIndex, prevInternship);
+        }
+        student.internships.push(internshipData);
+      }
+      student.markModified('internships');
+      await student.save();
+    }
+
+    res.json({ message: `${students.length} students promoted to intern successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

@@ -417,6 +417,118 @@ router.post("/adjustment", protect, async (req, res) => {
   }
 });
 
+// BULK CREATE / UPDATE PAYROLL ADJUSTMENTS
+router.post("/bulk-adjustment", protect, async (req, res) => {
+  try {
+    const { adjustments } = req.body;
+    
+    if (!Array.isArray(adjustments) || adjustments.length === 0) {
+      return res.status(400).json({ message: "No adjustments provided" });
+    }
+
+    let processedCount = 0;
+    
+    for (const adj of adjustments) {
+      const { employeeId, month, year, type, amount, note, internshipId } = adj;
+      
+      if (!employeeId || !month || !year || !type || !amount) {
+        continue;
+      }
+
+      let targetEmpId = employeeId;
+      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+        const Employee = require("../models/Employee");
+        const empDoc = await Employee.findOne({ empId: employeeId });
+        if (empDoc) {
+          targetEmpId = empDoc._id;
+        } else {
+          const Student = require("../models/Student");
+          const stuDoc = await Student.findOne({ studentId: employeeId });
+          if (stuDoc) {
+            targetEmpId = stuDoc._id;
+          } else {
+            continue;
+          }
+        }
+      }
+
+      const query = {
+        employee: targetEmpId,
+        month: Number(month),
+        year: Number(year)
+      };
+      if (internshipId) query.internshipId = internshipId;
+      else query.internshipId = { $in: [null, undefined] };
+
+      let payroll = await Payroll.findOne(query);
+
+      if (!payroll) {
+        let salary = 0;
+        let emp = await Employee.findById(targetEmpId);
+        
+        if (emp) {
+          salary = emp.salary;
+        } else {
+          const Student = require("../models/Student");
+          emp = await Student.findById(targetEmpId);
+          if (emp && emp.internships) {
+            const internship = emp.internships.find(i => i._id.toString() === internshipId);
+            if (internship) salary = internship.salary ? Number(internship.salary) : 0;
+            else {
+              const latestInternship = emp.internships?.[emp.internships.length - 1];
+              salary = latestInternship?.salary ? Number(latestInternship.salary) : 0;
+            }
+          }
+        }
+
+        if (!emp) {
+          continue;
+        }
+
+        payroll = new Payroll({
+          employee: targetEmpId,
+          month: Number(month),
+          year: Number(year),
+          internshipId: internshipId || null,
+          basicSalary: salary,
+          totalAllowances: 0,
+          totalDeductions: 0,
+          advance: 0,
+          adjustments: [],
+          status: "process"
+        });
+      }
+
+      payroll.adjustments.push({
+        type,
+        amount: Number(amount),
+        note: note || ""
+      });
+
+      if (type === "allowance") payroll.totalAllowances += Number(amount);
+      if (type === "deduction") payroll.totalDeductions += Number(amount);
+      if (type === "advance") payroll.advance += Number(amount);
+
+      payroll.netSalary =
+        payroll.basicSalary +
+        payroll.totalAllowances -
+        payroll.totalDeductions -
+        payroll.advance;
+
+      await payroll.save({ validateBeforeSave: false });
+      processedCount++;
+    }
+
+    res.status(200).json({
+      message: `Bulk adjustments applied. Processed ${processedCount} adjustments.`,
+    });
+
+  } catch (err) {
+    console.error("Payroll Bulk Adjustment Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ==============================
 // ✅ GENERATE PAYSLIP PDF
 // ==============================
