@@ -561,8 +561,10 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                         const filtered = batches.filter(b => {
                           let matchesCenter = true;
                           if (formData.center) {
+                            const studentCenterId = formData.center.toString();
+                            const bCenterIds = b.centers?.map(c => c._id ? c._id.toString() : c.toString()) || [];
                             const bCenterId = b.center?._id ? b.center._id.toString() : b.center?.toString();
-                            matchesCenter = bCenterId === formData.center.toString();
+                            matchesCenter = bCenterIds.includes(studentCenterId) || (bCenterId === studentCenterId);
                           }
                           return matchesCenter;
                         });

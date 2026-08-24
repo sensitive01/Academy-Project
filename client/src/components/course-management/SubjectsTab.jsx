@@ -12,12 +12,17 @@ import {
   BookOpen,
   DollarSign,
   Users,
+  Download,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import CustomDataTable from "../../components/common/DataTable";
 import AssignStudentsModal from "../../components/modals/AssignStudentsModal";
 import MultiSelectSubjects from "../../components/common/MultiSelectSubjects";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { saveAs } from "file-saver";
 
 const toTitleCase = (str) => {
   return str
@@ -59,6 +64,91 @@ const SubjectsTab = () => {
     semesters: [],
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState("all");
+  const [selectedSemFilter, setSelectedSemFilter] = useState("all");
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleExportExcel = () => {
+    // Generate data for export
+    const exportRows = filteredData.map((sub, i) => ({
+      "S.No": i + 1,
+      "Subject Name": sub.name || "-",
+      "Subject Code": sub.code || "-",
+      "Course": sub.course?.title || "-",
+      "Semester": sub.semester ? `Semester ${sub.semester}` : "-",
+      "Type": sub.type || "-"
+    }));
+
+    // Create Excel worksheet
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Subjects");
+    
+    // Auto-fit columns
+    const maxLens = {};
+    exportRows.forEach(row => {
+      Object.keys(row).forEach(key => {
+        const valStr = String(row[key]);
+        maxLens[key] = Math.max(maxLens[key] || 0, valStr.length);
+      });
+    });
+    worksheet["!cols"] = Object.keys(maxLens).map(key => ({
+      wch: Math.max(maxLens[key] + 3, 10)
+    }));
+
+    // Save File
+    XLSX.writeFile(workbook, "Subjects_Directory.xlsx");
+    toast.success("Excel exported successfully!");
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    // Draw Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Subjects Directory", 14, 15);
+    
+    // Date & count metadata
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Generated on: ${new Date().toLocaleDateString("en-IN")} | Total Subjects: ${filteredData.length}`, 14, 21);
+
+    const tableColumn = ["S.No", "Subject Name", "Subject Code", "Course", "Semester", "Type"];
+    const tableRows = [];
+
+    filteredData.forEach((sub, index) => {
+      const rowData = [
+        index + 1,
+        sub.name || "-",
+        sub.code || "-",
+        sub.course?.title || "-",
+        sub.semester ? `Semester ${sub.semester}` : "-",
+        sub.type || "-"
+      ];
+      tableRows.push(rowData);
+    });
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 25,
+      theme: "striped",
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 15 },  // S.No
+        1: { cellWidth: 50 },  // Subject Name
+        2: { cellWidth: 30 },  // Subject Code
+        3: { cellWidth: 50 },  // Course
+        4: { cellWidth: 25 },  // Semester
+        5: { cellWidth: 20 }   // Type
+      }
+    });
+    
+    const pdfBlob = doc.output("blob");
+    saveAs(pdfBlob, "Subjects_Directory.pdf");
+    toast.success("PDF exported successfully!");
+  };
 
   const [centersList, setCentersList] = useState([]);
   const [coursesList, setCoursesList] = useState([]);
@@ -423,6 +513,19 @@ const SubjectsTab = () => {
           ),
         },
         {
+          name: "Course",
+          selector: r => r.course?.title || "N/A",
+          sortable: true,
+        },
+        {
+          name: "Semester",
+          selector: r => r.semester,
+          sortable: true,
+          width: "120px",
+          center: true,
+          cell: r => `Semester ${r.semester}`
+        },
+        {
           name: "Type",
           selector: r => r.type,
           sortable: true,
@@ -531,7 +634,18 @@ const SubjectsTab = () => {
         item.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    return item.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          item.code?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (activeTab === "subjects") {
+      const subjectCourseId = item.course?._id ? item.course._id.toString() : item.course?.toString() || "";
+      const matchesCourse = selectedCourseFilter === "all" || subjectCourseId === selectedCourseFilter;
+      const matchesSem = selectedSemFilter === "all" || String(item.semester) === String(selectedSemFilter);
+      return matchesSearch && matchesCourse && matchesSem;
+    }
+
+    return matchesSearch;
   });
 
   return (
@@ -557,6 +671,69 @@ const SubjectsTab = () => {
           search={searchQuery}
           setSearch={setSearchQuery}
           searchPlaceholder={`Search ${config[activeTab].title.toLowerCase()}...`}
+          additionalHeaderContent={
+            activeTab === "subjects" && (
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Course Filter */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Course:</span>
+                  <select
+                    value={selectedCourseFilter}
+                    onChange={(e) => setSelectedCourseFilter(e.target.value)}
+                    className="rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2 py-1.5 text-xs bg-white min-w-[150px]"
+                  >
+                    <option value="all">All Courses</option>
+                    {coursesList.map(c => (
+                      <option key={c._id} value={c._id}>{c.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Semester Filter */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sem:</span>
+                  <select
+                    value={selectedSemFilter}
+                    onChange={(e) => setSelectedSemFilter(e.target.value)}
+                    className="rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2 py-1.5 text-xs bg-white min-w-[120px]"
+                  >
+                    <option value="all">All Semesters</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                      <option key={sem} value={sem}>Semester {sem}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Export Dropdown */}
+                <div className="relative ml-2">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-xl hover:bg-brand-700 shadow-sm transition-all active:scale-95"
+                    title="Export Options"
+                  >
+                    <Download size={14} />
+                    Export
+                  </button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                      <button 
+                        onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <span className="text-emerald-600 font-bold">XLSX</span> Excel
+                      </button>
+                      <button 
+                        onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <span className="text-red-600 font-bold">PDF</span> PDF
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          }
         />
       </div>
 
@@ -699,6 +876,33 @@ const SubjectsTab = () => {
                         setFormData({ ...formData, code: e.target.value })
                       }
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
+                    <select
+                      required
+                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white"
+                      value={formData.course}
+                      onChange={(e) => setFormData({ ...formData, course: e.target.value })}
+                    >
+                      <option value="">Select Course</option>
+                      {coursesList.map(c => (
+                        <option key={c._id} value={c._id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Semester</label>
+                    <select
+                      required
+                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white"
+                      value={formData.semester}
+                      onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                        <option key={sem} value={sem}>Semester {sem}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">

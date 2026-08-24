@@ -14,6 +14,8 @@ import {
   Users,
   X,
   RotateCcw,
+  Save,
+  Download,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -21,6 +23,10 @@ import CustomDataTable from "../../components/common/DataTable";
 import AssignStudentsModal from "../../components/modals/AssignStudentsModal";
 import MultiSelectSubjects from "../../components/common/MultiSelectSubjects";
 import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { saveAs } from "file-saver";
 
 const toTitleCase = (str) => {
   return str
@@ -66,10 +72,82 @@ const BatchesTab = () => {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCenterFilters, setSelectedCenterFilters] = useState(["all"]);
+  const [selectedCourseFilters, setSelectedCourseFilters] = useState(["all"]);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [centersList, setCentersList] = useState([]);
   const [coursesList, setCoursesList] = useState([]);
   const [batchesList, setBatchesList] = useState([]);
   const [subjectsList, setSubjectsList] = useState([]);
+
+  const handleExportExcel = () => {
+    const exportRows = filteredData.map((batch, i) => ({
+      "S.No": i + 1,
+      "Batch ID": batch.batchId || "-",
+      "Course": batch.course?.title || "-",
+      "Center": batch.centers?.map(c => c.name).join(", ") || batch.center?.name || "-",
+      "Semesters": batch.numberOfSemesters || "-",
+      "Period": batch.period ? `${batch.period.startDate} to ${batch.period.endDate}` : "-",
+      "Students": batch.students?.length || batch.numberOfStudents || 0
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Batches");
+    
+    const maxLens = {};
+    exportRows.forEach(row => {
+      Object.keys(row).forEach(key => {
+        const valStr = String(row[key]);
+        maxLens[key] = Math.max(maxLens[key] || 0, valStr.length);
+      });
+    });
+    worksheet["!cols"] = Object.keys(maxLens).map(key => ({
+      wch: Math.max(maxLens[key] + 3, 10)
+    }));
+
+    XLSX.writeFile(workbook, "Batches_Directory.xlsx");
+    toast.success("Excel exported successfully!");
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Batches Directory", 14, 15);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Generated on: ${new Date().toLocaleDateString("en-IN")} | Total Batches: ${filteredData.length}`, 14, 21);
+
+    const tableColumn = ["S.No", "Batch ID", "Course", "Center", "Period", "Semesters", "Students"];
+    const tableRows = [];
+
+    filteredData.forEach((batch, index) => {
+      const rowData = [
+        index + 1,
+        batch.batchId || "-",
+        batch.course?.title || "-",
+        batch.centers?.map(c => c.name).join(", ") || batch.center?.name || "-",
+        batch.period ? `${batch.period.startDate} to ${batch.period.endDate}` : "-",
+        batch.numberOfSemesters || "-",
+        batch.students?.length || batch.numberOfStudents || 0
+      ];
+      tableRows.push(rowData);
+    });
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 25,
+      theme: "striped",
+      styles: { fontSize: 8, cellPadding: 2.5 },
+    });
+    
+    const pdfBlob = doc.output("blob");
+    saveAs(pdfBlob, "Batches_Directory.pdf");
+    toast.success("PDF exported successfully!");
+  };
 
   const centerFilterOptions = [
     { label: "All Centers", value: "all" },
@@ -85,6 +163,23 @@ const BatchesTab = () => {
       setSelectedCenterFilters(["all"]);
     } else {
       setSelectedCenterFilters(newSelection);
+    }
+  };
+
+  const courseFilterOptions = [
+    { label: "All Courses", value: "all" },
+    ...coursesList.map(c => ({ label: c.title, value: c._id }))
+  ];
+
+  const handleCourseFilterChange = (newSelection) => {
+    if (newSelection.includes("all") && !selectedCourseFilters.includes("all")) {
+      setSelectedCourseFilters(["all"]);
+    } else if (newSelection.length > 1 && newSelection.includes("all")) {
+      setSelectedCourseFilters(newSelection.filter(v => v !== "all"));
+    } else if (newSelection.length === 0) {
+      setSelectedCourseFilters(["all"]);
+    } else {
+      setSelectedCourseFilters(newSelection);
     }
   };
 
@@ -106,6 +201,35 @@ const BatchesTab = () => {
   const handleAssignStudentsSuccess = (updatedBatch) => {
     setData(data.map((item) => (item._id === updatedBatch._id ? updatedBatch : item)));
     setShowAssignStudentsModal(false);
+    setShowAssignModal(false);
+  };
+
+  // Unified Assignment Modal State
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [activeAssignTab, setActiveAssignTab] = useState("students");
+
+  const openAssignModal = (batch) => {
+    setCurrentBatchAssign(batch);
+    const initialData = Array.from({ length: batch.numberOfSemesters || 1 }).map((_, i) => {
+      const semNum = i + 1;
+      const existingSem = batch.semesters?.find(s => s.semesterNumber === semNum);
+      const mappedSubjects = existingSem?.subjects?.map(s => {
+        if (!s) return null;
+        if (typeof s === 'object') {
+          return s._id ? s._id.toString() : s.toString();
+        }
+        return s.toString();
+      }).filter(Boolean) || [];
+      return {
+        semesterNumber: semNum,
+        noOfSubjects: existingSem?.subjects?.length || 0,
+        subjects: mappedSubjects
+      };
+    });
+    setAssignSubjectsData(initialData);
+    setAssignSemTab(1);
+    setActiveAssignTab("students");
+    setShowAssignModal(true);
   };
 
   // Login Management State
@@ -330,7 +454,7 @@ const BatchesTab = () => {
         type: item.type || "Theory",
         semester: item.semester || 1,
         center: item.center?._id || item.center || "",
-        centers: item.center ? [item.center?._id || item.center] : [],
+        centers: item.centers ? item.centers.map(c => c._id || c) : (item.center ? [item.center?._id || item.center] : []),
         course: item.course?._id || item.course || "",
         batch: item.batch?._id || item.batch || "",
         fee: item.fee || 0,
@@ -458,6 +582,7 @@ const BatchesTab = () => {
       
       setData(data.map((item) => (item._id === currentBatchAssign._id ? updatedBatch : item)));
       toast.success("Subjects assigned successfully");
+      setShowAssignModal(false);
       setShowAssignSubjectModal(false);
     } catch (error) {
       toast.error(error.response?.data?.message || "Error assigning subjects");
@@ -616,14 +741,9 @@ const BatchesTab = () => {
             </button>
           )}
           {activeTab === "batches" && (
-            <>
-              <button onClick={() => openAssignStudentsModal(r)} className="text-indigo-600 hover:text-indigo-900 p-2 rounded-lg hover:bg-indigo-50" title="Assign Students">
-                <Users size={18} />
-              </button>
-              <button onClick={() => openAssignSubjectModal(r)} className="text-emerald-600 hover:text-emerald-900 p-2 rounded-lg hover:bg-emerald-50" title="Assign Subjects">
-                <BookOpen size={18} />
-              </button>
-            </>
+            <button onClick={() => openAssignModal(r)} className="text-indigo-600 hover:text-indigo-900 p-2 rounded-lg hover:bg-indigo-50" title="Assign Students & Semester">
+              <UserCheck size={18} />
+            </button>
           )}
           <button onClick={() => openModal(r)} className="text-brand-600 hover:text-brand-900 p-2 rounded-lg hover:bg-brand-50">
             <Edit size={18} />
@@ -648,7 +768,9 @@ const BatchesTab = () => {
       const itemCenterIds = item.centers?.map(c => typeof c === 'object' ? c._id?.toString() : c.toString()) || [];
       const matchesCenter = selectedCenterFilters.includes("all") || 
                             selectedCenterFilters.some(filterId => itemCenterIds.includes(filterId));
-      return matchesSearch && matchesCenter;
+      const itemCourseId = item.course?._id ? item.course._id.toString() : item.course?.toString() || "";
+      const matchesCourse = selectedCourseFilters.includes("all") || selectedCourseFilters.includes(itemCourseId);
+      return matchesSearch && matchesCenter && matchesCourse;
     }
     return matchesSearch;
   });
@@ -678,7 +800,7 @@ const BatchesTab = () => {
           searchPlaceholder={`Search ${config[activeTab].title.toLowerCase()}...`}
           additionalHeaderContent={
             activeTab === "batches" && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Filter Center:</span>
                 <div className="w-56">
                   <MultiSelectDropdown
@@ -688,10 +810,22 @@ const BatchesTab = () => {
                     placeholder="All Centers"
                   />
                 </div>
-                {(!selectedCenterFilters.includes("all") || selectedCenterFilters.length > 1) && (
+                
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap ml-2">Course:</span>
+                <div className="w-56">
+                  <MultiSelectDropdown
+                    options={courseFilterOptions}
+                    selected={selectedCourseFilters}
+                    onChange={handleCourseFilterChange}
+                    placeholder="All Courses"
+                  />
+                </div>
+
+                {(!selectedCenterFilters.includes("all") || selectedCenterFilters.length > 1 || !selectedCourseFilters.includes("all") || selectedCourseFilters.length > 1) && (
                   <button
                     onClick={() => {
                       setSelectedCenterFilters(["all"]);
+                      setSelectedCourseFilters(["all"]);
                       setSearchQuery("");
                     }}
                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
@@ -700,6 +834,34 @@ const BatchesTab = () => {
                     <RotateCcw size={16} />
                   </button>
                 )}
+
+                {/* Export Dropdown */}
+                <div className="relative ml-2">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-xl hover:bg-brand-700 shadow-sm transition-all active:scale-95"
+                    title="Export Options"
+                  >
+                    <Download size={14} />
+                    Export
+                  </button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                      <button 
+                        onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <span className="text-emerald-600 font-bold">XLSX</span> Excel
+                      </button>
+                      <button 
+                        onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <span className="text-red-600 font-bold">PDF</span> PDF
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )
           }
@@ -943,107 +1105,156 @@ const BatchesTab = () => {
         </div>
       )}
 
-      {/* Assign Subjects Modal */}
-      {showAssignSubjectModal && currentBatchAssign && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-start justify-center p-4 py-10">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl scale-in-center">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                  <BookOpen size={20} />
+      {/* Unified Assignment Modal */}
+      {showAssignModal && currentBatchAssign && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-start justify-center p-4 py-10 animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-8 shadow-2xl scale-in-center">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-brand-50 text-brand-600 rounded-xl shadow-sm">
+                  <UserCheck size={24} />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Assign Subjects to {currentBatchAssign.name || currentBatchAssign.batchId}
-                </h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                    Batch Assignments
+                  </h2>
+                  <p className="text-sm text-brand-600 font-semibold mt-1">Batch: {currentBatchAssign.name || currentBatchAssign.batchId}</p>
+                </div>
               </div>
               <button
-                type="button"
-                onClick={() => setShowAssignSubjectModal(false)}
-                className="text-gray-400 hover:text-gray-600 bg-gray-50 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                onClick={() => setShowAssignModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
               >
-                <X size={18} />
+                <X size={24} />
               </button>
             </div>
-            
-            <form onSubmit={handleAssignSubjectSubmit} className="space-y-4">
-              <div className="flex border-b border-gray-200 gap-4 mb-4 overflow-x-auto">
-                {assignSubjectsData.map((sem) => (
-                  <button
-                    key={sem.semesterNumber}
-                    type="button"
-                    onClick={() => setAssignSemTab(sem.semesterNumber)}
-                    className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                      assignSemTab === sem.semesterNumber
-                        ? "text-brand-600"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    Semester {sem.semesterNumber}
-                    {assignSemTab === sem.semesterNumber && (
-                      <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
-                    )}
-                  </button>
-                ))}
-              </div>
-              
-              {assignSubjectsData.map((sem, index) => {
-                if (sem.semesterNumber !== assignSemTab) return null;
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-gray-200 gap-6 mb-6">
+              <button
+                type="button"
+                onClick={() => setActiveAssignTab("students")}
+                className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 transition-colors relative whitespace-nowrap ${
+                  activeAssignTab === "students"
+                    ? "text-brand-600 font-extrabold"
+                    : "text-gray-500 hover:text-brand-600"
+                }`}
+              >
+                <Users size={16} />
+                Assign Students
+                {activeAssignTab === "students" && (
+                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveAssignTab("semester")}
+                className={`pb-3 px-2 text-sm font-bold flex items-center gap-2 transition-colors relative whitespace-nowrap ${
+                  activeAssignTab === "semester"
+                    ? "text-brand-600 font-extrabold"
+                    : "text-gray-500 hover:text-brand-600"
+                }`}
+              >
+                <BookOpen size={16} />
+                Assign Semester
+                {activeAssignTab === "semester" && (
+                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
+                )}
+              </button>
+            </div>
+
+            {/* Tab content */}
+            {activeAssignTab === "students" ? (
+              <AssignStudentsModal
+                batch={currentBatchAssign}
+                isTabMode={true}
+                onClose={() => setShowAssignModal(false)}
+                onAssignSuccess={(updatedBatch) => {
+                  handleAssignStudentsSuccess(updatedBatch);
+                }}
+              />
+            ) : (
+              <form onSubmit={handleAssignSubjectSubmit} className="space-y-4">
+                <div className="flex border-b border-gray-200 gap-4 mb-4 overflow-x-auto">
+                  {assignSubjectsData.map((sem) => (
+                    <button
+                      key={sem.semesterNumber}
+                      type="button"
+                      onClick={() => setAssignSemTab(sem.semesterNumber)}
+                      className={`pb-3 px-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                        assignSemTab === sem.semesterNumber
+                          ? "text-brand-600 font-bold"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Semester {sem.semesterNumber}
+                      {assignSemTab === sem.semesterNumber && (
+                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full" />
+                      )}
+                    </button>
+                  ))}
+                </div>
                 
-                return (
-                  <div key={sem.semesterNumber} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Number of Subjects
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full rounded-xl border-gray-200 p-3"
-                        value={sem.noOfSubjects}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          const newData = [...assignSubjectsData];
-                          newData[index].noOfSubjects = val;
-                          setAssignSubjectsData(newData);
-                        }}
-                      />
-                    </div>
-                    
-                    {sem.noOfSubjects > 0 && (
+                {assignSubjectsData.map((sem, index) => {
+                  if (sem.semesterNumber !== assignSemTab) return null;
+                  
+                  return (
+                    <div key={sem.semesterNumber} className="space-y-4 animate-in fade-in duration-200">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects</label>
-                        <MultiSelectSubjects
-                          subjectsList={subjectsList}
-                          selectedSubjects={sem.subjects || []}
-                          maxSelection={sem.noOfSubjects}
-                          onChange={(selectedIds) => {
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Number of Subjects
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full rounded-xl border-gray-200 p-3"
+                          value={sem.noOfSubjects}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
                             const newData = [...assignSubjectsData];
-                            newData[index].subjects = selectedIds;
+                            newData[index].noOfSubjects = val;
                             setAssignSubjectsData(newData);
                           }}
                         />
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      
+                      {sem.noOfSubjects > 0 && (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects</label>
+                          <MultiSelectSubjects
+                            subjectsList={subjectsList}
+                            selectedSubjects={sem.subjects || []}
+                            maxSelection={sem.noOfSubjects}
+                            onChange={(selectedIds) => {
+                              const newData = [...assignSubjectsData];
+                              newData[index].subjects = selectedIds;
+                              setAssignSubjectsData(newData);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
-              <div className="flex justify-end gap-3 mt-8">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignSubjectModal(false)}
-                  className="px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 shadow-md transition-all"
-                >
-                  Assign Subjects
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 mt-8">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignModal(false)}
+                    className="px-6 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all flex items-center gap-2"
+                  >
+                    <Save size={18} /> Assign Subjects
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

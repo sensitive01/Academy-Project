@@ -262,9 +262,9 @@ const StudentRegistration = () => {
       : selectedCenterId.toString();
 
     return batches.filter(b => {
-      if (!b.center) return false;
-      const bCenterId = b.center._id ? b.center._id.toString() : b.center.toString();
-      return bCenterId === centerIdStr;
+      const bCenterIds = b.centers?.map(c => c._id ? c._id.toString() : c.toString()) || [];
+      const bCenterId = b.center?._id ? b.center._id.toString() : b.center?.toString();
+      return bCenterIds.includes(centerIdStr) || (bCenterId === centerIdStr);
     });
   };
 
