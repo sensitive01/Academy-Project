@@ -184,7 +184,8 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
               feeType: validFeeType,
               otherFeeType: fee.otherFeeType || (validFeeType === 'Other' ? (fee.feeType || 'Fee') : undefined),
               amount: Number(fee.amount),
-              status: 'pending'
+              status: 'pending',
+              year: student.year
             });
           }
         }
@@ -695,6 +696,77 @@ router.post("/bulk-promote-intern", protect, async (req, res) => {
     }
 
     res.json({ message: `${students.length} students promoted to intern successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// BULK ACADEMIC PROMOTE
+//////////////////////////////////////////////////////
+router.post("/bulk-promote-academic", protect, async (req, res) => {
+  try {
+    const { studentIds } = req.body;
+    
+    if (req.user.role !== 'admin' && req.user.role !== 'hr' && req.user.role !== 'center') {
+      return res.status(403).json({ message: "Not authorized to promote students" });
+    }
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ message: "No students provided" });
+    }
+
+    const students = await Student.find({ _id: { $in: studentIds } });
+    const StudentFee = require('../models/StudentFee');
+    let promotedCount = 0;
+
+    for (const student of students) {
+      if (!student.year) continue;
+
+      const yearMatch = student.year.match(/^(\d+)(st|nd|rd|th)\s+Year$/i) || student.year.match(/^(\d+)/);
+      if (yearMatch) {
+        const currentYearNum = parseInt(yearMatch[1], 10);
+        const nextYearNum = currentYearNum + 1;
+        
+        let newYearStr = `${nextYearNum}th Year`;
+        if (nextYearNum === 1) newYearStr = "1st Year";
+        else if (nextYearNum === 2) newYearStr = "2nd Year";
+        else if (nextYearNum === 3) newYearStr = "3rd Year";
+
+        student.year = newYearStr;
+        await student.save();
+
+        // Duplicate base fees (ignore Council fees for now, or just duplicate course/term/sem fees)
+        const currentFees = await StudentFee.find({ student: student._id });
+        // Find only those that are not penalty generated
+        const feesToDuplicate = currentFees.filter(f => f.feeType !== 'Council' && !f.isPenaltyApplied && !f.isFinalPenaltyApplied);
+        
+        for (const fee of feesToDuplicate) {
+          const newFee = new StudentFee({
+            student: fee.student,
+            center: fee.center,
+            course: fee.course,
+            batch: fee.batch,
+            feeType: fee.feeType,
+            otherFeeType: fee.otherFeeType,
+            terms: fee.terms,
+            amount: fee.amount,
+            status: 'pending',
+            year: newYearStr
+          });
+          await newFee.save();
+        }
+
+        // Retroactively set the old year on the old fees if they didn't have one
+        const oldYearStr = yearMatch[0];
+        await StudentFee.updateMany(
+          { student: student._id, year: { $exists: false } },
+          { $set: { year: oldYearStr } }
+        );
+        promotedCount++;
+      }
+    }
+
+    res.json({ message: `${promotedCount} students academically promoted successfully` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -5,10 +5,6 @@ const examSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  date: {
-    type: Date,
-    required: true,
-  },
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Course',
@@ -20,24 +16,30 @@ const examSchema = new mongoose.Schema({
     min: 1,
     max: 6,
   },
-  center: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Center',
-    required: true,
-  },
   batch: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Batch',
   },
-  subject: {
+  centers: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Subject',
-  },
-  totalMark: { type: Number, default: 100 },
-  passMark: { type: Number, default: 35 },
-  internalMark: { type: Number, default: 0 },
-  externalMark: { type: Number, default: 0 },
-  theoryMark: { type: Number, default: 0 }
+    ref: 'Center',
+  }],
+  subjects: [{
+    subject: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subject',
+      required: true
+    },
+    date: {
+      type: Date,
+      required: true
+    },
+    totalMark: { type: Number, default: 100 },
+    passMark: { type: Number, default: 35 },
+    internalMark: { type: Number, default: 0 },
+    externalMark: { type: Number, default: 0 },
+    theoryMark: { type: Number, default: 0 }
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Exam', examSchema);

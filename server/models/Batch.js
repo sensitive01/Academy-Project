@@ -11,11 +11,12 @@ const batchSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    course: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Course',
-      required: true,
-    },
+    courses: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Course',
+      }
+    ],
     centers: [
       {
         type: mongoose.Schema.Types.ObjectId,

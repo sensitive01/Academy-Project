@@ -39,9 +39,22 @@ const vendorPaymentRoutes = require("./routes/vendorPaymentRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const reminderRoutes = require("./routes/reminderRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const hallTicketRoutes = require("./routes/hallTicketRoutes");
 dotenv.config();
-connectDB();
-
+connectDB().then(async () => {
+  const Batch = require('./models/Batch');
+  try {
+    const res = await Batch.updateMany(
+      { course: { $exists: true }, courses: { $exists: false } },
+      [{ $set: { courses: ["$course"] } }]
+    );
+    if (res.modifiedCount > 0) {
+      console.log(`Migrated ${res.modifiedCount} batches to new courses array format.`);
+    }
+  } catch (err) {
+    console.error("Batch migration error:", err);
+  }
+});
 const app = express();
 
 app.use(cors());
@@ -92,6 +105,7 @@ app.use("/api/vendor-payments", vendorPaymentRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/hall-tickets", hallTicketRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

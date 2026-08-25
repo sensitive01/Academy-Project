@@ -82,7 +82,21 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
     if (name === "batch") {
       const selectedBatch = batches.find(b => b._id === value);
-      const courseIdForBatch = selectedBatch ? (selectedBatch.course?._id || selectedBatch.course) : "";
+      
+      let courseIdForBatch = formData.course;
+      if (selectedBatch) {
+        const batchCourses = selectedBatch.courses?.map(c => c._id || c) || [];
+        const legacyCourse = selectedBatch.course?._id || selectedBatch.course;
+        if (legacyCourse && !batchCourses.includes(legacyCourse)) {
+          batchCourses.push(legacyCourse);
+        }
+        if (batchCourses.length === 1) {
+          courseIdForBatch = batchCourses[0].toString();
+        } else if (batchCourses.length > 1 && !batchCourses.includes(courseIdForBatch)) {
+          courseIdForBatch = "";
+        }
+      }
+
       const centerIdForBatch = selectedBatch && selectedBatch.centers && selectedBatch.centers.length > 0 
         ? (selectedBatch.centers[0]?._id || selectedBatch.centers[0]) 
         : "";
@@ -329,7 +343,10 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                   </div>
                   <FormInput label="Father Name" name="fatherName" value={formData.fatherName} onChange={handleChange} />
                   <SelectBox label="Gender" name="gender" value={formData.gender} onChange={handleChange} options={["Male", "Female", "Other"]} />
-                  <FormInput label="Nationality" name="nationality" value={formData.nationality} onChange={handleChange} />
+                  <div className="grid grid-cols-2 gap-6">
+                    <FormInput label="Nationality" name="nationality" value={formData.nationality} onChange={handleChange} />
+                    <SelectBox label="Year" name="year" value={formData.year} onChange={handleChange} options={["1st Year", "2nd Year", "3rd Year", "4th Year"]} />
+                  </div>
                 </div>
 
                 <StepHeader title="National & Academic IDs" icon={<ShieldCheck className="text-brand-700" />} />
@@ -358,6 +375,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                   <FormDisplay label="Father Name" value={formData.fatherName} />
                   <FormDisplay label="Gender" value={formData.gender} />
                   <FormDisplay label="Nationality" value={formData.nationality} />
+                  <FormDisplay label="Year" value={formData.year} />
                 </div>
 
                 <StepHeader title="National & Academic IDs" icon={<ShieldCheck className="text-brand-700" />} />

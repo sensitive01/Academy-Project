@@ -5,6 +5,7 @@ const Student = require('../models/Student');
 const Exam = require('../models/Exam');
 const Course = require('../models/Course');
 const Subject = require('../models/Subject');
+const Batch = require('../models/Batch');
 const { protect } = require('../middleware/authMiddleware');
 const { createInAppNotification } = require('../utils/notificationUtils');
 
@@ -39,6 +40,49 @@ router.get('/student/:studentId', protect, async (req, res) => {
       .populate('course', 'title')
       .populate('subject', 'name code type');
     res.json(marks);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST create marks for a student's entire semester (Admin only)
+router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
+  try {
+    const { student, batch, course, semester, subjects } = req.body;
+    
+    if (!student || !course || !semester || !Array.isArray(subjects)) {
+      return res.status(400).json({ message: 'Missing required fields or invalid format' });
+    }
+
+    const createdMarks = [];
+
+    for (const sub of subjects) {
+      // Check if it already exists
+      const existing = await Mark.findOne({ student, semester, subject: sub.subject });
+      if (existing) {
+        // Update existing mark
+        existing.theoryMark = Number(sub.theoryMark || 0);
+        existing.internalMark = Number(sub.internalMark || 0);
+        existing.practicalMark = Number(sub.practicalMark || 0);
+        await existing.save();
+        createdMarks.push(existing);
+      } else {
+        // Create new mark
+        const newMark = await Mark.create({
+          student,
+          batch,
+          course,
+          semester: Number(semester),
+          subject: sub.subject,
+          theoryMark: Number(sub.theoryMark || 0),
+          internalMark: Number(sub.internalMark || 0),
+          practicalMark: Number(sub.practicalMark || 0)
+        });
+        createdMarks.push(newMark);
+      }
+    }
+
+    res.status(201).json(createdMarks);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -150,28 +194,71 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
       try {
         const studentDoc = await Student.findOne({ studentId: row['Student ID'] });
         const courseDoc = await Course.findOne({ title: row['Course Title'] });
-        const subjectDoc = await Subject.findOne({ code: row['Subject Code'] });
+        let batchDoc = null;
+        if (row['Batch Name']) {
+          batchDoc = await Batch.findOne({ name: row['Batch Name'] });
+        }
         const semester = Number(row['Semester']);
 
-        if (!studentDoc || !courseDoc || !subjectDoc || isNaN(semester)) {
-          throw new Error(`Missing reference or invalid semester`);
+        if (!studentDoc || !courseDoc || isNaN(semester)) {
+          throw new Error(`Missing student, course, or invalid semester`);
         }
 
-        const existing = await Mark.findOne({ student: studentDoc._id, semester, subject: subjectDoc._id });
-        if (existing) {
-          throw new Error('Mark already exists for this student, semester, and subject');
+        let processedAny = false;
+
+        const processSubject = async (codeKey, theoryKey, internalKey, pracKey) => {
+          if (!row[codeKey]) return false;
+          const subjectDoc = await Subject.findOne({ code: row[codeKey] });
+          if (!subjectDoc) {
+             results.failed += 1;
+             results.errors.push(`Row ${i + 1}: Subject code ${row[codeKey]} not found`);
+             return true;
+          }
+          
+          const theoryMark = Number(row[theoryKey] || 0);
+          const internalMark = Number(row[internalKey] || 0);
+          const practicalMark = Number(row[pracKey] || 0);
+
+          const existing = await Mark.findOne({ student: studentDoc._id, semester, subject: subjectDoc._id });
+          if (existing) {
+            existing.theoryMark = theoryMark;
+            existing.internalMark = internalMark;
+            existing.practicalMark = practicalMark;
+            if (batchDoc) existing.batch = batchDoc._id;
+            await existing.save();
+            results.success += 1;
+          } else {
+            await Mark.create({
+              student: studentDoc._id,
+              batch: batchDoc ? batchDoc._id : undefined,
+              semester,
+              course: courseDoc._id,
+              subject: subjectDoc._id,
+              theoryMark,
+              internalMark,
+              practicalMark
+            });
+            results.success += 1;
+          }
+          return true;
+        };
+
+        // Check for old format
+        if (row['Subject Code']) {
+           await processSubject('Subject Code', 'Theory Mark', 'Internal Mark', 'Practical Mark');
+           processedAny = true;
         }
 
-        await Mark.create({
-          student: studentDoc._id,
-          semester,
-          course: courseDoc._id,
-          subject: subjectDoc._id,
-          theoryMark: Number(row['Theory Mark'] || 0),
-          internalMark: Number(row['Internal Mark'] || 0),
-          practicalMark: Number(row['Practical Mark'] || 0)
-        });
-        results.success += 1;
+        // Check for new multiple-subject format (up to 20 subjects per row)
+        for (let j = 1; j <= 20; j++) {
+           const found = await processSubject(`Subject ${j} Code`, `Subject ${j} Theory`, `Subject ${j} Internal`, `Subject ${j} Practical`);
+           if (found) processedAny = true;
+        }
+
+        if (!processedAny) {
+           throw new Error('No valid subjects provided in row');
+        }
+
       } catch (err) {
         results.failed += 1;
         results.errors.push(`Row ${i + 1} (${row['Student ID'] || 'Unknown'}): ${err.message}`);

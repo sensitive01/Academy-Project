@@ -31,7 +31,7 @@ const ExamsTab = () => {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedGroupData, setSelectedGroupData] = useState(null);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,7 +102,7 @@ const ExamsTab = () => {
     if (!batch || !batch.semesters) return subjects;
     const sem = batch.semesters.find(s => Number(s.semesterNumber) === Number(semesterNumber));
     if (!sem || !sem.subjects || sem.subjects.length === 0) return [];
-    
+
     const subjectIds = sem.subjects.map(s => typeof s === 'object' ? (s._id || s) : s).map(String);
     return subjects.filter(sub => subjectIds.includes(String(sub._id)));
   };
@@ -243,17 +243,17 @@ const ExamsTab = () => {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
-        
+
         if (data.length === 0) {
-           toast.error("Excel sheet is empty");
-           return;
+          toast.error("Excel sheet is empty");
+          return;
         }
 
         const res = await api.post('/marks/bulk', { marks: data });
         toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
         if (res.data.results.failed > 0) {
-            console.error("Bulk Upload Errors:", res.data.results.errors);
-            toast.error("Some records failed. Check console for details.");
+          console.error("Bulk Upload Errors:", res.data.results.errors);
+          toast.error("Some records failed. Check console for details.");
         }
         fetchData();
       } catch (err) {
@@ -265,7 +265,7 @@ const ExamsTab = () => {
   };
 
   const downloadSampleExcel = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + "Student ID,Semester,Course Title,Subject Code,Theory Mark,Internal Mark,Practical Mark\n"
       + "STU123,1,Class 10,MAT01,40,20,10";
     const encodedUri = encodeURI(csvContent);
@@ -332,7 +332,7 @@ const ExamsTab = () => {
     let courseId = "";
     let batchId = "";
     if (st) {
-      const studentBatch = batches.find(b => 
+      const studentBatch = batches.find(b =>
         b.students && b.students.some(sid => {
           const idStr = typeof sid === 'object' ? (sid._id || sid).toString() : sid.toString();
           return idStr === studentId;
@@ -340,7 +340,10 @@ const ExamsTab = () => {
       );
       if (studentBatch) {
         batchId = studentBatch._id;
-        courseId = studentBatch.course?._id || studentBatch.course || "";
+        const batchCourses = studentBatch.courses?.map(c => c._id || c) || [];
+        const legacyCourse = studentBatch.course?._id || studentBatch.course;
+        if (legacyCourse && !batchCourses.includes(legacyCourse)) batchCourses.push(legacyCourse);
+        courseId = batchCourses.length > 0 ? batchCourses[0] : "";
       } else if (st.enrolledCourses && st.enrolledCourses.length > 0) {
         courseId = st.enrolledCourses[0].course?._id || st.enrolledCourses[0].course || "";
         batchId = st.enrolledCourses[0].batch?._id || st.enrolledCourses[0].batch || "";
@@ -389,10 +392,10 @@ const ExamsTab = () => {
 
   const filteredStudentFees = studentFees.filter(f => {
     if (f.feeType !== 'Exam') return false;
-    
+
     if (searchQuery) {
-      return f.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-             f.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase());
+      return f.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        f.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase());
     }
     return true;
   });
@@ -495,7 +498,7 @@ const ExamsTab = () => {
         failCount: 0
       };
     }
-    
+
     // Look up exam config to find pass/fail
     const examConfig = exams.find(e => {
       const eSubId = (e.subject && e.subject._id) ? e.subject._id : e.subject;
@@ -504,16 +507,16 @@ const ExamsTab = () => {
       const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
       return String(eSubId) === String(mSubId) && String(eCourseId) === String(mCourseId) && e.semester === m.semester;
     });
-    
+
     let isPass = false;
     let totalSecured = (m.theoryMark || 0) + (m.internalMark || 0) + (m.practicalMark || 0);
-    
+
     if (examConfig) {
       isPass = totalSecured >= (examConfig.passMark || 0);
     } else {
       isPass = totalSecured >= 35; // default fallback
     }
-    
+
     groupedMarksMap[key].marks.push({ ...m, isPass, examConfig });
     groupedMarksMap[key].totalSubjects += 1;
     if (isPass) groupedMarksMap[key].passCount += 1;
@@ -611,7 +614,7 @@ const ExamsTab = () => {
   const paymentColumns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     {
-      name: "Student", width:"200px",
+      name: "Student", width: "200px",
       selector: row => row.student?.studentNameEnglish,
       sortable: true,
       cell: row => (
@@ -631,7 +634,7 @@ const ExamsTab = () => {
             <span>{row.batch?.name}</span>
             <span>&bull;</span>
             <span className="text-brand-600 font-medium">
-              {row.feeType === 'Other' ? row.otherFeeType : `${row.feeType} Fee`} 
+              {row.feeType === 'Other' ? row.otherFeeType : `${row.feeType} Fee`}
               {row.terms?.length > 0 && ` (Term ${row.terms[0]})`}
             </span>
           </div>
@@ -652,11 +655,10 @@ const ExamsTab = () => {
       cell: row => (
         <button
           onClick={() => handleTogglePaymentStatus(row._id)}
-          className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${
-            row.status === 'paid' 
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+          className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${row.status === 'paid'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
               : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-          }`}
+            }`}
         >
           {row.status === 'paid' ? 'PAID' : 'UNPAID'}
         </button>
@@ -674,12 +676,12 @@ const ExamsTab = () => {
     }
   ];
 
-  const filteredExams = exams.filter(e => 
+  const filteredExams = exams.filter(e =>
     e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredGroupedMarks = groupedMarksArray.filter(m => 
+  const filteredGroupedMarks = groupedMarksArray.filter(m =>
     m.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     String(m.semester).includes(searchQuery)
@@ -692,31 +694,31 @@ const ExamsTab = () => {
           <h2 className="text-xl font-bold text-gray-800">Exams</h2>
         </div>
         <div className="flex gap-2">
-        {isAdmin && activeTab === "exams" && (
-          <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
-            <Plus size={20} /> Add Exam
-          </button>
-        )}
-        {isAdmin && activeTab === "marks" && (
-          <>
-            <button onClick={downloadSampleExcel} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
-              <Download size={20} /> Sample CSV
+          {isAdmin && activeTab === "exams" && (
+            <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
+              <Plus size={20} /> Add Exam
             </button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
-              <Upload size={20} /> Bulk Excel
-            </button>
-            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
-            <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
-              <Plus size={20} /> Upload Result
-            </button>
-          </>
-        )}
+          )}
+          {isAdmin && activeTab === "marks" && (
+            <>
+              <button onClick={downloadSampleExcel} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
+                <Download size={20} /> Sample CSV
+              </button>
+              <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
+                <Upload size={20} /> Bulk Excel
+              </button>
+              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
+              <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
+                <Plus size={20} /> Upload Result
+              </button>
+            </>
+          )}
 
-        {isAdmin && activeTab === "payments" && (
-          <button onClick={() => setShowPaymentModal(true)} className="bg-brand-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 shadow-md shadow-brand-600/20 transition-all hover:scale-[1.02]">
-            <Plus size={20} /> Add Fees
-          </button>
-        )}
+          {isAdmin && activeTab === "payments" && (
+            <button onClick={() => setShowPaymentModal(true)} className="bg-brand-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 shadow-md shadow-brand-600/20 transition-all hover:scale-[1.02]">
+              <Plus size={20} /> Add Fees
+            </button>
+          )}
         </div>
       </div>
 
@@ -898,7 +900,7 @@ const ExamsTab = () => {
                     {getFilteredSubjects(markFormData.batch, markFormData.semester).map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
                   </select>
                 </div>
-                
+
 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Theory Mark</label>
@@ -925,17 +927,17 @@ const ExamsTab = () => {
       )}
 
       {showMarksheetModal && selectedGroupData && (
-        <MarksheetModal 
-          data={selectedGroupData} 
-          onClose={() => setShowMarksheetModal(false)} 
+        <MarksheetModal
+          data={selectedGroupData}
+          onClose={() => setShowMarksheetModal(false)}
         />
       )}
 
       {showBulkEditModal && selectedGroupData && (
-        <BulkEditMarksModal 
-          data={selectedGroupData} 
-          onClose={() => setShowBulkEditModal(false)} 
-          onSave={handleBulkEditSave} 
+        <BulkEditMarksModal
+          data={selectedGroupData}
+          onClose={() => setShowBulkEditModal(false)}
+          onSave={handleBulkEditSave}
           students={students}
           batches={batches}
           courses={courses}

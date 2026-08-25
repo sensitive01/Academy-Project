@@ -2,16 +2,31 @@ import React, { useRef } from 'react';
 import { X, Printer } from 'lucide-react';
 import logo from '../../assets/logo-2.jpeg';
 
+const getGrade = (percentage) => {
+  if (percentage >= 90) return 'O';
+  if (percentage >= 80) return 'A+';
+  if (percentage >= 70) return 'A';
+  if (percentage >= 60) return 'B+';
+  if (percentage >= 50) return 'B';
+  if (percentage >= 35) return 'C';
+  return 'F';
+};
+
 const MarksheetModal = ({ data, onClose }) => {
   const printRef = useRef();
 
   const handlePrint = () => {
     const printContent = printRef.current;
+    const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(el => el.outerHTML)
+      .join('\n');
+
     const windowPrint = window.open('', '', 'width=900,height=800');
     windowPrint.document.write(`
       <html>
         <head>
           <title>Print Marksheet</title>
+          ${styleTags}
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; background: #fffdf2; color: #000; }
             .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; text-align: center; }
@@ -54,7 +69,7 @@ const MarksheetModal = ({ data, onClose }) => {
     setTimeout(() => {
       windowPrint.print();
       windowPrint.close();
-    }, 250);
+    }, 750);
   };
 
   const { student, semester, course, marks, batch } = data;
@@ -100,15 +115,14 @@ const MarksheetModal = ({ data, onClose }) => {
               EXAMINATION RESULT
             </div>
 
-            <div className="mb-6 text-sm font-semibold text-slate-800 grid grid-cols-2 gap-4">
+            <div className="mb-6 text-sm font-semibold text-slate-800 flex justify-between">
               <div className="space-y-3">
                 <div>Student Name : {student.studentNameEnglish?.toUpperCase()}</div>
                 <div>Course & Year : {course?.title} - {student.year || 'I Year'}</div>
-                <div>Batch : {batch?.name || 'N/A'}</div>
               </div>
-              <div className="space-y-3">
-                <div>Exam Code : {marks.find(m => m.examConfig)?.examConfig?.name || 'N/A'}</div>
-                <div>Exam Date : {marks.find(m => m.examConfig)?.examConfig?.date ? new Date(marks.find(m => m.examConfig).examConfig.date).toLocaleDateString() : 'N/A'}</div>
+              <div className="space-y-3 text-right">
+                <div>Enrollment No : {student.studentId}</div>
+                <div>Batch : {batch?.name || 'N/A'}</div>
               </div>
             </div>
 
@@ -127,6 +141,7 @@ const MarksheetModal = ({ data, onClose }) => {
                   <th className="border border-slate-200 p-3 text-center">Internal</th>
                   <th className="border border-slate-200 p-3 text-center">Practical</th>
                   <th className="border border-slate-200 p-3 text-center">Total<br/>Marks</th>
+                  <th className="border border-slate-200 p-3 text-center">Grade</th>
                   <th className="border border-slate-200 p-3 text-center">Result</th>
                 </tr>
               </thead>
@@ -137,8 +152,8 @@ const MarksheetModal = ({ data, onClose }) => {
                   const practical = m.practicalMark || 0;
                   const total = theory + internal + practical;
                   
-                  const maxMark = m.examConfig?.totalMark || 100;
-                  const passMark = m.examConfig?.passMark || 40;
+                  const maxMark = 100;
+                  const passMark = 35;
 
                   grandMax += maxMark;
                   grandTotal += total;
@@ -156,6 +171,7 @@ const MarksheetModal = ({ data, onClose }) => {
                       <td className="border border-slate-200 p-3 text-center">{internal}</td>
                       <td className="border border-slate-200 p-3 text-center">{practical}</td>
                       <td className="border border-slate-200 p-3 text-center font-semibold">{total}</td>
+                      <td className="border border-slate-200 p-3 text-center font-bold text-[#1e3a8a]">{getGrade((total / maxMark) * 100)}</td>
                       <td className="border border-slate-200 p-3 text-center font-bold text-slate-800">{m.isPass ? 'PASS' : 'FAIL'}</td>
                     </tr>
                   );
@@ -164,14 +180,28 @@ const MarksheetModal = ({ data, onClose }) => {
                   <td className="border border-slate-200 p-3 text-center" colSpan="2"></td>
                   <td className="border border-slate-200 p-3 text-center">{grandMax}</td>
                   <td className="border border-slate-200 p-3 text-center"></td>
-                  <td className="border border-slate-200 p-3 text-center">{grandTheory}</td>
-                  <td className="border border-slate-200 p-3 text-center">{grandInternal}</td>
-                  <td className="border border-slate-200 p-3 text-center">{grandPractical}</td>
+                  <td className="border border-slate-200 p-3 text-center"></td>
+                  <td className="border border-slate-200 p-3 text-center"></td>
+                  <td className="border border-slate-200 p-3 text-center"></td>
                   <td className="border border-slate-200 p-3 text-center">{grandTotal}</td>
+                  <td className="border border-slate-200 p-3 text-center font-bold text-[#1e3a8a]">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
                   <td className="border border-slate-200 p-3 text-center"></td>
                 </tr>
               </tbody>
             </table>
+
+            <div className="mt-8 border border-slate-200 rounded-lg bg-slate-50 p-4">
+              <h4 className="font-bold text-xs text-slate-800 mb-3 uppercase tracking-wider">Grading Scale Reference</h4>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded text-slate-700 shadow-sm"><span className="font-extrabold text-[#1e3a8a] w-5 text-center">O</span> <span className="text-slate-400">|</span> 90-100%</div>
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded text-slate-700 shadow-sm"><span className="font-extrabold text-[#1e3a8a] w-5 text-center">A+</span> <span className="text-slate-400">|</span> 80-89%</div>
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded text-slate-700 shadow-sm"><span className="font-extrabold text-[#1e3a8a] w-5 text-center">A</span> <span className="text-slate-400">|</span> 70-79%</div>
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded text-slate-700 shadow-sm"><span className="font-extrabold text-[#1e3a8a] w-5 text-center">B+</span> <span className="text-slate-400">|</span> 60-69%</div>
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded text-slate-700 shadow-sm"><span className="font-extrabold text-[#1e3a8a] w-5 text-center">B</span> <span className="text-slate-400">|</span> 50-59%</div>
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded text-slate-700 shadow-sm"><span className="font-extrabold text-[#1e3a8a] w-5 text-center">C</span> <span className="text-slate-400">|</span> 35-49%</div>
+                <div className="flex items-center gap-1.5 bg-white border border-red-100 px-2.5 py-1.5 rounded text-red-700 bg-red-50 shadow-sm"><span className="font-extrabold w-5 text-center">F</span> <span className="text-red-300">|</span> Below 35%</div>
+              </div>
+            </div>
 
             <div className="mt-12 text-sm text-slate-800 pb-8">
               <div className="mt-6 flex justify-between items-center relative">

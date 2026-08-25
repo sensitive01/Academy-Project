@@ -142,6 +142,7 @@ const PendingApprovalsList = () => {
         <div>
           <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
           <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
+          <div className="text-[10px] text-brand-600 font-bold">{row.year || row.student?.year || ""}</div>
         </div>
       )
     },

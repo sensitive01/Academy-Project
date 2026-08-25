@@ -19,11 +19,26 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
 
   const remainingBalance = Math.max(0, totalAmount - totalApprovedPaid);
 
-  const [collectAmount, setCollectAmount] = useState(remainingBalance);
+  const isBoth = fee.feeType === 'Both';
+  
+  const courseTotal = (fee.courseAmount || 0) + (fee.coursePenaltyAmount || 0);
+  const coursePaid = fee.coursePayments ? fee.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+  const courseBalance = Math.max(0, courseTotal - coursePaid);
+
+  const councilTotal = (fee.councilAmount || 0) + (fee.councilPenaltyAmount || 0);
+  const councilPaid = fee.councilPayments ? fee.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+  const councilBalance = Math.max(0, councilTotal - councilPaid);
+
+  const [targetFeeType, setTargetFeeType] = useState(isBoth ? (courseBalance > 0 ? 'Course' : 'Council') : fee.feeType);
+
+  const displayTotalAmount = isBoth ? (targetFeeType === 'Course' ? courseTotal : councilTotal) : totalAmount;
+  const displayRemainingBalance = isBoth ? (targetFeeType === 'Course' ? courseBalance : councilBalance) : remainingBalance;
+
+  const [collectAmount, setCollectAmount] = useState(displayRemainingBalance);
 
   useEffect(() => {
-    setCollectAmount(remainingBalance);
-  }, [remainingBalance]);
+    setCollectAmount(displayRemainingBalance);
+  }, [displayRemainingBalance]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -43,7 +58,7 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
     } else if (paymentMode === 'Online') {
       data.proofOfPayment = proofOfPayment;
     }
-    onSave(fee._id, data);
+    onSave(fee.studentId, data, isBoth ? targetFeeType : undefined, fee.year);
   };
 
   const [globalBank, setGlobalBank] = useState(null);
@@ -84,6 +99,27 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
         </div>
 
         {/* Total Due Card */}
+        {isBoth && (
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Fee to Pay</label>
+            <div className="flex gap-4">
+              <label className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-between transition-all ${targetFeeType === 'Course' ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20' : 'border-slate-200 bg-white hover:border-slate-300'} ${courseBalance <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <div className="flex items-center gap-2">
+                  <input type="radio" name="targetFee" className="w-4 h-4 text-brand-600 focus:ring-brand-500" checked={targetFeeType === 'Course'} onChange={() => setTargetFeeType('Course')} disabled={courseBalance <= 0} />
+                  <span className="text-sm font-bold text-slate-800">Course Fees</span>
+                </div>
+                <span className="text-xs font-bold text-slate-500">Bal: ₹{courseBalance.toLocaleString('en-IN')}</span>
+              </label>
+              <label className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-between transition-all ${targetFeeType === 'Council' ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20' : 'border-slate-200 bg-white hover:border-slate-300'} ${councilBalance <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <div className="flex items-center gap-2">
+                  <input type="radio" name="targetFee" className="w-4 h-4 text-brand-600 focus:ring-brand-500" checked={targetFeeType === 'Council'} onChange={() => setTargetFeeType('Council')} disabled={councilBalance <= 0} />
+                  <span className="text-sm font-bold text-slate-800">Council Fees</span>
+                </div>
+                <span className="text-xs font-bold text-slate-500">Bal: ₹{councilBalance.toLocaleString('en-IN')}</span>
+              </label>
+            </div>
+          </div>
+        )}
         <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 rounded-2xl text-white shadow-md flex justify-between items-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 mix-blend-overlay flex items-center justify-center pointer-events-none">
             <svg className="w-full h-full text-white" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -92,7 +128,7 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
           </div>
           <div className="relative z-10">
             <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Remaining Balance / Total Fee</p>
-            <p className="text-3xl font-black tracking-tight">₹{remainingBalance.toLocaleString('en-IN')} <span className="text-xs font-normal text-indigo-200/70">/ ₹{totalAmount.toLocaleString('en-IN')}</span></p>
+            <p className="text-3xl font-black tracking-tight">₹{displayRemainingBalance.toLocaleString('en-IN')} <span className="text-xs font-normal text-indigo-200/70">/ ₹{displayTotalAmount.toLocaleString('en-IN')}</span></p>
           </div>
           <div className="text-right relative z-10 flex flex-col items-end">
             <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-1">Student</p>
@@ -112,7 +148,7 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
             type="number" 
             required 
             min="1" 
-            max={remainingBalance}
+            max={displayRemainingBalance}
             className="w-full rounded-2xl border border-slate-200 p-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 font-bold text-slate-800" 
             value={collectAmount} 
             onChange={(e) => setCollectAmount(parseFloat(e.target.value) || 0)} 

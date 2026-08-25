@@ -11,7 +11,7 @@ const { createInAppNotification } = require('../utils/notificationUtils');
 router.get('/', protect, async (req, res) => {
   try {
     let fees = await StudentFee.find()
-      .populate('student', 'studentNameEnglish studentId')
+      .populate('student', 'studentNameEnglish studentId year')
       .populate('center', 'name bankDetails')
       .populate('course', 'title')
       .populate('batch', 'name')
@@ -148,13 +148,21 @@ router.delete('/:id', protect, async (req, res) => {
 // Cascade collection for a student's grouped fees (Course, Council, or Other)
 router.post('/collect-cascade', protect, async (req, res) => {
   try {
-    const { studentId, feeType, paymentMode, proofOfPayment, bankReference, amount } = req.body;
+    const { studentId, feeType, paymentMode, proofOfPayment, bankReference, amount, year } = req.body;
     
     // Find all student fee records for this student that are not fully paid
-    let feeRecords = await StudentFee.find({
+    let query = {
       student: studentId,
       status: { $ne: 'paid' }
-    });
+    };
+    if (year) {
+      if (year === "Unknown Year") {
+        query.year = { $exists: false }; // or match those explicitly marked as unknown
+      } else {
+        query.year = year;
+      }
+    }
+    let feeRecords = await StudentFee.find(query);
 
     // Filter by feeType matching logic
     feeRecords = feeRecords.filter(f => {
@@ -385,7 +393,7 @@ router.patch('/:id/approve', protect, async (req, res) => {
 router.get('/:id/receipt', protect, async (req, res) => {
   try {
     const fee = await StudentFee.findById(req.params.id)
-      .populate('student', 'studentNameEnglish studentId email phone')
+      .populate('student', 'studentNameEnglish studentId email phone year')
       .populate('center', 'name bankDetails')
       .populate('course', 'title')
       .populate('batch', 'name');

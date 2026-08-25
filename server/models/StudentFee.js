@@ -26,6 +26,9 @@ const studentFeeSchema = new mongoose.Schema({
   otherFeeType: {
     type: String
   },
+  year: {
+    type: String // To track which academic year this fee belongs to
+  },
   terms: [{
     type: Number
   }],

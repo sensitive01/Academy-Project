@@ -6,11 +6,15 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 const StudentRegistration = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const registrationType = queryParams.get("type");
+  
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [centers, setCenters] = useState([]);
@@ -34,6 +38,7 @@ const StudentRegistration = () => {
     fatherName: "",
     gender: "",
     nationality: "",
+    year: "",
     aadharNo: "",
     kcetRegNo: "",
     neetRegNo: "",
@@ -270,10 +275,11 @@ const StudentRegistration = () => {
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = ['admin', 'center', 'hr'].includes(user?.role) || ['admin', 'center', 'hr'].includes(storedUser?.role);
+  const hasFeesStep = isAdmin && registrationType !== 'online';
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      const maxSteps = isAdmin ? 6 : 5;
+      const maxSteps = hasFeesStep ? 6 : 5;
       setCurrentStep((prev) => Math.min(prev + 1, maxSteps));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -285,7 +291,7 @@ const StudentRegistration = () => {
   };
 
   const validateStep = (step) => {
-    if (isAdmin && step === 6) {
+    if (hasFeesStep && step === 6) {
       if (Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
         toast.error("Please select a course fee payment scheme!");
         return false;
@@ -298,7 +304,7 @@ const StudentRegistration = () => {
     e.preventDefault();
     setSubmitAttempted(true);
 
-    if (isAdmin && Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
+    if (hasFeesStep && Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
       toast.error("Please select a course fee payment scheme!");
       return;
     }
@@ -355,12 +361,16 @@ const StudentRegistration = () => {
           placeOfSchool: formData.hscPlace,
           boardOfExamination: formData.hscBoard,
         },
-        adminEnrollment: isAdmin ? adminEnrollment : undefined,
+        adminEnrollment: hasFeesStep ? adminEnrollment : undefined,
       };
+
+      if (!payload.center) delete payload.center;
+      if (!payload.course) delete payload.course;
+      if (!payload.batch) delete payload.batch;
 
       const res = await api.post("/students/public-registration", payload);
       toast.success("Application Submitted Successfully!");
-      setCurrentStep(isAdmin ? 7 : 6);
+      setCurrentStep(hasFeesStep ? 7 : 6);
     } catch (err) {
       console.error(err);
       if (err.response?.data?.errors) {
@@ -380,10 +390,10 @@ const StudentRegistration = () => {
     { title: "Background", icon: <GraduationCap size={20} /> },
     { title: "Marksheet", icon: <BookOpen size={20} /> },
     { title: "Family", icon: <Users size={20} /> },
-    ...(isAdmin ? [{ title: "Fees", icon: <CreditCard size={20} /> }] : [])
+    ...(hasFeesStep ? [{ title: "Fees", icon: <CreditCard size={20} /> }] : [])
   ];
 
-  if (currentStep === (isAdmin ? 7 : 6)) {
+  if (currentStep === (hasFeesStep ? 7 : 6)) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="max-w-2xl w-full bg-white rounded-3xl p-12 text-center shadow-2xl border-t-8 border-brand-700">
@@ -424,7 +434,7 @@ const StudentRegistration = () => {
 
       <div className="max-w-6xl mx-auto px-4 pb-20">
         {/* Professional Stepper Indicator */}
-        <div className={`grid ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'} gap-2 md:gap-4 -mt-8 mb-10`}>
+        <div className={`grid ${hasFeesStep ? 'grid-cols-6' : 'grid-cols-5'} gap-2 md:gap-4 -mt-8 mb-10`}>
           {steps.map((s, i) => (
             <div key={i}
               onClick={() => {
@@ -450,7 +460,7 @@ const StudentRegistration = () => {
               <span className="text-[10px] font-bold tracking-widest">Fields marked with (*) are mandatory</span>
             </div>
             <div className="text-[10px] font-bold text-slate-400 tracking-widest">
-              Step {currentStep} of {isAdmin ? 6 : 5}
+              Step {currentStep} of {hasFeesStep ? 6 : 5}
             </div>
           </div>
 
@@ -471,7 +481,10 @@ const StudentRegistration = () => {
                   <FormInput label="Father / Mother Name *" name="fatherName" value={formData.fatherName} onChange={handleChange} />
 
                   <SelectBox label="Gender *" name="gender" value={formData.gender} onChange={handleChange} options={["Male", "Female", "Other"]} />
-                  <FormInput label="Nationality *" name="nationality" value={formData.nationality} onChange={handleChange} />
+                  <div className="grid grid-cols-2 gap-6">
+                    <FormInput label="Nationality *" name="nationality" value={formData.nationality} onChange={handleChange} />
+                    <SelectBox label="Year" name="year" value={formData.year} onChange={handleChange} options={["1st Year", "2nd Year", "3rd Year", "4th Year"]} />
+                  </div>
                 </div>
 
                 <StepHeader title="National & Academic IDs" icon={<ShieldCheck className="text-brand-700" />} />
@@ -493,7 +506,9 @@ const StudentRegistration = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <SelectBox label="Marital Status" name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} options={["Married", "Unmarried"]} />
-                    <SelectBox label="Select Center" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
+                    {registrationType !== 'online' && (
+                      <SelectBox label="Select Center" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -925,7 +940,7 @@ const StudentRegistration = () => {
               </div>
             )}
 
-            {currentStep === 6 && isAdmin && (
+            {currentStep === 6 && hasFeesStep && (
               <div className="space-y-8 animate-fade-in-up">
                 <StepHeader title="Fee Structure & Course Assignment" subtitle="Assign Course, Batch, Council Fees, and Course Fee Schemes (Step 6)" icon={<CreditCard className="text-brand-700" />} />
                 
@@ -937,8 +952,20 @@ const StudentRegistration = () => {
                     onChange={(e) => {
                       const batchId = e.target.value;
                       const selectedBatchObj = batches.find(b => b._id === batchId);
-                      const courseIdForBatch = selectedBatchObj ? (selectedBatchObj.course?._id || selectedBatchObj.course) : "";
-                      const finalCourseId = courseIdForBatch ? (typeof courseIdForBatch === 'object' ? courseIdForBatch.toString() : courseIdForBatch) : "";
+                      
+                      let finalCourseId = adminEnrollment.course;
+                      if (selectedBatchObj) {
+                        const batchCourses = selectedBatchObj.courses?.map(c => c._id || c) || [];
+                        const legacyCourse = selectedBatchObj.course?._id || selectedBatchObj.course;
+                        if (legacyCourse && !batchCourses.includes(legacyCourse)) {
+                          batchCourses.push(legacyCourse);
+                        }
+                        if (batchCourses.length === 1) {
+                          finalCourseId = batchCourses[0].toString();
+                        } else if (batchCourses.length > 1 && !batchCourses.includes(finalCourseId)) {
+                          finalCourseId = ""; // Reset if current course is not in the new batch
+                        }
+                      }
 
                       setAdminEnrollment(prev => ({
                         ...prev,
@@ -1189,7 +1216,7 @@ const StudentRegistration = () => {
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-4 w-full md:w-auto">
-                {currentStep < (isAdmin ? 6 : 5) ? (
+                {currentStep < (hasFeesStep ? 6 : 5) ? (
                   <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
                     Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </button>

@@ -102,7 +102,12 @@ const StudentFilterBar = ({
       {setFilterYears && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
-            options={[1, 2, 3, 4].map(y => ({ label: `Year ${y}`, value: String(y) }))}
+            options={[
+              { label: "1st Year", value: "1st Year" },
+              { label: "2nd Year", value: "2nd Year" },
+              { label: "3rd Year", value: "3rd Year" },
+              { label: "4th Year", value: "4th Year" }
+            ]}
             selected={filterYears}
             onChange={setFilterYears}
             placeholder="All Years"

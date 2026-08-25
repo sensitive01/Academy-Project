@@ -265,9 +265,15 @@ const ResultsTab = () => {
   };
 
   const downloadSampleExcel = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + "Student ID,Semester,Course Title,Subject Code,Theory Mark,Internal Mark,Practical Mark\n"
-      + "STU123,1,Class 10,MAT01,40,20,10";
+    let headers = "Student ID,Semester,Course Title";
+    let rowData = "STU123,1,Full Stack Web";
+    
+    for (let i = 1; i <= 5; i++) {
+      headers += `,Subject ${i} Code,Subject ${i} Theory,Subject ${i} Internal,Subject ${i} Practical`;
+      rowData += `,SUB0${i},40,20,10`;
+    }
+    
+    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rowData;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -340,7 +346,10 @@ const ResultsTab = () => {
       );
       if (studentBatch) {
         batchId = studentBatch._id;
-        courseId = studentBatch.course?._id || studentBatch.course || "";
+        const batchCourses = studentBatch.courses?.map(c => c._id || c) || [];
+        const legacyCourse = studentBatch.course?._id || studentBatch.course;
+        if (legacyCourse && !batchCourses.includes(legacyCourse)) batchCourses.push(legacyCourse);
+        courseId = batchCourses.length > 0 ? batchCourses[0] : "";
       } else if (st.enrolledCourses && st.enrolledCourses.length > 0) {
         courseId = st.enrolledCourses[0].course?._id || st.enrolledCourses[0].course || "";
         batchId = st.enrolledCourses[0].batch?._id || st.enrolledCourses[0].batch || "";

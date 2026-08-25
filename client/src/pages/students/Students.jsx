@@ -117,6 +117,7 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
           <div className="min-w-0">
             <div className="font-bold text-slate-900 whitespace-nowrap leading-tight truncate">{row.user?.name}</div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter shrink-0">{row.studentId || "NO-ID"}</div>
+            <div className="text-[10px] font-black text-brand-600 uppercase tracking-tighter shrink-0 mt-0.5">{row.year || ""}</div>
           </div>
         </div>
       ),
@@ -314,6 +315,8 @@ const Students = () => {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [isAcademicBulkMode, setIsAcademicBulkMode] = useState(false);
+  const [academicPromoteConfig, setAcademicPromoteConfig] = useState({ isOpen: false });
   const [reminderConfig, setReminderConfig] = useState({ isOpen: false, student: null });
   const [vendors, setVendors] = useState([]);
   const [promoteForm, setPromoteForm] = useState({
@@ -811,24 +814,33 @@ const Students = () => {
               onSendReminder={(student) => setReminderConfig({ isOpen: true, student })}
               search={search}
               setSearch={setSearch}
-              selectableRows={isBulkMode}
-              selectableRowDisabled={row => row.internships && row.internships.length > 0}
+              selectableRows={isBulkMode || isAcademicBulkMode}
+              selectableRowDisabled={row => isBulkMode && row.internships && row.internships.length > 0}
               onSelectedRowsChange={({ selectedRows }) => setSelectedStudents(selectedRows)}
               clearSelectedRows={clearSelectedRows}
               tableHeaderActions={
                 <div className="flex gap-3">
-                  {!isBulkMode ? (
-                    <button
-                      onClick={() => setIsBulkMode(true)}
-                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-2xl hover:bg-indigo-100 transition-all active:scale-95 cursor-pointer"
-                    >
-                      <Briefcase size={18} /> Bulk Promote
-                    </button>
+                  {!isBulkMode && !isAcademicBulkMode ? (
+                    <>
+                      <button
+                        onClick={() => setIsBulkMode(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-2xl hover:bg-indigo-100 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Briefcase size={18} /> Bulk Promote
+                      </button>
+                      <button
+                        onClick={() => setIsAcademicBulkMode(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <GraduationCap size={18} /> Academic Promote
+                      </button>
+                    </>
                   ) : (
                     <>
                       <button
                         onClick={() => {
                           setIsBulkMode(false);
+                          setIsAcademicBulkMode(false);
                           setSelectedStudents([]);
                           setClearSelectedRows(!clearSelectedRows);
                         }}
@@ -839,18 +851,22 @@ const Students = () => {
                       <button
                         disabled={selectedStudents.length === 0}
                         onClick={() => {
-                          setPromoteForm({
-                            vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false
-                          });
-                          setPromoteConfig({ isOpen: true, student: null, isBulk: true });
+                          if (isBulkMode) {
+                            setPromoteForm({
+                              vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false
+                            });
+                            setPromoteConfig({ isOpen: true, student: null, isBulk: true });
+                          } else {
+                            setAcademicPromoteConfig({ isOpen: true });
+                          }
                         }}
                         className={`flex items-center gap-2 px-5 py-2.5 font-bold rounded-2xl transition-all ${
                           selectedStudents.length > 0 
-                            ? "text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer" 
+                            ? (isBulkMode ? "text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20" : "text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20") + " active:scale-95 cursor-pointer" 
                             : "text-slate-400 bg-slate-50 border border-slate-100 cursor-not-allowed"
                         }`}
                       >
-                        <Briefcase size={18} /> Proceed to Promote {selectedStudents.length > 0 && `(${selectedStudents.length})`}
+                        {isBulkMode ? <Briefcase size={18} /> : <GraduationCap size={18} />} Proceed to Promote {selectedStudents.length > 0 && `(${selectedStudents.length})`}
                       </button>
                     </>
                   )}
@@ -861,7 +877,10 @@ const Students = () => {
                     <Download size={18} /> Export
                   </button>
                   <button
-                    onClick={() => window.open("/student-registration", "_blank")}
+                    onClick={() => {
+                      const type = activeTab === "online_students" ? "online" : "center";
+                      window.open(`/student-registration?type=${type}`, "_blank");
+                    }}
                     className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
                   >
                     <UserPlus size={18} /> Add Student
@@ -1118,6 +1137,47 @@ const Students = () => {
                 className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-brand-600/20 transition-all"
               >
                 Export
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* Academic Promote Confirmation Modal */}
+      {academicPromoteConfig.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+              <GraduationCap size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Bulk Academic Promote</h3>
+            <p className="text-slate-500 text-xs mb-6">Are you sure you want to promote {selectedStudents.length} students to their next academic year? This will also duplicate their base fee structures for the new year.</p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setAcademicPromoteConfig({ isOpen: false })}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const studentIds = selectedStudents.map(s => s._id);
+                    const { data } = await api.post(`/students/bulk-promote-academic`, { studentIds });
+                    toast.success(data.message || "Students promoted successfully!");
+                    setSelectedStudents([]);
+                    setClearSelectedRows(!clearSelectedRows);
+                    setIsAcademicBulkMode(false);
+                    fetchStudents();
+                    setAcademicPromoteConfig({ isOpen: false });
+                  } catch (err) {
+                    toast.error(err.response?.data?.message || "Failed to promote students");
+                  }
+                }}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                Promote
               </button>
             </div>
           </div>

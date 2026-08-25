@@ -455,7 +455,7 @@ const BatchesTab = () => {
         semester: item.semester || 1,
         center: item.center?._id || item.center || "",
         centers: item.centers ? item.centers.map(c => c._id || c) : (item.center ? [item.center?._id || item.center] : []),
-        course: item.course?._id || item.course || "",
+        courses: item.courses ? item.courses.map(c => c._id || c) : (item.course ? [item.course?._id || item.course] : []),
         batch: item.batch?._id || item.batch || "",
         fee: item.fee || 0,
         feeType: item.feeType || "Term",
@@ -479,7 +479,7 @@ const BatchesTab = () => {
         semester: 1,
         center: "",
         centers: [],
-        course: "",
+        courses: [],
         batch: "",
         fee: 0,
         feeType: "Term",
@@ -575,7 +575,7 @@ const BatchesTab = () => {
       const { data: updatedBatch } = await api.put(`/batches/${currentBatchAssign._id}`, {
         ...currentBatchAssign,
         center: currentBatchAssign.center?._id || currentBatchAssign.center,
-        course: currentBatchAssign.course?._id || currentBatchAssign.course,
+        courses: currentBatchAssign.courses ? currentBatchAssign.courses.map(c => c._id || c) : [],
         semesters: updatedSemesters
       });
       console.log("updatedBatch returned from server:", updatedBatch);
@@ -669,9 +669,10 @@ const BatchesTab = () => {
           ),
         },
         {
-          name: "Course",
-          selector: r => r.course?.title || "N/A",
+          name: "Course(s)",
+          selector: r => r.courses ? r.courses.map(c => c.title).join(", ") : (r.course?.title || "N/A"),
           sortable: true,
+          omit: activeTab !== "batches"
         },
         {
           name: "Centers",
@@ -1053,11 +1054,13 @@ const BatchesTab = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
-                    <select required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white" value={formData.course} onChange={e => setFormData({ ...formData, course: e.target.value })}>
-                      <option value="">Select Course</option>
-                      {coursesList.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
-                    </select>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Course(s) *</label>
+                    <MultiSelectDropdown
+                      options={coursesList.map(c => ({ label: c.title, value: c._id }))}
+                      selected={formData.courses || []}
+                      onChange={(selected) => setFormData({ ...formData, courses: selected })}
+                      placeholder="Select Course(s)"
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1223,7 +1226,17 @@ const BatchesTab = () => {
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects</label>
                           <MultiSelectSubjects
-                            subjectsList={subjectsList}
+                            subjectsList={subjectsList.filter(sub => {
+                              const batchCourseIds = (currentBatchAssign?.courses || []).map(c => c._id?.toString() || c.toString());
+                              const legacyBatchCourseId = currentBatchAssign?.course?._id?.toString() || currentBatchAssign?.course?.toString();
+                              if (legacyBatchCourseId && !batchCourseIds.includes(legacyBatchCourseId)) {
+                                batchCourseIds.push(legacyBatchCourseId);
+                              }
+                              const subCourseId = sub.course?._id?.toString() || sub.course?.toString() || "";
+                              const matchesCourse = batchCourseIds.length === 0 || batchCourseIds.includes(subCourseId);
+                              const matchesSemester = sub.semester === sem.semesterNumber;
+                              return matchesCourse && matchesSemester;
+                            })}
                             selectedSubjects={sem.subjects || []}
                             maxSelection={sem.noOfSubjects}
                             onChange={(selectedIds) => {

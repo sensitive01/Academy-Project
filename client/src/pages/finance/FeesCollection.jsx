@@ -13,6 +13,7 @@ const FeesCollection = () => {
   const tabs = {
     course_fees: { label: "Course Fees", icon: <FileText size={18} /> },
     council_fees: { label: "Council Fees", icon: <FileText size={18} /> },
+    both_fees: { label: "Both Fees", icon: <FileText size={18} /> },
     approvals: { label: "Pending Approvals", icon: <CheckSquare size={18} /> },
     others: { label: "Others", icon: <MoreHorizontal size={18} /> },
   };
@@ -52,6 +53,7 @@ const FeesCollection = () => {
       <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
         {activeTab === "course_fees" && <StudentFeesList feeType="Course" excludePaid={true} />}
         {activeTab === "council_fees" && <StudentFeesList feeType="Council" excludePaid={true} />}
+        {activeTab === "both_fees" && <StudentFeesList feeType="Both" excludePaid={true} />}
         {activeTab === "approvals" && <PendingApprovalsList />}
         {activeTab === "others" && <StudentFeesList feeType="Other" excludePaid={true} />}
       </div>

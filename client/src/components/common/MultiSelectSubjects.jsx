@@ -59,7 +59,7 @@ const MultiSelectSubjects = ({ subjectsList, selectedSubjects, maxSelection, onC
             >
               <div className="overflow-hidden pr-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {subject.code}
+                  {subject.code} • {subject.type || 'Theory'}
                 </span>
                 <p className="text-sm font-semibold truncate leading-tight mt-0.5">
                   {subject.name}

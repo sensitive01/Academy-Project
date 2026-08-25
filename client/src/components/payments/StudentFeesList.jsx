@@ -169,6 +169,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         if (feeType === 'All') return true;
         if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
         if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
+        if (feeType === 'Both') return ['Sem', 'Term', 'Monthly'].includes(f.feeType) || f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
         if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees';
         return f.feeType === feeType;
       });
@@ -231,14 +232,19 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
           const studentId = f.student?._id?.toString();
           if (!studentId) return;
 
-          if (!studentMap[studentId]) {
-            studentMap[studentId] = {
-              _id: studentId, // Use student ID as row ID for selection / modal
+          const feeYear = f.year || f.student?.year || "Unknown Year";
+          const groupKey = `${studentId}_${feeYear}`;
+
+          if (!studentMap[groupKey]) {
+            studentMap[groupKey] = {
+              _id: groupKey, // Use groupKey as row ID
+              studentId: studentId,
+              year: feeYear,
               student: f.student,
               course: f.course,
               batch: f.batch,
               center: f.center,
-              feeType: feeType === 'Course' ? 'Course' : f.feeType,
+              feeType: feeType === 'Course' ? 'Course' : (feeType === 'Both' ? 'Both' : f.feeType),
               otherFeeType: f.otherFeeType,
               amount: 0,
               penaltyAmount: 0,
@@ -248,36 +254,57 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
               payments: [],
               status: 'paid', // default, calculated below
               createdAt: f.createdAt,
-              originalFees: []
+              originalFees: [],
+              courseAmount: 0,
+              councilAmount: 0,
+              coursePenaltyAmount: 0,
+              councilPenaltyAmount: 0,
+              coursePayments: [],
+              councilPayments: []
             };
-            grouped.push(studentMap[studentId]);
+            grouped.push(studentMap[groupKey]);
           }
 
-          const group = studentMap[studentId];
+          const group = studentMap[groupKey];
           group.originalFees.push(f);
           group.amount += f.amount || 0;
           
+          let isCourse = ['Sem', 'Term', 'Monthly'].includes(f.feeType);
+          let isCouncil = f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
+
+          if (isCourse) group.courseAmount += f.amount || 0;
+          if (isCouncil) group.councilAmount += f.amount || 0;
+
           if (f.isPenaltyApplied) {
             group.isPenaltyApplied = true;
             group.penaltyAmount += f.penaltyAmount || 0;
+            if (isCourse) group.coursePenaltyAmount += f.penaltyAmount || 0;
+            if (isCouncil) group.councilPenaltyAmount += f.penaltyAmount || 0;
           }
           if (f.isFinalPenaltyApplied) {
             group.isFinalPenaltyApplied = true;
             group.finalPenaltyAmount += f.finalPenaltyAmount || 0;
+            if (isCourse) group.coursePenaltyAmount += f.finalPenaltyAmount || 0;
+            if (isCouncil) group.councilPenaltyAmount += f.finalPenaltyAmount || 0;
           }
 
           // Combine payments
           if (f.payments && f.payments.length > 0) {
             f.payments.forEach(p => {
               group.payments.push(p);
+              if (isCourse) group.coursePayments.push(p);
+              if (isCouncil) group.councilPayments.push(p);
             });
           } else if (f.status === 'paid') {
             // Legacy paid record: simulate a payment to make the math work
-            group.payments.push({
+            const dummyPayment = {
               amount: f.amount,
               status: 'Approved',
               paidAt: f.paidAt || f.createdAt
-            });
+            };
+            group.payments.push(dummyPayment);
+            if (isCourse) group.coursePayments.push(dummyPayment);
+            if (isCouncil) group.councilPayments.push(dummyPayment);
           }
         });
 
@@ -336,11 +363,12 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
     }
   };
 
-  const handleCollectPayment = async (studentId, data) => {
+  const handleCollectPayment = async (studentId, data, targetFeeType, year) => {
     try {
       await api.post(`/student-fees/collect-cascade`, {
         studentId,
-        feeType,
+        feeType: targetFeeType || feeType,
+        year,
         ...data
       });
       fetchFees();
@@ -586,6 +614,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         <div>
           <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
           <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
+          <div className="text-[10px] text-brand-600 font-bold">{row.year || row.student?.year || ""}</div>
         </div>
       )
     },
@@ -696,6 +725,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         <div>
           <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
           <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
+          <div className="text-[10px] text-brand-600 font-bold">{row.year || row.student?.year || ""}</div>
         </div>
       )
     },
@@ -717,7 +747,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
     { 
-      name: "Fee Details", width:"180px",
+      name: feeType === 'Both' ? "Total Fees" : "Fee Details", width:"180px",
       selector: row => row.amount, 
       sortable: true, 
       cell: row => {
@@ -745,6 +775,42 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
       }
     },
     ...monthColumns,
+    ...(feeType === 'Both' ? [
+      {
+        name: "Course Fees", width: "140px",
+        selector: row => row.courseAmount,
+        cell: row => {
+          const totalCourseDue = row.courseAmount + row.coursePenaltyAmount;
+          const coursePaid = row.coursePayments ? row.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const courseBal = Math.max(0, totalCourseDue - coursePaid);
+          return (
+            <div className="flex flex-col gap-1 py-1.5">
+              <span className="text-xs font-black text-slate-800">Total: ₹{totalCourseDue?.toLocaleString("en-IN")}</span>
+              <span className={`text-[10px] font-bold ${courseBal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                Bal: ₹{courseBal.toLocaleString('en-IN')}
+              </span>
+            </div>
+          );
+        }
+      },
+      {
+        name: "Council Fees", width: "140px",
+        selector: row => row.councilAmount,
+        cell: row => {
+          const totalCouncilDue = row.councilAmount + row.councilPenaltyAmount;
+          const councilPaid = row.councilPayments ? row.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const councilBal = Math.max(0, totalCouncilDue - councilPaid);
+          return (
+            <div className="flex flex-col gap-1 py-1.5">
+              <span className="text-xs font-black text-slate-800">Total: ₹{totalCouncilDue?.toLocaleString("en-IN")}</span>
+              <span className={`text-[10px] font-bold ${councilBal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                Bal: ₹{councilBal.toLocaleString('en-IN')}
+              </span>
+            </div>
+          );
+        }
+      }
+    ] : []),
     {
       name: "Balance",
       width: "110px",
