@@ -29,6 +29,8 @@ const ExamManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showMarkModal, setShowMarkModal] = useState(false);
+  const [showSampleCsvModal, setShowSampleCsvModal] = useState(false);
+  const [sampleCsvForm, setSampleCsvForm] = useState({ courseId: "", batchId: "", centerId: "", semester: "" });
   const [showMarksheetModal, setShowMarksheetModal] = useState(false);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showHallTicketModal, setShowHallTicketModal] = useState(false);
@@ -338,6 +340,8 @@ const ExamManagement = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const toastId = toast.loading("Processing bulk upload...");
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -348,42 +352,96 @@ const ExamManagement = () => {
         const data = XLSX.utils.sheet_to_json(ws);
         
         if (data.length === 0) {
-           toast.error("Excel sheet is empty");
+           toast.error("Excel sheet is empty", { id: toastId });
            return;
         }
 
         const res = await api.post('/marks/bulk', { marks: data });
-        toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
+        toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`, { id: toastId });
         if (res.data.results.failed > 0) {
             console.error("Bulk Upload Errors:", res.data.results.errors);
             toast.error("Some records failed. Check console for details.");
         }
         fetchData();
       } catch (err) {
-        toast.error("Failed to process Excel file");
+        toast.error("Failed to process Excel file", { id: toastId });
       }
       e.target.value = null;
     };
     reader.readAsBinaryString(file);
   };
 
-  const downloadSampleExcel = () => {
-    let headers = ["Student ID", "Batch Name", "Semester", "Course Title"];
-    let rowData = ["STU123", "Batch A", 1, "Full Stack Web"];
+  const handleDownloadDynamicCSV = () => {
+    const { courseId, batchId, centerId, semester } = sampleCsvForm;
     
-    for (let i = 1; i <= 5; i++) {
-      headers.push(`Subject ${i} Code`, `Subject ${i} Theory`, `Subject ${i} Internal`, `Subject ${i} Practical`);
-      rowData.push(`SUB0${i}`, 40, 20, 10);
+    if (!courseId || !semester) {
+      toast.error("Course and Semester are required!");
+      return;
     }
     
-    const ws = XLSX.utils.aoa_to_sheet([headers, rowData]);
+    // Filter students
+    let filteredStudents = students;
+    if (courseId) {
+      filteredStudents = filteredStudents.filter(s => s.enrolledCourses?.some(c => c.course?._id === courseId || c.course === courseId));
+    }
+    if (batchId) {
+      filteredStudents = filteredStudents.filter(s => s.enrolledCourses?.some(c => c.batch?._id === batchId || c.batch === batchId));
+    }
+    if (centerId) {
+      filteredStudents = filteredStudents.filter(s => s.center?._id === centerId || s.center === centerId);
+    }
+    
+    // Filter subjects
+    const filteredSubjects = subjects.filter(sub => (sub.course?._id === courseId || sub.course === courseId) && sub.semester === Number(semester));
+    
+    if (filteredSubjects.length === 0) {
+      toast.error("No subjects found for the selected course and semester.");
+      return;
+    }
+    if (filteredStudents.length === 0) {
+      toast.error("No students found matching the selected criteria.");
+      return;
+    }
+    
+    // Construct Headers
+    let headers = ["Student ID", "Student Name", "Batch Name", "Course Title", "Semester"];
+    filteredSubjects.forEach((sub, index) => {
+      const i = index + 1;
+      headers.push(`Subject ${i} Code`, `Subject ${i} Mark`, `Subject ${i} Internal`);
+    });
+    
+    let rowsData = [];
+    
+    // Find course and batch names for reference
+    const courseObj = courses.find(c => c._id === courseId);
+    const courseTitle = courseObj ? courseObj.title : "";
+    const batchObj = batches.find(b => b._id === batchId);
+    const batchName = batchObj ? batchObj.name : "";
+    
+    filteredStudents.forEach(student => {
+      let row = [
+        student.studentId,
+        student.studentNameEnglish || "",
+        batchName,
+        courseTitle,
+        semester
+      ];
+      
+      filteredSubjects.forEach(sub => {
+        row.push(`${sub.code} - ${sub.name} (${sub.type || "Theory"})`, "", "");
+      });
+      rowsData.push(row);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsData]);
     const wscols = headers.map(h => ({ wch: Math.max(15, h.length + 2) }));
     ws['!cols'] = wscols;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sample");
     
-    XLSX.writeFile(wb, "sample_marks.xlsx");
+    XLSX.writeFile(wb, `prefilled_marks_sem${semester}.xlsx`);
+    setShowSampleCsvModal(false);
   };
 
   const handleMarkDelete = async (id) => {
@@ -902,7 +960,7 @@ const ExamManagement = () => {
         )}
         {isAdmin && activeTab === "marks" && (
           <>
-            <button onClick={downloadSampleExcel} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
+            <button onClick={() => setShowSampleCsvModal(true)} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
               <Download size={20} /> Sample CSV
             </button>
             <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
@@ -1547,6 +1605,99 @@ const ExamManagement = () => {
           exam={exams.find(e => String(e._id) === String(selectedHallTicketExam))}
           onClose={() => setShowHallTicketModal(false)}
         />
+      )}
+
+      {/* Sample CSV Modal */}
+      {showSampleCsvModal && (
+        <div className="fixed inset-0 z-[1000] overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in-95 duration-200 relative">
+            <button
+              onClick={() => setShowSampleCsvModal(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Download size={24} className="text-brand-600" /> Download Pre-filled Template
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Center</label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  value={sampleCsvForm.centerId}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, centerId: e.target.value })}
+                >
+                  <option value="">All Centers</option>
+                  {centers.map(c => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Batch</label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  value={sampleCsvForm.batchId}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, batchId: e.target.value, courseId: "" })}
+                >
+                  <option value="">All Batches</option>
+                  {batches.map(b => (
+                    <option key={b._id} value={b._id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Course <span className="text-red-500">*</span></label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  value={sampleCsvForm.courseId}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, courseId: e.target.value })}
+                >
+                  <option value="">Select Course</option>
+                  {(sampleCsvForm.batchId 
+                    ? courses.filter(c => batches.find(b => b._id === sampleCsvForm.batchId)?.courses?.some(bc => (bc._id || bc) === c._id))
+                    : courses
+                  ).map(c => (
+                    <option key={c._id} value={c._id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Semester <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  value={sampleCsvForm.semester}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, semester: e.target.value })}
+                  placeholder="e.g. 1"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowSampleCsvModal(false)}
+                  className="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDownloadDynamicCSV}
+                  className="px-6 py-2.5 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all active:scale-95 flex items-center gap-2"
+                >
+                  <Download size={18} /> Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

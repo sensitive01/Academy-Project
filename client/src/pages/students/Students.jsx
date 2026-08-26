@@ -583,16 +583,17 @@ const Students = () => {
   };
 
   const handleBulkDelete = async () => {
+    const toastId = toast.loading(`Deleting ${selectedStudents.length} students...`);
     try {
       const studentIds = selectedStudents.map(s => s._id);
       const { data } = await api.post(`/students/bulk-delete`, { ids: studentIds });
-      toast.success(data.message || "Students deleted successfully!");
+      toast.success(data.message || "Students deleted successfully!", { id: toastId });
       setSelectedStudents([]);
       setClearSelectedRows(!clearSelectedRows);
       setConfirmBulkDelete(false);
       fetchStudents();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to delete students");
+      toast.error(err.response?.data?.message || "Failed to delete students", { id: toastId });
     }
   };
 

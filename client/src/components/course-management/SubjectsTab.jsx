@@ -918,7 +918,6 @@ const SubjectsTab = () => {
                     >
                       <option value="Theory">Theory</option>
                       <option value="Practical">Practical</option>
-                      <option value="Both">Both</option>
                     </select>
                   </div>
                 </>

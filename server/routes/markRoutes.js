@@ -206,18 +206,27 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
 
         let processedAny = false;
 
-        const processSubject = async (codeKey, theoryKey, internalKey, pracKey) => {
+        const processSubject = async (codeKey, markKey, internalKey) => {
           if (!row[codeKey]) return false;
-          const subjectDoc = await Subject.findOne({ code: row[codeKey] });
+          let actualCode = String(row[codeKey]).split(' - ')[0].trim();
+          
+          const subjectDoc = await Subject.findOne({ code: actualCode });
           if (!subjectDoc) {
              results.failed += 1;
-             results.errors.push(`Row ${i + 1}: Subject code ${row[codeKey]} not found`);
+             results.errors.push(`Row ${i + 1}: Subject code ${actualCode} not found`);
              return true;
           }
           
-          const theoryMark = Number(row[theoryKey] || 0);
+          let theoryMark = 0;
+          let practicalMark = 0;
+          
+          if (subjectDoc.type === "Practical") {
+            practicalMark = Number(row[markKey] || 0);
+          } else {
+            theoryMark = Number(row[markKey] || 0);
+          }
+          
           const internalMark = Number(row[internalKey] || 0);
-          const practicalMark = Number(row[pracKey] || 0);
 
           const existing = await Mark.findOne({ student: studentDoc._id, semester, subject: subjectDoc._id });
           if (existing) {
@@ -245,13 +254,13 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
 
         // Check for old format
         if (row['Subject Code']) {
-           await processSubject('Subject Code', 'Theory Mark', 'Internal Mark', 'Practical Mark');
+           await processSubject('Subject Code', 'Mark', 'Internal Mark');
            processedAny = true;
         }
 
         // Check for new multiple-subject format (up to 20 subjects per row)
         for (let j = 1; j <= 20; j++) {
-           const found = await processSubject(`Subject ${j} Code`, `Subject ${j} Theory`, `Subject ${j} Internal`, `Subject ${j} Practical`);
+           const found = await processSubject(`Subject ${j} Code`, `Subject ${j} Mark`, `Subject ${j} Internal`);
            if (found) processedAny = true;
         }
 

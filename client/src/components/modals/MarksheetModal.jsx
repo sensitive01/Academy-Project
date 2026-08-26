@@ -137,9 +137,8 @@ const MarksheetModal = ({ data, onClose }) => {
                   <th className="border border-slate-200 p-3 text-left">Subject</th>
                   <th className="border border-slate-200 p-3 text-center">Max.<br/>Marks</th>
                   <th className="border border-slate-200 p-3 text-center">Pass<br/>Marks</th>
-                  <th className="border border-slate-200 p-3 text-center">Theory</th>
+                  <th className="border border-slate-200 p-3 text-center">External</th>
                   <th className="border border-slate-200 p-3 text-center">Internal</th>
-                  <th className="border border-slate-200 p-3 text-center">Practical</th>
                   <th className="border border-slate-200 p-3 text-center">Total<br/>Marks</th>
                   <th className="border border-slate-200 p-3 text-center">Grade</th>
                   <th className="border border-slate-200 p-3 text-center">Result</th>
@@ -147,29 +146,26 @@ const MarksheetModal = ({ data, onClose }) => {
               </thead>
               <tbody>
                 {marks.map((m, idx) => {
-                  const theory = m.theoryMark || 0;
+                  const external = m.subject?.type === "Practical" ? (m.practicalMark || 0) : (m.theoryMark || 0);
                   const internal = m.internalMark || 0;
-                  const practical = m.practicalMark || 0;
-                  const total = theory + internal + practical;
+                  const total = external + internal;
                   
                   const maxMark = 100;
                   const passMark = 35;
 
                   grandMax += maxMark;
                   grandTotal += total;
-                  grandTheory += theory;
+                  grandTheory += external;
                   grandInternal += internal;
-                  grandPractical += practical;
 
                   return (
                     <tr key={m._id} className="bg-transparent hover:bg-slate-50">
                       <td className="border border-slate-200 p-3 text-center">{idx + 1}</td>
-                      <td className="border border-slate-200 p-3 text-left font-medium text-slate-700 uppercase">{m.subject?.name || 'Unknown'}</td>
+                      <td className="border border-slate-200 p-3 text-left font-medium text-slate-700 uppercase">{m.subject?.name || 'Unknown'} ({m.subject?.type || 'Theory'})</td>
                       <td className="border border-slate-200 p-3 text-center">{maxMark}</td>
                       <td className="border border-slate-200 p-3 text-center">{passMark}</td>
-                      <td className="border border-slate-200 p-3 text-center">{theory}</td>
+                      <td className="border border-slate-200 p-3 text-center">{external}</td>
                       <td className="border border-slate-200 p-3 text-center">{internal}</td>
-                      <td className="border border-slate-200 p-3 text-center">{practical}</td>
                       <td className="border border-slate-200 p-3 text-center font-semibold">{total}</td>
                       <td className="border border-slate-200 p-3 text-center font-bold text-[#1e3a8a]">{getGrade((total / maxMark) * 100)}</td>
                       <td className="border border-slate-200 p-3 text-center font-bold text-slate-800">{m.isPass ? 'PASS' : 'FAIL'}</td>
@@ -180,10 +176,9 @@ const MarksheetModal = ({ data, onClose }) => {
                   <td className="border border-slate-200 p-3 text-center" colSpan="2"></td>
                   <td className="border border-slate-200 p-3 text-center">{grandMax}</td>
                   <td className="border border-slate-200 p-3 text-center"></td>
-                  <td className="border border-slate-200 p-3 text-center"></td>
-                  <td className="border border-slate-200 p-3 text-center"></td>
-                  <td className="border border-slate-200 p-3 text-center"></td>
-                  <td className="border border-slate-200 p-3 text-center">{grandTotal}</td>
+                  <td className="border border-slate-200 p-3 text-center">{grandTheory}</td>
+                  <td className="border border-slate-200 p-3 text-center">{grandInternal}</td>
+                  <td className="border border-slate-200 p-3 text-center font-bold">{grandTotal}</td>
                   <td className="border border-slate-200 p-3 text-center font-bold text-[#1e3a8a]">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
                   <td className="border border-slate-200 p-3 text-center"></td>
                 </tr>
