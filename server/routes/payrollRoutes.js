@@ -7,7 +7,7 @@ const Employee = require("../models/Employee");
 const Leave = require("../models/Leave");
 const Attendance = require("../models/Attendance");
 const { protect } = require("../middleware/authMiddleware");
-const PDFDocument = require("pdfkit"); 
+const PDFDocument = require("pdfkit");
 const toWords = require('number-to-words');
 
 // GET ALL PAYROLLS
@@ -29,23 +29,23 @@ router.get("/salary/all", protect, async (req, res) => {
     if (internOnly === "true") {
       const Student = require("../models/Student");
       const students = await Student.find({ "internships.0": { $exists: true } }).populate("user");
-      
+
       students.forEach(s => {
         let activeInternships = (s.internships || []).filter(internship => {
           if (internship.status && internship.status !== 'active' && internship.status !== 'completed') return false;
-          
+
           if (!internship.startDate) return true;
           const iStart = new Date(internship.startDate);
           if (isNaN(iStart.getTime())) return true;
           iStart.setHours(0, 0, 0, 0);
-          
+
           const iEnd = internship.endDate ? new Date(internship.endDate) : null;
           if (iEnd && !isNaN(iEnd.getTime())) iEnd.setHours(23, 59, 59, 999);
-          
+
           // Check overlap with current month (startDate to endDate)
           if (iStart > endDate) return false;
           if (iEnd && iEnd < startDate) return false;
-          
+
           return true;
         });
 
@@ -66,7 +66,7 @@ router.get("/salary/all", protect, async (req, res) => {
               overlapStart.setHours(0, 0, 0, 0);
             }
           }
-          
+
           let overlapEnd = new Date(endDate);
           if (internship.endDate) {
             const d = new Date(internship.endDate);
@@ -75,7 +75,7 @@ router.get("/salary/all", protect, async (req, res) => {
               overlapEnd.setHours(23, 59, 59, 999);
             }
           }
-          
+
           targetUsers.push({
             _id: s._id,
             user: s.user?._id,
@@ -107,19 +107,24 @@ router.get("/salary/all", protect, async (req, res) => {
           year: y,
           internshipId: emp.internshipId || null
         };
-        
+
         const payroll = await Payroll.findOne(payrollQuery);
 
         // 2. Fetch Attendance & Leaves
         let present = 0;
         let absent = 0;
+        let empTotalDays = totalDaysInMonth;
         let lateDays = 0;
         let lateTimeDisplay = "0h 0m";
 
-        if (userId) {
+        if (payroll && payroll.isManualAttendance) {
+          present = payroll.present;
+          absent = payroll.absent;
+          empTotalDays = payroll.totalDays;
+        } else if (userId) {
           const attStart = emp.overlapStart || startDate;
           const attEnd = emp.overlapEnd || endDate;
-          
+
           const attendance = await Attendance.find({
             userId,
             date: { $gte: attStart, $lte: attEnd }
@@ -134,9 +139,9 @@ router.get("/salary/all", protect, async (req, res) => {
           });
           absent = leaves.length;
 
-          let shiftStart = emp.shift?.start || "09:30"; 
+          let shiftStart = emp.shift?.start || "09:30";
           if (shiftStart.split(":").length === 2) shiftStart += ":00";
-          
+
           const shift = new Date(`1970-01-01T${shiftStart}`);
           let totalLateMinutes = 0;
 
@@ -184,7 +189,7 @@ router.get("/salary/all", protect, async (req, res) => {
             createdAt: a.createdAt,
             _id: a._id
           })) : [],
-          totalDays: totalDaysInMonth,
+          totalDays: empTotalDays,
           present,
           absent,
           lateDays,
@@ -244,9 +249,9 @@ router.post("/bulk-status", protect, async (req, res) => {
         validInternshipId = internshipId;
       }
 
-      const findQuery = { 
-        employee: targetEmpId, 
-        month: Number(month), 
+      const findQuery = {
+        employee: targetEmpId,
+        month: Number(month),
         year: Number(year)
       };
       if (validInternshipId) {
@@ -254,15 +259,15 @@ router.post("/bulk-status", protect, async (req, res) => {
       } else {
         findQuery.internshipId = { $in: [null, undefined] };
       }
-      
+
       let payroll = await Payroll.findOne(findQuery);
-      
+
       if (payroll) {
         await Payroll.updateOne({ _id: payroll._id }, { $set: { status: status } });
       } else {
         let salary = 0;
         let employee = await Employee.findById(targetEmpId);
-        
+
         if (employee) {
           salary = employee.salary || 0;
         } else {
@@ -353,7 +358,7 @@ router.post("/adjustment", protect, async (req, res) => {
     if (!payroll) {
       let salary = 0;
       let emp = await Employee.findById(employeeId);
-      
+
       if (emp) {
         salary = emp.salary;
       } else {
@@ -421,17 +426,17 @@ router.post("/adjustment", protect, async (req, res) => {
 router.post("/bulk-adjustment", protect, async (req, res) => {
   try {
     const { adjustments } = req.body;
-    
+
     if (!Array.isArray(adjustments) || adjustments.length === 0) {
       return res.status(400).json({ message: "No adjustments provided" });
     }
 
     let processedCount = 0;
-    
+
     for (const adj of adjustments) {
-      const { employeeId, month, year, type, amount, note, internshipId } = adj;
-      
-      if (!employeeId || !month || !year || !type || !amount) {
+      const { employeeId, month, year, type, amount, note, internshipId, allowance, allowanceReason, deduction, deductionReason, totalDays, present, absent } = adj;
+
+      if (!employeeId || !month || !year) {
         continue;
       }
 
@@ -465,7 +470,7 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
       if (!payroll) {
         let salary = 0;
         let emp = await Employee.findById(targetEmpId);
-        
+
         if (emp) {
           salary = emp.salary;
         } else {
@@ -499,28 +504,65 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
         });
       }
 
-      payroll.adjustments.push({
-        type,
-        amount: Number(amount),
-        note: note || ""
-      });
+      let updated = false;
 
-      if (type === "allowance") payroll.totalAllowances += Number(amount);
-      if (type === "deduction") payroll.totalDeductions += Number(amount);
-      if (type === "advance") payroll.advance += Number(amount);
+      // Legacy format check
+      if (type && amount) {
+        payroll.adjustments.push({
+          type,
+          amount: Number(amount),
+          note: note || ""
+        });
+        if (type === "allowance") payroll.totalAllowances += Number(amount);
+        if (type === "deduction") payroll.totalDeductions += Number(amount);
+        if (type === "advance") payroll.advance += Number(amount);
+        updated = true;
+      }
 
-      payroll.netSalary =
-        payroll.basicSalary +
-        payroll.totalAllowances -
-        payroll.totalDeductions -
-        payroll.advance;
+      // New row-based format check
+      if (allowance && Number(allowance) > 0) {
+        payroll.adjustments.push({
+          type: "allowance",
+          amount: Number(allowance),
+          note: allowanceReason || ""
+        });
+        payroll.totalAllowances += Number(allowance);
+        updated = true;
+      }
 
-      await payroll.save({ validateBeforeSave: false });
-      processedCount++;
+      if (deduction && Number(deduction) > 0) {
+        payroll.adjustments.push({
+          type: "deduction",
+          amount: Number(deduction),
+          note: deductionReason || ""
+        });
+        payroll.totalDeductions += Number(deduction);
+        updated = true;
+      }
+
+      // Attendance check
+      if (totalDays !== undefined && present !== undefined && absent !== undefined) {
+        payroll.totalDays = Number(totalDays);
+        payroll.present = Number(present);
+        payroll.absent = Number(absent);
+        payroll.isManualAttendance = true;
+        updated = true;
+      }
+
+      if (updated) {
+        payroll.netSalary =
+          payroll.basicSalary +
+          payroll.totalAllowances -
+          payroll.totalDeductions -
+          payroll.advance;
+
+        await payroll.save({ validateBeforeSave: false });
+        processedCount++;
+      }
     }
 
     res.status(200).json({
-      message: `Bulk adjustments applied. Processed ${processedCount} adjustments.`,
+      message: `Processed ${processedCount} adjustments successfully`
     });
 
   } catch (err) {
@@ -536,7 +578,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
   try {
     const payrollRaw = await Payroll.findById(req.params.id);
     if (!payrollRaw) return res.status(404).json({ message: "Payroll not found" });
-    
+
     let payroll = await Payroll.findById(req.params.id).populate('employee');
     let emp = payroll.employee;
     let isIntern = Boolean(payrollRaw.internshipId);
@@ -552,11 +594,11 @@ router.get('/payslip/:id', protect, async (req, res) => {
             internDept = `Intern (${internship.vendorName})`;
           }
         }
-        
+
         emp = {
           _id: student._id,
           user: student.user?._id,
-          studentId: student.studentId || student._id.toString().substring(0,8).toUpperCase(),
+          studentId: student.studentId || student._id.toString().substring(0, 8).toUpperCase(),
           firstName: student.user?.name || student.studentNameEnglish,
           lastName: "",
           department: internDept,
@@ -574,42 +616,42 @@ router.get('/payslip/:id', protect, async (req, res) => {
         const Student = require("../models/Student");
         const student = await Student.findById(payrollRaw.employee);
         if (student) {
-          emp.studentId = student.studentId || student._id.toString().substring(0,8).toUpperCase();
+          emp.studentId = student.studentId || student._id.toString().substring(0, 8).toUpperCase();
         }
       }
     }
-    
+
     const userId = emp.user; // To fetch attendance
 
     // Recalculate Attendance precisely since it is not saved to Payroll model continuously
     const m = payroll.month;
     const y = payroll.year;
-    
+
     let startDate = new Date(y, m - 1, 1);
     let endDate = new Date(y, m, 0, 23, 59, 59, 999);
     let totalDaysInMonth = endDate.getDate();
-    
+
     if (emp.internshipId) {
-       const Student = require("../models/Student");
-       const s = await Student.findById(payrollRaw.employee);
-       if (s && s.internships) {
-          const internship = s.internships.find(i => i._id.toString() === emp.internshipId.toString());
-          if (internship) {
-            const iStart = new Date(internship.startDate);
-            iStart.setHours(0,0,0,0);
-            if (iStart > startDate) startDate = iStart;
-            
-            if (internship.endDate) {
-               const iEnd = new Date(internship.endDate);
-               iEnd.setHours(23,59,59,999);
-               if (iEnd < endDate) endDate = iEnd;
-            }
-            
-            // Calculate days for the internship portion of the month
-            const diffTime = Math.abs(endDate - startDate);
-            totalDaysInMonth = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const Student = require("../models/Student");
+      const s = await Student.findById(payrollRaw.employee);
+      if (s && s.internships) {
+        const internship = s.internships.find(i => i._id.toString() === emp.internshipId.toString());
+        if (internship) {
+          const iStart = new Date(internship.startDate);
+          iStart.setHours(0, 0, 0, 0);
+          if (iStart > startDate) startDate = iStart;
+
+          if (internship.endDate) {
+            const iEnd = new Date(internship.endDate);
+            iEnd.setHours(23, 59, 59, 999);
+            if (iEnd < endDate) endDate = iEnd;
           }
-       }
+
+          // Calculate days for the internship portion of the month
+          const diffTime = Math.abs(endDate - startDate);
+          totalDaysInMonth = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+      }
     }
 
     let present = 0;
@@ -632,7 +674,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
       });
       absent = leaves.length;
 
-      let shiftStart = emp.shift?.start || "09:30"; 
+      let shiftStart = emp.shift?.start || "09:30";
       if (shiftStart.split(":").length === 2) shiftStart += ":00";
       const shift = new Date(`1970-01-01T${shiftStart}`);
 
@@ -669,36 +711,36 @@ router.get('/payslip/:id', protect, async (req, res) => {
     const accentColor = '#e2e8f0'; // Slate-200
     const textDark = '#0f172a';
     const textLight = '#64748b';
-    
+
     // ===============================
     // HEADER (Company Info)
     // ===============================
     doc.rect(0, 0, doc.page.width, 100).fill(primaryColor);
-    
+
     doc.fillColor('#ffffff')
-       .fontSize(28).font('Helvetica-Bold')
-       .text("DR ACADEMY", 50, 35);
-       
+      .fontSize(28).font('Helvetica-Bold')
+      .text("DR ACADEMY", 50, 35);
+
     doc.fontSize(10).font('Helvetica')
-       .opacity(0.8)
-       .text(isIntern ? "Official Intern Stipend Slip" : "Official Employee Payslip", 50, 65)
-       .opacity(1);
+      .opacity(0.8)
+      .text(isIntern ? "Official Intern Stipend Slip" : "Official Employee Payslip", 50, 65)
+      .opacity(1);
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthName = monthNames[m - 1];
 
     let payslipPeriod = `${isIntern ? 'Stipend Slip' : 'Payslip'} for ${monthName} ${y}`;
     if (emp.internshipId) {
-      const sDateStr = startDate.getDate().toString().padStart(2, '0') + '-' + monthNames[startDate.getMonth()].substring(0,3);
-      const eDateStr = endDate.getDate().toString().padStart(2, '0') + '-' + monthNames[endDate.getMonth()].substring(0,3);
+      const sDateStr = startDate.getDate().toString().padStart(2, '0') + '-' + monthNames[startDate.getMonth()].substring(0, 3);
+      const eDateStr = endDate.getDate().toString().padStart(2, '0') + '-' + monthNames[endDate.getMonth()].substring(0, 3);
       if (startDate.getDate() !== 1 || endDate.getDate() !== new Date(y, m, 0).getDate()) {
-         payslipPeriod = `${monthName} ${y} (${sDateStr} to ${eDateStr})`;
+        payslipPeriod = `${monthName} ${y} (${sDateStr} to ${eDateStr})`;
       }
     }
 
     doc.fillColor('#ffffff')
-       .fontSize(12).font('Helvetica-Bold')
-       .text(payslipPeriod, doc.page.width - 320, 45, { width: 270, align: 'right' });
+      .fontSize(12).font('Helvetica-Bold')
+      .text(payslipPeriod, doc.page.width - 320, 45, { width: 270, align: 'right' });
 
     // ===============================
     // EMPLOYEE / INTERN DETAILS SECTION
@@ -708,33 +750,33 @@ router.get('/payslip/:id', protect, async (req, res) => {
 
     // Box around details
     doc.rect(50, topY, doc.page.width - 100, 90)
-       .lineWidth(1).strokeColor(accentColor).stroke();
+      .lineWidth(1).strokeColor(accentColor).stroke();
 
     doc.fillColor(textDark)
-       .fontSize(13).font('Helvetica-Bold')
-       .text(isIntern ? "Intern Information" : "Employee Information", 65, topY + 15);
+      .fontSize(13).font('Helvetica-Bold')
+      .text(isIntern ? "Intern Information" : "Employee Information", 65, topY + 15);
 
     doc.fontSize(10).font('Helvetica').fillColor(textLight);
-    
+
     // Left column info
     doc.text("Name:", 65, topY + 40)
-       .text(isIntern ? "Student ID:" : "Employee ID:", 65, topY + 60);
+      .text(isIntern ? "Student ID:" : "Employee ID:", 65, topY + 60);
 
     // Right column info
     const midX = doc.page.width / 2;
     doc.text("Department:", midX, topY + 40)
-       .text("Designation:", midX, topY + 60);
+      .text("Designation:", midX, topY + 60);
 
     // Values (Dark details)
-    const displayId = isIntern 
-      ? (emp.studentId || emp.empId || payroll._id.toString().substring(0,8).toUpperCase())
-      : (emp.empId || payroll._id.toString().substring(0,8).toUpperCase());
+    const displayId = isIntern
+      ? (emp.studentId || emp.empId || payroll._id.toString().substring(0, 8).toUpperCase())
+      : (emp.empId || payroll._id.toString().substring(0, 8).toUpperCase());
 
     doc.fillColor(textDark).font('Helvetica-Bold');
     doc.text(`${emp.firstName} ${emp.lastName}`.trim(), 145, topY + 40)
-       .text(displayId, 145, topY + 60)
-       .text((emp.department || '-').toUpperCase(), midX + 80, topY + 40)
-       .text((emp.position || (isIntern ? 'INTERN' : '-')).toUpperCase(), midX + 80, topY + 60);
+      .text(displayId, 145, topY + 60)
+      .text((emp.department || '-').toUpperCase(), midX + 80, topY + 40)
+      .text((emp.position || (isIntern ? 'INTERN' : '-')).toUpperCase(), midX + 80, topY + 60);
 
 
     // ===============================
@@ -742,25 +784,25 @@ router.get('/payslip/:id', protect, async (req, res) => {
     // ===============================
     topY += 110;
     doc.rect(50, topY, doc.page.width - 100, 65)
-       .lineWidth(1).strokeColor(accentColor).stroke();
+      .lineWidth(1).strokeColor(accentColor).stroke();
 
     doc.fillColor(textDark)
-       .fontSize(11).font('Helvetica-Bold')
-       .text("Attendance & Time Tracking", 65, topY + 10);
-    
+      .fontSize(11).font('Helvetica-Bold')
+      .text("Attendance & Time Tracking", 65, topY + 10);
+
     doc.fontSize(9).font('Helvetica').fillColor(textLight);
     doc.text("Total Days:", 65, topY + 30)
-       .text("Present:", 165, topY + 30)
-       .text("Leaves/Absent:", 265, topY + 30)
-       .text("Late Days:", 375, topY + 30)
-       .text("Total Late Hrs:", 455, topY + 30);
+      .text("Present:", 165, topY + 30)
+      .text("Leaves/Absent:", 265, topY + 30)
+      .text("Late Days:", 375, topY + 30)
+      .text("Total Late Hrs:", 455, topY + 30);
 
     doc.fillColor(textDark).font('Helvetica-Bold');
     doc.text(totalDaysInMonth.toString(), 65, topY + 45)
-       .text(present.toString(), 165, topY + 45)
-       .text(absent.toString(), 265, topY + 45)
-       .text(lateDays.toString(), 375, topY + 45)
-       .text(lateTimeDisplay, 455, topY + 45);
+      .text(present.toString(), 165, topY + 45)
+      .text(absent.toString(), 265, topY + 45)
+      .text(lateDays.toString(), 375, topY + 45)
+      .text(lateTimeDisplay, 455, topY + 45);
 
     // ===============================
     // SALARY / STIPEND BREAKDOWN TABLE
@@ -771,9 +813,9 @@ router.get('/payslip/:id', protect, async (req, res) => {
     doc.rect(50, topY, doc.page.width - 100, 25).fill(accentColor);
     doc.fillColor(textDark).fontSize(10).font('Helvetica-Bold');
     doc.text("Earnings", 60, topY + 7, { width: 200 })
-       .text("Amount (INR)", 210, topY + 7, { width: 80, align: 'right' })
-       .text("Deductions", 310, topY + 7, { width: 150 })
-       .text("Amount (INR)", 450, topY + 7, { width: 80, align: 'right' });
+      .text("Amount (INR)", 210, topY + 7, { width: 80, align: 'right' })
+      .text("Deductions", 310, topY + 7, { width: 150 })
+      .text("Amount (INR)", 450, topY + 7, { width: 80, align: 'right' });
 
     let currentY = topY + 35;
 
@@ -783,7 +825,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
     if (allowanceAdjustments.length > 0) {
       allowanceAdjustments.forEach(a => {
         earnings.push({ name: a.note ? `Allowance (${a.note})` : 'Allowance', amount: a.amount });
-      }); 
+      });
     } else if (payroll.totalAllowances > 0) {
       earnings.push({ name: 'Allowances (Total)', amount: payroll.totalAllowances });
     }
@@ -840,9 +882,9 @@ router.get('/payslip/:id', protect, async (req, res) => {
     // ===============================
     currentY += 10;
     doc.font('Helvetica').fontSize(10).fillColor(textDark);
-    
+
     let sumAllowances = totalEarning - payroll.basicSalary;
-    
+
     let sumAdvances = 0;
     const advAdj = (payroll.adjustments || []).filter(a => a.type === 'advance');
     if (advAdj.length > 0) {
@@ -863,7 +905,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
     doc.text("Total Advances", 310, currentY);
     doc.text(sumAdvances.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 450, currentY, { width: 80, align: 'right' });
     currentY += 15;
-    
+
     doc.moveTo(50, currentY).lineTo(doc.page.width - 50, currentY).lineWidth(1).strokeColor(accentColor).stroke();
     currentY += 10;
 
@@ -873,7 +915,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
     doc.font('Helvetica-Bold').fontSize(10).fillColor(textDark);
     doc.text("Gross Earnings", 60, currentY);
     doc.text(totalEarning.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 210, currentY, { width: 80, align: 'right' });
-    
+
     doc.text("Total Deducted", 310, currentY);
     doc.text(totalDeduction.toLocaleString('en-IN', { minimumFractionDigits: 2 }), 450, currentY, { width: 80, align: 'right' });
 
@@ -881,10 +923,10 @@ router.get('/payslip/:id', protect, async (req, res) => {
     // NET PAY BLOCK
     // ===============================
     currentY += 40;
-    
+
     doc.rect(doc.page.width - 250, currentY, 200, 35)
-       .fill('#1e40af'); // blue-800
-    
+      .fill('#1e40af'); // blue-800
+
     doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold');
     doc.text(isIntern ? "Net Stipend :" : "Net Salary :", doc.page.width - 240, currentY + 11);
     doc.text("₹ " + payroll.netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2 }), doc.page.width - 150, currentY + 11, { width: 90, align: 'right' });
@@ -895,7 +937,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
       doc.text(`Amount in words: Rupees ${toWords.toWords(payroll.netSalary).replace(/-/g, ' ')} only.`, 50, currentY + 14);
     } catch (e) {
       // Ignore if number-to-words is not robust enough
-    } 
+    }
 
     // ===============================
     // FOOTER (Signatures & Notes)
@@ -914,7 +956,7 @@ router.get('/payslip/:id', protect, async (req, res) => {
     doc.page.margins.bottom = 0;
 
     doc.fontSize(8).fillColor('#94a3b8')
-       .text("This is a computer-generated document. No signature is required for official purposes.", 0, doc.page.height - 30, { align: "center", width: doc.page.width });
+      .text("This is a computer-generated document. No signature is required for official purposes.", 0, doc.page.height - 30, { align: "center", width: doc.page.width });
 
     doc.page.margins.bottom = oldBottomMargin;
 

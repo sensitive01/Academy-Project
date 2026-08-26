@@ -35,6 +35,8 @@ const payrollSchema = new mongoose.Schema(
     // Store multiple adjustments
     adjustments: [adjustmentSchema],
 
+    isManualAttendance: { type: Boolean, default: false },
+
     status: { type: String, default: "process" },
   },
   { timestamps: true }

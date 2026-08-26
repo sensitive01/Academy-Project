@@ -46,8 +46,9 @@ connectDB().then(async () => {
   try {
     const res = await Batch.updateMany(
       { course: { $exists: true }, courses: { $exists: false } },
-      [{ $set: { courses: ["$course"] } }]
-    );
+      [{ $set: { courses: ["$course"] } }],
+      { updatePipeline: true }
+    ); 
     if (res.modifiedCount > 0) {
       console.log(`Migrated ${res.modifiedCount} batches to new courses array format.`);
     }
