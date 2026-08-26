@@ -49,76 +49,14 @@ router.get('/student/:studentId', async (req, res) => {
   }
 });
 
-// @route   POST /api/public-results/send-otp
-// @desc    Send OTP to student's registered email
-router.post('/send-otp', async (req, res) => {
-  try {
-    const { studentId } = req.body;
-    
-    if (!studentId) {
-      return res.status(400).json({ message: 'Student ID is required' });
-    }
-
-    const student = await Student.findOne({ studentId });
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
-    }
-
-    const email = student.email;
-    if (!email) {
-      return res.status(400).json({ message: 'No email registered for this student' });
-    }
-
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Save to database
-    await Otp.findOneAndUpdate(
-      { email },
-      { otp, createdAt: Date.now() },
-      { upsert: true, new: true }
-    );
-
-    // Send Email
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Results Access OTP - Dr.RG Academy',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px; margin: auto;">
-          <h2 style="color: #b91c1c; text-align: center;">Dr.RG Academy</h2>
-          <p>Dear ${student.studentNameEnglish},</p>
-          <p>Your OTP to access your academic results is:</p>
-          <div style="background: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #111827; border-radius: 8px; margin: 20px 0;">
-            ${otp}
-          </div>
-          <p>This OTP is valid for 5 minutes. Please do not share it with anyone.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 12px; color: #6b7280; text-align: center;">
-            &copy; ${new Date().getFullYear()} Dr.RG Academy. All rights reserved.
-          </p>
-        </div>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    res.status(200).json({ message: 'OTP sent successfully' });
-  } catch (error) {
-    console.error('SEND RESULT OTP ERROR:', error);
-    res.status(500).json({ message: 'Failed to send OTP' });
-  }
-});
-
 // @route   POST /api/public-results/results
-// @desc    Verify OTP and fetch results
+// @desc    Verify DOB and fetch results
 router.post('/results', async (req, res) => {
   try {
-    const { studentId, otp } = req.body;
+    const { studentId, dob } = req.body;
     
-    if (!studentId || !otp) {
-      return res.status(400).json({ message: 'Student ID and OTP are required' });
+    if (!studentId || !dob) {
+      return res.status(400).json({ message: 'Student ID and Date of Birth are required' });
     }
 
     const student = await Student.findOne({ studentId })
@@ -128,19 +66,19 @@ router.post('/results', async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const email = student.email;
-    const otpRecord = await Otp.findOne({ email });
-
-    if (!otpRecord) {
-      return res.status(400).json({ message: 'OTP expired or not found. Please request a new one.' });
+    if (!student.dob) {
+      return res.status(400).json({ message: 'DOB not registered for this student. Contact administration.' });
     }
 
-    if (otpRecord.otp !== otp) {
-      return res.status(400).json({ message: 'Invalid OTP' });
-    }
+    const studentDob = new Date(student.dob);
+    const day = String(studentDob.getDate()).padStart(2, '0');
+    const month = String(studentDob.getMonth() + 1).padStart(2, '0');
+    const year = studentDob.getFullYear();
+    const formattedStoredDob = `${day}-${month}-${year}`;
 
-    // Optional: Delete OTP after successful verification
-    await Otp.deleteOne({ email });
+    if (dob !== formattedStoredDob) {
+      return res.status(400).json({ message: 'Invalid Date of Birth' });
+    }
 
     // Fetch marks
     const marks = await Mark.find({ student: student._id })

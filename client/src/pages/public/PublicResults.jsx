@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { Search, ShieldCheck, FileText, ArrowRight, Mail, CheckCircle, GraduationCap } from 'lucide-react';
@@ -6,56 +6,28 @@ import { Search, ShieldCheck, FileText, ArrowRight, Mail, CheckCircle, Graduatio
 const PublicResults = () => {
   const [step, setStep] = useState(1);
   const [studentId, setStudentId] = useState('');
-  const [studentDetails, setStudentDetails] = useState(null);
-  const [otp, setOtp] = useState('');
+  const [dob, setDob] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Step 1: Fetch Student Details
-  const handleFetchDetails = async (e) => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Fetch Results
+  const handleFetchResults = async (e) => {
     e.preventDefault();
     if (!studentId) return toast.error('Please enter your Student ID');
+    if (!dob) return toast.error('Please enter your Date of Birth');
 
     setLoading(true);
     try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/public-results/student/${studentId}`);
-      setStudentDetails(data);
-      setStep(2);
-      toast.success('Student details fetched');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to fetch details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 2: Request OTP
-  const handleRequestOtp = async () => {
-    setLoading(true);
-    try {
-      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/public-results/send-otp`, { studentId });
-      setStep(3);
-      toast.success(data.message || 'OTP sent to your email');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 3: Verify OTP and Fetch Results
-  const handleVerifyAndFetch = async (e) => {
-    e.preventDefault();
-    if (!otp) return toast.error('Please enter the OTP');
-
-    setLoading(true);
-    try {
-      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/public-results/results`, { studentId, otp });
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/public-results/results`, { studentId, dob });
       setResults(data);
-      setStep(4);
+      setStep(2);
       toast.success('Results fetched successfully');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Invalid OTP or failed to fetch results');
+      toast.error(error.response?.data?.message || 'Invalid Student ID or Date of Birth');
     } finally {
       setLoading(false);
     }
@@ -91,16 +63,13 @@ const PublicResults = () => {
             <div className="flex items-center justify-between max-w-2xl mx-auto">
               {[
                 { id: 1, label: 'Search', icon: Search },
-                { id: 2, label: 'Verify', icon: ShieldCheck },
-                { id: 3, label: 'Auth', icon: Mail },
-                { id: 4, label: 'Results', icon: FileText }
+                { id: 2, label: 'Results', icon: FileText }
               ].map((item, index) => (
                 <div key={item.id} className="flex flex-col items-center flex-1 relative">
                   {/* Connecting Line */}
-                  {index < 3 && (
+                  {index < 1 && (
                     <div className={`absolute top-5 left-[50%] w-full h-[2px] -z-10 transition-colors duration-500 ${step > item.id ? 'bg-brand-500' : 'bg-slate-200'}`}></div>
                   )}
-
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 relative z-10 ${step >= item.id
                       ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/30'
                       : 'bg-white text-slate-400 border border-slate-200'
@@ -119,24 +88,40 @@ const PublicResults = () => {
 
             {/* Step 1 */}
             {step === 1 && (
-              <form onSubmit={handleFetchDetails} className="space-y-8 animate-fade-in-up max-w-md mx-auto">
+              <form onSubmit={handleFetchResults} className="space-y-8 animate-fade-in-up max-w-md mx-auto">
                 <div className="text-center mb-10">
                   <h2 className="text-3xl font-bold text-slate-800">Find Your Results</h2>
-                  <p className="text-slate-500 mt-3 font-light">Enter your official academy Student ID to access your academic transcripts securely.</p>
+                  <p className="text-slate-500 mt-3 font-light">Enter your official academy Student ID and Date of Birth to access your academic transcripts securely.</p>
                 </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-brand-400" />
+                <div className="relative space-y-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-brand-400" />
+                    </div>
+                    <input
+                      type="text"
+                      id="studentId"
+                      value={studentId}
+                      onChange={(e) => setStudentId(e.target.value)}
+                      className="block w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-lg bg-slate-50 focus:bg-white transition-all uppercase placeholder:normal-case"
+                      placeholder="Enter Student ID (e.g. STU-XXXX-YYYY)"
+                      required
+                    />
                   </div>
-                  <input
-                    type="text"
-                    id="studentId"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    className="block w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-lg bg-slate-50 focus:bg-white transition-all uppercase placeholder:normal-case"
-                    placeholder="Enter Student ID (e.g. STU-XXXX-YYYY)"
-                    required
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <ShieldCheck className="h-5 w-5 text-brand-400" />
+                    </div>
+                    <input
+                      type="text"
+                      id="dob"
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      className="block w-full pl-12 pr-4 py-4 rounded-xl border border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-lg bg-slate-50 focus:bg-white transition-all placeholder:normal-case"
+                      placeholder="DD-MM-YYYY"
+                      required
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -148,93 +133,8 @@ const PublicResults = () => {
               </form>
             )}
 
-            {/* Step 2 */}
-            {step === 2 && studentDetails && (
-              <div className="space-y-8 animate-fade-in-up text-center max-w-lg mx-auto">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-800">Identity Verification</h2>
-                  <p className="text-slate-500 mt-3 font-light">Please verify that these details belong to you before requesting access.</p>
-                </div>
-
-                <div className="bg-gradient-to-br from-slate-50 to-brand-50 rounded-2xl p-8 border border-brand-100 shadow-inner">
-                  <div className="mb-6">
-                    <span className="block text-xs font-bold text-brand-500 tracking-widest uppercase mb-1">Student Name</span>
-                    <span className="block text-2xl font-bold text-slate-900">{studentDetails.name}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-brand-500 tracking-widest uppercase mb-1">Registered Email</span>
-                    <span className="block text-xl font-medium text-slate-700">{studentDetails.maskedEmail}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="flex-1 py-4 px-4 border-2 border-slate-200 rounded-xl text-lg font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
-                  >
-                    Not Me? Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRequestOtp}
-                    disabled={loading}
-                    className="flex-1 py-4 px-4 rounded-xl shadow-lg shadow-brand-500/20 text-lg font-bold text-white bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 flex justify-center items-center gap-2"
-                  >
-                    {loading ? 'Sending OTP...' : <>Send Secure OTP <ShieldCheck size={20} /></>}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3 */}
-            {step === 3 && (
-              <form onSubmit={handleVerifyAndFetch} className="space-y-8 animate-fade-in-up max-w-md mx-auto">
-                <div className="text-center mb-10">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-50 text-brand-500 mb-6">
-                    <Mail size={32} />
-                  </div>
-                  <h2 className="text-3xl font-bold text-slate-800">Check Your Email</h2>
-                  <p className="text-slate-500 mt-3 font-light leading-relaxed">
-                    We've sent a 6-digit security code to <br />
-                    <span className="font-bold text-slate-800">{studentDetails?.maskedEmail}</span>
-                  </p>
-                </div>
-
-                <div>
-                  <input
-                    type="text"
-                    id="otp"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    className="block w-full rounded-xl border-slate-200 shadow-inner focus:border-brand-500 focus:ring-brand-500 text-center text-3xl font-mono tracking-[0.5em] px-4 py-4 bg-slate-50 transition-colors"
-                    placeholder="000000"
-                    maxLength={6}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="flex-1 py-4 px-4 border-2 border-slate-200 rounded-xl text-lg font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading || otp.length < 6}
-                    className="flex-1 py-4 px-4 rounded-xl shadow-lg shadow-brand-500/20 text-lg font-bold text-white bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 flex justify-center items-center gap-2"
-                  >
-                    {loading ? 'Verifying...' : <>View Results <CheckCircle size={20} /></>}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Step 4 */}
-            {step === 4 && results && (
+            {/* Step 2 (Results) */}
+            {step === 2 && results && (
               <div className="space-y-8 animate-fade-in-up">
                 {/* Results Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between bg-gradient-to-r from-slate-900 to-brand-900 p-8 rounded-2xl shadow-lg relative overflow-hidden">
@@ -310,7 +210,7 @@ const PublicResults = () => {
                     onClick={() => {
                       setStep(1);
                       setStudentId('');
-                      setOtp('');
+                      setDob('');
                       setResults(null);
                     }}
                     className="inline-flex items-center gap-2 px-6 py-3 border-2 border-slate-200 text-base font-bold rounded-xl text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-all"
