@@ -76,9 +76,6 @@ const MarksheetModal = ({ data, onClose }) => {
 
   let grandMax = 0;
   let grandTotal = 0;
-  let grandTheory = 0;
-  let grandInternal = 0;
-  let grandPractical = 0;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -97,18 +94,19 @@ const MarksheetModal = ({ data, onClose }) => {
 
         <div className="overflow-y-auto p-8" style={{ backgroundColor: '#fffdf2' }}>
           <div ref={printRef} className="max-w-3xl mx-auto">
-            
+
             {/* Header */}
-            <div className="flex items-center justify-center mb-6 text-center border-b border-slate-200 pb-6">
-              <div className="flex items-center">
+            <div className="grid grid-cols-[100px_1fr_100px] items-center mb-6 border-b border-slate-200 pb-6">
+              <div className="flex justify-start">
                 {/* Academy Logo */}
-                <img src={logo} alt="DRRG Academy Logo" className="w-20 h-auto mr-4 object-contain" />
-                <div className="text-left">
-                  <h1 className="text-[#1e3a8a] text-3xl font-extrabold m-0 tracking-wide" style={{ fontFamily: 'Times New Roman, serif' }}>RG MODERN COMMUNITY COLLEGE</h1>
-                  <p className="text-[#2563eb] text-xs font-semibold m-0 mt-1">Managed By - R.G MODERN EDUCATIONAL AND CHARITABLE TRUST - (RGMECT)</p>
-                  <p className="text-slate-600 text-[11px] m-0 mt-1 font-medium">No: 21, 3rd Floor, 9th Main, 6th Cross, RK Layout – 2nd Stage, Padmanabha Nagar, Bengaluru – 560070, Karnataka. Email : rgmect@gmail.com</p>
-                </div>
+                <img src={logo} alt="DRRG Academy Logo" className="w-20 h-auto object-contain" />
               </div>
+              <div className="text-center">
+                <h1 className="text-[#1e3a8a] text-3xl font-extrabold m-0 tracking-wide" style={{ fontFamily: 'Times New Roman, serif' }}>RG MODERN COMMUNITY COLLEGE</h1>
+                <p className="text-[#2563eb] text-xs font-semibold m-0 mt-1">Managed By - R.G MODERN EDUCATIONAL AND CHARITABLE TRUST - (RGMECT)</p>
+                <p className="text-slate-600 text-[11px] m-0 mt-1 font-medium">No: 21, 3rd Floor, 9th Main, 6th Cross, RK Layout – 2nd Stage, Padmanabha Nagar, Bengaluru – 560070, Karnataka. Email : rgmect@gmail.com</p>
+              </div>
+              <div></div>
             </div>
 
             <div className="text-center text-xl font-bold mb-8 uppercase tracking-widest text-slate-800">
@@ -135,11 +133,11 @@ const MarksheetModal = ({ data, onClose }) => {
                 <tr>
                   <th className="border border-slate-200 p-3 text-center w-12">S.No</th>
                   <th className="border border-slate-200 p-3 text-left">Subject</th>
-                  <th className="border border-slate-200 p-3 text-center">Max.<br/>Marks</th>
-                  <th className="border border-slate-200 p-3 text-center">Pass<br/>Marks</th>
+                  <th className="border border-slate-200 p-3 text-center">Max.<br />Marks</th>
+                  <th className="border border-slate-200 p-3 text-center">Pass<br />Marks</th>
                   <th className="border border-slate-200 p-3 text-center">External</th>
                   <th className="border border-slate-200 p-3 text-center">Internal</th>
-                  <th className="border border-slate-200 p-3 text-center">Total<br/>Marks</th>
+                  <th className="border border-slate-200 p-3 text-center">Total<br />Marks</th>
                   <th className="border border-slate-200 p-3 text-center">Grade</th>
                   <th className="border border-slate-200 p-3 text-center">Result</th>
                 </tr>
@@ -149,14 +147,12 @@ const MarksheetModal = ({ data, onClose }) => {
                   const external = m.subject?.type === "Practical" ? (m.practicalMark || 0) : (m.theoryMark || 0);
                   const internal = m.internalMark || 0;
                   const total = external + internal;
-                  
+
                   const maxMark = 100;
                   const passMark = 35;
 
                   grandMax += maxMark;
                   grandTotal += total;
-                  grandTheory += external;
-                  grandInternal += internal;
 
                   return (
                     <tr key={m._id} className="bg-transparent hover:bg-slate-50">
@@ -176,8 +172,8 @@ const MarksheetModal = ({ data, onClose }) => {
                   <td className="border border-slate-200 p-3 text-center" colSpan="2"></td>
                   <td className="border border-slate-200 p-3 text-center">{grandMax}</td>
                   <td className="border border-slate-200 p-3 text-center"></td>
-                  <td className="border border-slate-200 p-3 text-center">{grandTheory}</td>
-                  <td className="border border-slate-200 p-3 text-center">{grandInternal}</td>
+                  <td className="border border-slate-200 p-3 text-center"></td>
+                  <td className="border border-slate-200 p-3 text-center"></td>
                   <td className="border border-slate-200 p-3 text-center font-bold">{grandTotal}</td>
                   <td className="border border-slate-200 p-3 text-center font-bold text-[#1e3a8a]">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
                   <td className="border border-slate-200 p-3 text-center"></td>

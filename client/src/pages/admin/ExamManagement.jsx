@@ -35,7 +35,7 @@ const ExamManagement = () => {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showHallTicketModal, setShowHallTicketModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  
+
   // Hall ticket generation states
   const [selectedHallTicketExam, setSelectedHallTicketExam] = useState("");
   const [isGenerateMode, setIsGenerateMode] = useState(false);
@@ -45,7 +45,7 @@ const ExamManagement = () => {
   const [deleteHallTicketConfirm, setDeleteHallTicketConfirm] = useState({ isOpen: false, id: null });
 
   const [selectedGroupData, setSelectedGroupData] = useState(null);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,8 +108,8 @@ const ExamManagement = () => {
   }, []);
 
   useEffect(() => {
-    if (showModal && formData.batch && formData.semester) {
-      const availableSubjects = getFilteredSubjects(formData.batch, formData.semester);
+    if (showModal && formData.batch && formData.semester && formData.course) {
+      const availableSubjects = getFilteredSubjects(formData.batch, formData.semester, formData.course);
       if (availableSubjects.length > 0) {
         setFormData(prev => {
           const newSubjects = availableSubjects.map(sub => {
@@ -126,13 +126,17 @@ const ExamManagement = () => {
           });
           return { ...prev, subjects: newSubjects };
         });
+      } else {
+        setFormData(prev => ({ ...prev, subjects: [] }));
       }
+    } else if (showModal && (!formData.batch || !formData.semester || !formData.course)) {
+      setFormData(prev => ({ ...prev, subjects: [] }));
     }
-  }, [formData.batch, formData.semester, showModal, subjects]);
+  }, [formData.batch, formData.semester, formData.course, showModal, subjects]);
 
   useEffect(() => {
-    if (showMarkModal && markFormData.batch && markFormData.semester) {
-      const availableSubjects = getFilteredSubjects(markFormData.batch, markFormData.semester);
+    if (showMarkModal && markFormData.batch && markFormData.semester && markFormData.course) {
+      const availableSubjects = getFilteredSubjects(markFormData.batch, markFormData.semester, markFormData.course);
       if (availableSubjects.length > 0) {
         setMarkFormData(prev => {
           const newSubjects = availableSubjects.map(sub => {
@@ -146,9 +150,13 @@ const ExamManagement = () => {
           });
           return { ...prev, subjects: newSubjects };
         });
+      } else {
+        setMarkFormData(prev => ({ ...prev, subjects: [] }));
       }
+    } else if (showMarkModal && (!markFormData.batch || !markFormData.semester || !markFormData.course)) {
+      setMarkFormData(prev => ({ ...prev, subjects: [] }));
     }
-  }, [markFormData.batch, markFormData.semester, showMarkModal, subjects]);
+  }, [markFormData.batch, markFormData.semester, markFormData.course, showMarkModal, subjects]);
 
   const handleCenterToggle = (centerId) => {
     setFormData(prev => {
@@ -185,15 +193,13 @@ const ExamManagement = () => {
     });
   };
 
-  const getFilteredSubjects = (batchId, semesterNumber) => {
-    if (!batchId || !semesterNumber) return subjects;
-    const batch = batches.find(b => b._id === batchId);
-    if (!batch || !batch.semesters) return subjects;
-    const sem = batch.semesters.find(s => Number(s.semesterNumber) === Number(semesterNumber));
-    if (!sem || !sem.subjects || sem.subjects.length === 0) return [];
-    
-    const subjectIds = sem.subjects.map(s => typeof s === 'object' ? (s._id || s) : s).map(String);
-    return subjects.filter(sub => subjectIds.includes(String(sub._id)));
+  const getFilteredSubjects = (batchId, semesterNumber, courseId) => {
+    if (!batchId || !semesterNumber || !courseId) return [];
+
+    return subjects.filter(sub => {
+      const subCourseId = sub.course?._id ? String(sub.course._id) : (sub.course ? String(sub.course) : "");
+      return subCourseId === String(courseId) && Number(sub.semester) === Number(semesterNumber);
+    });
   };
 
   const getAvailableSemesters = (batchId) => {
@@ -350,7 +356,7 @@ const ExamManagement = () => {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
-        
+
         if (data.length === 0) {
            toast.error("Excel sheet is empty", { id: toastId });
            return;
@@ -359,8 +365,8 @@ const ExamManagement = () => {
         const res = await api.post('/marks/bulk', { marks: data });
         toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`, { id: toastId });
         if (res.data.results.failed > 0) {
-            console.error("Bulk Upload Errors:", res.data.results.errors);
-            toast.error("Some records failed. Check console for details.");
+          console.error("Bulk Upload Errors:", res.data.results.errors);
+          toast.error("Some records failed. Check console for details.");
         }
         fetchData();
       } catch (err) {
@@ -499,7 +505,7 @@ const ExamManagement = () => {
     let courseId = "";
     let batchId = "";
     if (st) {
-      const studentBatch = batches.find(b => 
+      const studentBatch = batches.find(b =>
         b.students && b.students.some(sid => {
           const idStr = typeof sid === 'object' ? (sid._id || sid).toString() : sid.toString();
           return idStr === studentId;
@@ -513,7 +519,7 @@ const ExamManagement = () => {
         batchId = st.enrolledCourses[0].batch?._id || st.enrolledCourses[0].batch || "";
       }
     }
-    
+
     // Ensure they are strings, not populated objects
     courseId = typeof courseId === 'object' ? (courseId._id || "") : String(courseId || "");
     batchId = typeof batchId === 'object' ? (batchId._id || "") : String(batchId || "");
@@ -556,10 +562,10 @@ const ExamManagement = () => {
 
   const filteredStudentFees = studentFees.filter(f => {
     if (f.feeType !== 'Exam') return false;
-    
+
     if (searchQuery) {
-      return f.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-             f.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase());
+      return f.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        f.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase());
     }
     return true;
   });
@@ -656,7 +662,7 @@ const ExamManagement = () => {
         failCount: 0
       };
     }
-    
+
     // Look up exam config to find pass/fail
     const examConfig = exams.find(e => {
       const eSubId = (e.subject && e.subject._id) ? e.subject._id : e.subject;
@@ -665,16 +671,16 @@ const ExamManagement = () => {
       const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
       return String(eSubId) === String(mSubId) && String(eCourseId) === String(mCourseId) && e.semester === m.semester;
     });
-    
+
     let isPass = false;
     let totalSecured = (m.theoryMark || 0) + (m.internalMark || 0) + (m.practicalMark || 0);
-    
+
     if (examConfig) {
       isPass = totalSecured >= (examConfig.passMark || 0);
     } else {
       isPass = totalSecured >= 35; // default fallback
     }
-    
+
     groupedMarksMap[key].marks.push({ ...m, isPass, examConfig });
     groupedMarksMap[key].totalSubjects += 1;
     if (isPass) groupedMarksMap[key].passCount += 1;
@@ -727,19 +733,19 @@ const ExamManagement = () => {
       minWidth: "220px",
       cell: row => (
         <div className="flex justify-center gap-2">
-          <button 
+          <button
             onClick={() => {
               setSelectedHallTicketStudents(row.students || []);
               setSelectedHallTicketExam(row.exam?._id || "");
               setShowHallTicketModal(true);
-            }} 
+            }}
             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
             title="View Hall Tickets"
           >
             <FileText size={18} /> View
           </button>
-          <button 
-            onClick={() => setDeleteHallTicketConfirm({ isOpen: true, id: row._id })} 
+          <button
+            onClick={() => setDeleteHallTicketConfirm({ isOpen: true, id: row._id })}
             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
             title="Delete Hall Ticket Batch"
           >
@@ -761,7 +767,7 @@ const ExamManagement = () => {
       fetchData(); // Refresh the hallTickets list
       setShowGenerateView(false);
       setIsGenerateMode(false);
-      
+
       // We don't clear selectedHallTicketStudents here because the modal needs it to display the generated tickets.
       // It will be overwritten next time they view or generate.
       setShowHallTicketModal(true);
@@ -871,7 +877,7 @@ const ExamManagement = () => {
   const paymentColumns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     {
-      name: "Student", width:"200px",
+      name: "Student", width: "200px",
       selector: row => row.student?.studentNameEnglish,
       sortable: true,
       cell: row => (
@@ -891,7 +897,7 @@ const ExamManagement = () => {
             <span>{row.batch?.name}</span>
             <span>&bull;</span>
             <span className="text-brand-600 font-medium">
-              {row.feeType === 'Other' ? row.otherFeeType : `${row.feeType} Fee`} 
+              {row.feeType === 'Other' ? row.otherFeeType : `${row.feeType} Fee`}
               {row.terms?.length > 0 && ` (Term ${row.terms[0]})`}
             </span>
           </div>
@@ -912,11 +918,10 @@ const ExamManagement = () => {
       cell: row => (
         <button
           onClick={() => handleTogglePaymentStatus(row._id)}
-          className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${
-            row.status === 'paid' 
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+          className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${row.status === 'paid'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
               : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-          }`}
+            }`}
         >
           {row.status === 'paid' ? 'PAID' : 'UNPAID'}
         </button>
@@ -934,12 +939,12 @@ const ExamManagement = () => {
     }
   ];
 
-  const filteredExams = exams.filter(e => 
+  const filteredExams = exams.filter(e =>
     e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredGroupedMarks = groupedMarksArray.filter(m => 
+  const filteredGroupedMarks = groupedMarksArray.filter(m =>
     m.student?.studentNameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     String(m.semester).includes(searchQuery)
@@ -976,20 +981,18 @@ const ExamManagement = () => {
         </div>
       </div>
 
-      {/* Tabs */} 
+      {/* Tabs */}
       <div className="flex items-center gap-4 border-b border-slate-200">
         <button
-          className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-          }`}
+          className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+            }`}
           onClick={() => setActiveTab("exams")}
         >
           <FileText size={18} /> Exams
         </button>
         <button
-          className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-          }`}
+          className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+            }`}
           onClick={() => setActiveTab("marks")}
         >
           <CheckSquare size={18} /> Results
@@ -998,17 +1001,15 @@ const ExamManagement = () => {
           <>
 
             <button
-              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-                activeTab === "hall_tickets" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-              }`}
+              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "hall_tickets" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+                }`}
               onClick={() => setActiveTab("hall_tickets")}
             >
               <FileText size={18} /> Hall Tickets
             </button>
             <button
-              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${
-                activeTab === "payments_list" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-              }`}
+              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "payments_list" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+                }`}
               onClick={() => setActiveTab("payments_list")}
             >
               <DollarSign size={18} /> Payments
@@ -1036,7 +1037,7 @@ const ExamManagement = () => {
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-800">Generated Hall Tickets</h3>
-                  <button 
+                  <button
                     onClick={() => setShowGenerateView(true)}
                     className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold"
                   >
@@ -1053,103 +1054,103 @@ const ExamManagement = () => {
                 />
               </div>
             ) : (
-            <>
-            <div className="mb-6 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-800">Generate New Hall Tickets</h3>
-              <button 
-                onClick={() => {
-                  setShowGenerateView(false);
-                  setIsGenerateMode(false);
-                  setSelectedHallTicketExam("");
-                }}
-                className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
-              >
-                Back to History
-              </button>
-            </div>
-            <div className="mb-6 flex items-end gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Select Exam Schedule</label>
-                <select 
-                  className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50"
-                  value={selectedHallTicketExam}
-                  onChange={(e) => {
-                    setSelectedHallTicketExam(e.target.value);
-                    setSelectedHallTicketStudents([]);
-                    setIsGenerateMode(false);
-                  }}
-                >
-                  <option value="">-- Select Exam --</option>
-                  {exams.map(exam => (
-                    <option key={exam._id} value={exam._id}>{exam.name} - Sem {exam.semester}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="shrink-0 flex gap-2">
-                {!isGenerateMode && selectedHallTicketExam && (
-                  <button 
-                    onClick={() => setIsGenerateMode(true)}
-                    className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20"
+              <>
+                <div className="mb-6 flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-slate-800">Generate New Hall Tickets</h3>
+                  <button
+                    onClick={() => {
+                      setShowGenerateView(false);
+                      setIsGenerateMode(false);
+                      setSelectedHallTicketExam("");
+                    }}
+                    className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
                   >
-                    Generate Hall Tickets
+                    Back to History
                   </button>
-                )}
-                {isGenerateMode && (
-                  <>
-                    <button 
-                      onClick={() => { setIsGenerateMode(false); setSelectedHallTicketStudents([]); }}
-                      className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                </div>
+                <div className="mb-6 flex items-end gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Select Exam Schedule</label>
+                    <select
+                      className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50"
+                      value={selectedHallTicketExam}
+                      onChange={(e) => {
+                        setSelectedHallTicketExam(e.target.value);
+                        setSelectedHallTicketStudents([]);
+                        setIsGenerateMode(false);
+                      }}
                     >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={handleConfirmGeneration}
-                      disabled={selectedHallTicketStudents.length === 0}
-                      className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Confirm Generation ({selectedHallTicketStudents.length})
-                    </button>
-                  </>
+                      <option value="">-- Select Exam --</option>
+                      {exams.map(exam => (
+                        <option key={exam._id} value={exam._id}>{exam.name} - Sem {exam.semester}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="shrink-0 flex gap-2">
+                    {!isGenerateMode && selectedHallTicketExam && (
+                      <button
+                        onClick={() => setIsGenerateMode(true)}
+                        className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20"
+                      >
+                        Generate Hall Tickets
+                      </button>
+                    )}
+                    {isGenerateMode && (
+                      <>
+                        <button
+                          onClick={() => { setIsGenerateMode(false); setSelectedHallTicketStudents([]); }}
+                          className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleConfirmGeneration}
+                          disabled={selectedHallTicketStudents.length === 0}
+                          className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Confirm Generation ({selectedHallTicketStudents.length})
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {selectedHallTicketExam && (
+                  <CustomDataTable
+                    columns={[
+                      { name: "S.NO", selector: (row, idx) => idx + 1, width: "80px", center: true },
+                      { name: "STUDENT ID", selector: row => row.studentId, sortable: true },
+                      { name: "NAME", selector: row => row.studentNameEnglish, sortable: true },
+                      { name: "COURSE", selector: row => row.enrolledCourses?.[0]?.course?.title || 'N/A' },
+                      { name: "BATCH", selector: row => batches.find(b => String(b._id) === String(row.enrolledCourses?.[0]?.batch))?.name || 'N/A' },
+                    ]}
+                    data={students.filter(student => {
+                      const examObj = exams.find(e => String(e._id) === String(selectedHallTicketExam));
+                      if (!examObj || !examObj.batch) return false;
+
+                      // Exclude students who already have a hall ticket for this exam
+                      const hasHallTicket = hallTickets.some(ht => {
+                        const isSameExam = String(typeof ht.exam === 'object' ? ht.exam?._id : ht.exam) === String(selectedHallTicketExam);
+                        if (!isSameExam) return false;
+                        return ht.students?.some(s => String(typeof s === 'object' ? s?._id : s) === String(student._id));
+                      });
+                      if (hasHallTicket) return false;
+
+                      // Filter students by this exam's batch
+                      const studentBatch = student.enrolledCourses?.[0]?.batch;
+                      if (!studentBatch) return false;
+                      return String(typeof studentBatch === 'object' ? studentBatch._id : studentBatch) === String(typeof examObj.batch === 'object' ? examObj.batch._id : examObj.batch);
+                    })}
+                    selectableRows={isGenerateMode}
+                    onSelectedRowsChange={({ selectedRows }) => {
+                      setSelectedHallTicketStudents(selectedRows);
+                    }}
+                    search={searchQuery}
+                    setSearch={setSearchQuery}
+                    searchPlaceholder="Search students..."
+                  />
                 )}
-              </div>
-            </div>
-
-            {selectedHallTicketExam && (
-              <CustomDataTable
-                columns={[
-                  { name: "S.NO", selector: (row, idx) => idx + 1, width: "80px", center: true },
-                  { name: "STUDENT ID", selector: row => row.studentId, sortable: true },
-                  { name: "NAME", selector: row => row.studentNameEnglish, sortable: true },
-                  { name: "COURSE", selector: row => row.enrolledCourses?.[0]?.course?.title || 'N/A' },
-                  { name: "BATCH", selector: row => batches.find(b => String(b._id) === String(row.enrolledCourses?.[0]?.batch))?.name || 'N/A' },
-                ]}
-                data={students.filter(student => {
-                  const examObj = exams.find(e => String(e._id) === String(selectedHallTicketExam));
-                  if (!examObj || !examObj.batch) return false;
-                  
-                  // Exclude students who already have a hall ticket for this exam
-                  const hasHallTicket = hallTickets.some(ht => {
-                    const isSameExam = String(typeof ht.exam === 'object' ? ht.exam?._id : ht.exam) === String(selectedHallTicketExam);
-                    if (!isSameExam) return false;
-                    return ht.students?.some(s => String(typeof s === 'object' ? s?._id : s) === String(student._id));
-                  });
-                  if (hasHallTicket) return false;
-
-                  // Filter students by this exam's batch
-                  const studentBatch = student.enrolledCourses?.[0]?.batch;
-                  if (!studentBatch) return false;
-                  return String(typeof studentBatch === 'object' ? studentBatch._id : studentBatch) === String(typeof examObj.batch === 'object' ? examObj.batch._id : examObj.batch);
-                })}
-                selectableRows={isGenerateMode}
-                onSelectedRowsChange={({ selectedRows }) => {
-                  setSelectedHallTicketStudents(selectedRows);
-                }}
-                search={searchQuery}
-                setSearch={setSearchQuery}
-                searchPlaceholder="Search students..."
-              />
-            )}
-            </>
+              </>
             )}
           </div>
         ) : (
@@ -1190,8 +1191,8 @@ const ExamManagement = () => {
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.batch} onChange={(e) => {
                     const selectedBatchId = e.target.value;
                     const selectedBatch = batches.find(b => String(b._id) === String(selectedBatchId));
-                    setFormData({ 
-                      ...formData, 
+                    setFormData({
+                      ...formData,
                       batch: selectedBatchId,
                       course: (() => {
                         const batchCourses = selectedBatch?.courses?.map(c => c._id || c) || [];
@@ -1310,8 +1311,8 @@ const ExamManagement = () => {
 
               <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={formData.centers.length === 0 || formData.subjects.length === 0}
                   className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1335,8 +1336,8 @@ const ExamManagement = () => {
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">Exam Schedule: {selectedExamData.name}</h2>
                   <div className="text-sm text-slate-500 font-medium flex gap-4 mt-1">
-                    <span className="flex items-center gap-1"><BookOpen size={14}/> {selectedExamData.course?.title} - Sem {selectedExamData.semester}</span>
-                    <span className="flex items-center gap-1"><MapPin size={14}/> {selectedExamData.centers?.length || 0} Centers</span>
+                    <span className="flex items-center gap-1"><BookOpen size={14} /> {selectedExamData.course?.title} - Sem {selectedExamData.semester}</span>
+                    <span className="flex items-center gap-1"><MapPin size={14} /> {selectedExamData.centers?.length || 0} Centers</span>
                   </div>
                 </div>
               </div>
@@ -1432,8 +1433,8 @@ const ExamManagement = () => {
                   <select required className={`w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm ${markFormData.student ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-slate-50'}`} value={markFormData.batch} onChange={(e) => {
                     const selectedBatchId = e.target.value;
                     const selectedBatch = batches.find(b => String(b._id) === String(selectedBatchId));
-                    setMarkFormData({ 
-                      ...markFormData, 
+                    setMarkFormData({
+                      ...markFormData,
                       batch: selectedBatchId,
                       course: (() => {
                         const batchCourses = selectedBatch?.courses?.map(c => c._id || c) || [];
@@ -1470,7 +1471,7 @@ const ExamManagement = () => {
                   </select>
                 </div>
               </div>
-              
+
               {markFormData.subjects.length > 0 && (
                 <div className="mt-6 border-t border-slate-200 pt-6">
                   <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -1518,17 +1519,17 @@ const ExamManagement = () => {
       )}
 
       {showMarksheetModal && selectedGroupData && (
-        <MarksheetModal 
-          data={selectedGroupData} 
-          onClose={() => setShowMarksheetModal(false)} 
+        <MarksheetModal
+          data={selectedGroupData}
+          onClose={() => setShowMarksheetModal(false)}
         />
       )}
 
       {showBulkEditModal && selectedGroupData && (
-        <BulkEditMarksModal 
-          data={selectedGroupData} 
-          onClose={() => setShowBulkEditModal(false)} 
-          onSave={handleBulkEditSave} 
+        <BulkEditMarksModal
+          data={selectedGroupData}
+          onClose={() => setShowBulkEditModal(false)}
+          onSave={handleBulkEditSave}
           students={students}
           batches={batches}
           courses={courses}
@@ -1549,14 +1550,14 @@ const ExamManagement = () => {
                 Are you sure you want to completely delete this exam schedule? This action cannot be undone.
               </p>
               <div className="flex w-full gap-3">
-                <button 
-                  onClick={() => setDeleteConfirm({ isOpen: false, id: null })} 
+                <button
+                  onClick={() => setDeleteConfirm({ isOpen: false, id: null })}
                   className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={confirmDelete} 
+                <button
+                  onClick={confirmDelete}
                   className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
                 >
                   Delete
@@ -1580,14 +1581,14 @@ const ExamManagement = () => {
                 Are you sure you want to completely delete this generated Hall Ticket batch? This action cannot be undone.
               </p>
               <div className="flex w-full gap-3">
-                <button 
-                  onClick={() => setDeleteHallTicketConfirm({ isOpen: false, id: null })} 
+                <button
+                  onClick={() => setDeleteHallTicketConfirm({ isOpen: false, id: null })}
                   className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={confirmDeleteHallTicket} 
+                <button
+                  onClick={confirmDeleteHallTicket}
                   className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
                 >
                   Delete

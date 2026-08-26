@@ -656,8 +656,8 @@ const ExamsTab = () => {
         <button
           onClick={() => handleTogglePaymentStatus(row._id)}
           className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${row.status === 'paid'
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-              : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
             }`}
         >
           {row.status === 'paid' ? 'PAID' : 'UNPAID'}

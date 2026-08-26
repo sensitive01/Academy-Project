@@ -110,7 +110,6 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
       }
       return "Term (3 Split)";
     }
-
     return "";
   };
 
@@ -131,7 +130,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
     setSelectedBatch("all");
     setSelectedStatus("all");
   }, [feeType, excludePaid]);
-
+ 
   const fetchDropdownData = async () => {
     try {
       const [studentsRes, centersRes, coursesRes, batchesRes] = await Promise.all([
