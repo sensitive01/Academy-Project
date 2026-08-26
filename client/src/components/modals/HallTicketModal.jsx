@@ -72,9 +72,10 @@ const HallTicketModal = ({ students, exam, onClose }) => {
           </div>
           <div className="flex-1 text-center">
             <h1 className="text-[#1e3a8a] text-3xl font-bold m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
-              R.G.MODERN COMMUNITY COLLEGE
+              RG MODERN COMMUNITY COLLEGE
             </h1>
-            <div className="text-sm font-bold mt-1 text-[#1e3a8a]">Chennai - 45</div>
+            <div className="text-[11px] font-bold mt-1 text-[#1e3a8a]">Managed By - R.G MODERN EDUCATIONAL AND CHARITABLE TRUST - (RGMECT)</div>
+            <div className="text-[10px] mt-1 text-[#1e3a8a] max-w-lg mx-auto">No: 21, 3rd Floor, 9th Main, 6th Cross, RK Layout – 2nd Stage, Padmanabha Nagar, Bengaluru – 560070, Karnataka. Email : rgmect@gmail.com</div>
             <div className="text-lg font-bold mt-2 uppercase text-[#1e3a8a]">
               EXAM HALL TICKET – {exam?.name || "N/A"}
             </div>

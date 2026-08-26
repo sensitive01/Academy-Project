@@ -104,9 +104,9 @@ const MarksheetModal = ({ data, onClose }) => {
                 {/* Academy Logo */}
                 <img src={logo} alt="DRRG Academy Logo" className="w-20 h-auto mr-4 object-contain" />
                 <div className="text-left">
-                  <h1 className="text-[#1e3a8a] text-3xl font-extrabold m-0 tracking-wide" style={{ fontFamily: 'Times New Roman, serif' }}>DR.R.G. Academy</h1>
-                  <p className="text-[#2563eb] text-xs font-semibold m-0 mt-1">Managed By R.G.Modern Educational Trust</p>
-                  <p className="text-slate-600 text-[11px] m-0 mt-1 font-medium">A State Government University, An ISO 9001:2015 Certified Institution</p>
+                  <h1 className="text-[#1e3a8a] text-3xl font-extrabold m-0 tracking-wide" style={{ fontFamily: 'Times New Roman, serif' }}>RG MODERN COMMUNITY COLLEGE</h1>
+                  <p className="text-[#2563eb] text-xs font-semibold m-0 mt-1">Managed By - R.G MODERN EDUCATIONAL AND CHARITABLE TRUST - (RGMECT)</p>
+                  <p className="text-slate-600 text-[11px] m-0 mt-1 font-medium">No: 21, 3rd Floor, 9th Main, 6th Cross, RK Layout – 2nd Stage, Padmanabha Nagar, Bengaluru – 560070, Karnataka. Email : rgmect@gmail.com</p>
                 </div>
               </div>
             </div>

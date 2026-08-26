@@ -1068,6 +1068,15 @@ const ExamManagement = () => {
                 data={students.filter(student => {
                   const examObj = exams.find(e => String(e._id) === String(selectedHallTicketExam));
                   if (!examObj || !examObj.batch) return false;
+                  
+                  // Exclude students who already have a hall ticket for this exam
+                  const hasHallTicket = hallTickets.some(ht => {
+                    const isSameExam = String(typeof ht.exam === 'object' ? ht.exam?._id : ht.exam) === String(selectedHallTicketExam);
+                    if (!isSameExam) return false;
+                    return ht.students?.some(s => String(typeof s === 'object' ? s?._id : s) === String(student._id));
+                  });
+                  if (hasHallTicket) return false;
+
                   // Filter students by this exam's batch
                   const studentBatch = student.enrolledCourses?.[0]?.batch;
                   if (!studentBatch) return false;
