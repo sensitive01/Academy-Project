@@ -312,6 +312,7 @@ const Students = () => {
   const [exportFormat, setExportFormat] = useState("excel");
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, id: null });
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [promoteConfig, setPromoteConfig] = useState({ isOpen: false, student: null, isBulk: false });
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
@@ -540,7 +541,15 @@ const Students = () => {
       if (filterBatch && filterBatch.length > 0) {
         const selectedBatches = batches.filter(b => filterBatch.includes(b.name || b.batchId || b._id));
         if (selectedBatches.length > 0) {
-          result = result.filter(s => selectedBatches.some(b => b.students?.some(bs => bs === s._id || bs?._id === s._id)));
+          const batchIds = selectedBatches.map(b => b._id.toString());
+          result = result.filter(s => {
+            const inBatchState = selectedBatches.some(b => b.students?.some(bs => bs === s._id || bs?._id === s._id));
+            const inStudentState = s.enrolledCourses?.some(ec => {
+              const ecBatchId = typeof ec.batch === 'object' ? ec.batch?._id : ec.batch;
+              return ecBatchId && batchIds.includes(ecBatchId.toString());
+            });
+            return inBatchState || inStudentState;
+          });
         } else {
           result = [];
         }
@@ -571,6 +580,20 @@ const Students = () => {
 
   const handleDelete = (id) => {
     setConfirmConfig({ isOpen: true, id });
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const studentIds = selectedStudents.map(s => s._id);
+      const { data } = await api.post(`/students/bulk-delete`, { ids: studentIds });
+      toast.success(data.message || "Students deleted successfully!");
+      setSelectedStudents([]);
+      setClearSelectedRows(!clearSelectedRows);
+      setConfirmBulkDelete(false);
+      fetchStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete students");
+    }
   };
 
   const confirmDelete = async () => {
@@ -913,68 +936,57 @@ const Students = () => {
               onSendReminder={(student) => setReminderConfig({ isOpen: true, student })}
               search={search}
               setSearch={setSearch}
-              selectableRows={isBulkMode || isAcademicBulkMode}
-              selectableRowDisabled={row => isBulkMode && row.internships && row.internships.length > 0}
+              selectableRows={true}
               onSelectedRowsChange={({ selectedRows }) => setSelectedStudents(selectedRows)}
               clearSelectedRows={clearSelectedRows}
               tableHeaderActions={
-                <div className="flex gap-3">
-                  {!isBulkMode && !isAcademicBulkMode ? (
+                selectedStudents.length > 0 ? (
+                  <div className="flex gap-3 animate-in fade-in zoom-in-95 duration-200">
+                    <button
+                      onClick={() => setConfirmBulkDelete(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-red-600 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 cursor-pointer"
+                    >
+                      <Trash2 size={18} /> Delete Selected ({selectedStudents.length})
+                    </button>
+
                     <div className="relative group">
-                      <button className="flex items-center gap-2 px-5 py-2.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-2xl hover:bg-indigo-100 transition-all cursor-pointer">
-                        <Briefcase size={18} /> Promote <ChevronDown size={16} />
+                      <button className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer">
+                        <Briefcase size={18} /> Promote Selected <ChevronDown size={16} />
                       </button>
                       <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <button
-                          onClick={() => setIsBulkMode(true)}
+                          onClick={() => {
+                            setPromoteForm({ vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false });
+                            setPromoteConfig({ isOpen: true, student: null, isBulk: true });
+                          }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-50 transition-colors text-left"
                         >
                           <Briefcase size={16} /> Bulk Promote
                         </button>
                         <div className="h-px bg-slate-50 w-full"></div>
                         <button
-                          onClick={() => setIsAcademicBulkMode(true)}
+                          onClick={() => {
+                            setAcademicPromoteConfig({ isOpen: true });
+                          }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
                         >
                           <GraduationCap size={16} /> Academic Promote
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsBulkMode(false);
-                          setIsAcademicBulkMode(false);
-                          setSelectedStudents([]);
-                          setClearSelectedRows(!clearSelectedRows);
-                        }}
-                        className="flex items-center gap-2 px-5 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
-                      >
-                        Cancel Selection
-                      </button>
-                      <button
-                        disabled={selectedStudents.length === 0}
-                        onClick={() => {
-                          if (isBulkMode) {
-                            setPromoteForm({
-                              vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false
-                            });
-                            setPromoteConfig({ isOpen: true, student: null, isBulk: true });
-                          } else {
-                            setAcademicPromoteConfig({ isOpen: true });
-                          }
-                        }}
-                        className={`flex items-center gap-2 px-5 py-2.5 font-bold rounded-2xl transition-all ${
-                          selectedStudents.length > 0 
-                            ? (isBulkMode ? "text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20" : "text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20") + " active:scale-95 cursor-pointer" 
-                            : "text-slate-400 bg-slate-50 border border-slate-100 cursor-not-allowed"
-                        }`}
-                      >
-                        {isBulkMode ? <Briefcase size={18} /> : <GraduationCap size={18} />} Proceed to Promote {selectedStudents.length > 0 && `(${selectedStudents.length})`}
-                      </button>
-                    </>
-                  )}
+
+                    <button
+                      onClick={() => {
+                        setSelectedStudents([]);
+                        setClearSelectedRows(!clearSelectedRows);
+                      }}
+                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
                   <button
                     onClick={() => {
                       const type = activeTab === "online_students" ? "online" : "center";
@@ -1018,7 +1030,7 @@ const Students = () => {
                     <Download size={18} /> Export
                   </button>
                 </div>
-              }
+              )}
             />
           </div>
         </>
@@ -1316,6 +1328,35 @@ const Students = () => {
         </div>,
         document.body
       )}
+      {/* Bulk Delete Confirmation Modal */}
+      {confirmBulkDelete && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete {selectedStudents.length} Students</h3>
+            <p className="text-slate-500 text-xs mb-6">Are you sure you want to delete {selectedStudents.length} students? This action will permanently remove their profiles, linked user accounts, and all fee records. This action cannot be undone.</p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmBulkDelete(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-600/20 transition-all cursor-pointer"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Delete Confirmation Modal */}
       {confirmConfig.isOpen && ReactDOM.createPortal(
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">

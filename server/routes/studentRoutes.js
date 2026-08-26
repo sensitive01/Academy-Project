@@ -534,6 +534,36 @@ router.delete("/:id", protect, adminOrCenter, async (req, res) => {
 });
 
 // ======================================================
+// BULK DELETE STUDENTS (Deletes User + Student + Fees)
+// ======================================================
+router.post("/bulk-delete", protect, adminOrCenter, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No student IDs provided" });
+    }
+
+    for (const id of ids) {
+      const student = await Student.findById(id);
+      if (student) {
+        if (student.user) {
+          await User.findByIdAndDelete(student.user);
+        }
+        await Student.findByIdAndDelete(id);
+        await StudentFee.deleteMany({ student: id });
+      }
+    }
+
+    res.json({
+      message: `${ids.length} students and their linked records deleted successfully`,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ======================================================
 // TOGGLE STATUS
 // ======================================================
 router.patch('/:id/status', protect, adminOrCenter, async (req, res) => {
