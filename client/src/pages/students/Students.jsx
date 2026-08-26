@@ -38,7 +38,8 @@ import {
   RotateCcw,
   Download,
   FileSpreadsheet,
-  FileText
+  FileText,
+  ChevronDown
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -821,20 +822,26 @@ const Students = () => {
               tableHeaderActions={
                 <div className="flex gap-3">
                   {!isBulkMode && !isAcademicBulkMode ? (
-                    <>
-                      <button
-                        onClick={() => setIsBulkMode(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-2xl hover:bg-indigo-100 transition-all active:scale-95 cursor-pointer"
-                      >
-                        <Briefcase size={18} /> Bulk Promote
+                    <div className="relative group">
+                      <button className="flex items-center gap-2 px-5 py-2.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-2xl hover:bg-indigo-100 transition-all cursor-pointer">
+                        <Briefcase size={18} /> Promote <ChevronDown size={16} />
                       </button>
-                      <button
-                        onClick={() => setIsAcademicBulkMode(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer"
-                      >
-                        <GraduationCap size={18} /> Academic Promote
-                      </button>
-                    </>
+                      <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <button
+                          onClick={() => setIsBulkMode(true)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-50 transition-colors text-left"
+                        >
+                          <Briefcase size={16} /> Bulk Promote
+                        </button>
+                        <div className="h-px bg-slate-50 w-full"></div>
+                        <button
+                          onClick={() => setIsAcademicBulkMode(true)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
+                        >
+                          <GraduationCap size={16} /> Academic Promote
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <button
@@ -871,12 +878,6 @@ const Students = () => {
                     </>
                   )}
                   <button
-                    onClick={() => setShowExportModal(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 font-bold text-brand-700 bg-brand-50 rounded-2xl hover:bg-brand-100 transition-all active:scale-95 cursor-pointer"
-                  >
-                    <Download size={18} /> Export
-                  </button>
-                  <button
                     onClick={() => {
                       const type = activeTab === "online_students" ? "online" : "center";
                       window.open(`/student-registration?type=${type}`, "_blank");
@@ -884,6 +885,17 @@ const Students = () => {
                     className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
                   >
                     <UserPlus size={18} /> Add Student
+                  </button>
+                  <button
+                    className="flex items-center gap-2 px-5 py-2.5 font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 transition-all cursor-default"
+                  >
+                    <UploadCloud size={18} /> Bulk Upload
+                  </button>
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-2xl hover:bg-brand-100 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Download size={18} /> Export
                   </button>
                 </div>
               }

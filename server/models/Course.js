@@ -38,6 +38,11 @@ const lessonSchema = mongoose.Schema({
 ========================= */
 const courseSchema = mongoose.Schema({
   
+  courseId: {
+    type: String,
+    unique: true
+  },
+
   title: {
     type: String,
     default: 'Untitled Course'
@@ -55,7 +60,7 @@ const courseSchema = mongoose.Schema({
 
   durationUnit: {
     type: String,
-    enum: ['week', 'month'],
+    enum: ['week', 'month', 'year'],
     default: 'week'
   },
 
@@ -143,6 +148,14 @@ const courseSchema = mongoose.Schema({
 
 }, {
   timestamps: true,
+});
+
+courseSchema.pre("save", function () {
+  if (!this.courseId) {
+    const year = new Date().getFullYear();
+    const unique = Date.now().toString().slice(-4) + Math.floor(Math.random() * 100);
+    this.courseId = `CRS-${unique}`;
+  }
 });
 
 const Course = mongoose.model('Course', courseSchema);

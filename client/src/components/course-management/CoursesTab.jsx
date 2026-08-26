@@ -360,7 +360,8 @@ const CoursesTab = ({ courseType }) => {
           </div>
           <div className="ml-4">
             <div className="text-sm font-bold text-gray-900">{row.title}</div>
-            <div className="text-xs font-semibold text-slate-500">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-0.5">{row.courseId || "NO-ID"}</div>
+            <div className="text-xs font-semibold text-slate-500 mt-1">
               {row.duration ? `${row.duration} ${row.durationUnit || (courseType === 'Center Courses' ? 'year' : 'week')}s` : ''}
               {courseType !== "Center Courses" && row.level ? ` • ${row.level}` : ''}
             </div>
