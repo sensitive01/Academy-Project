@@ -273,13 +273,28 @@ const StudentRegistration = () => {
     });
   };
 
+  const getAvailableCoursesForBatch = () => {
+    if (!adminEnrollment.batch) return [];
+    
+    const selectedBatchObj = batches.find(b => b._id === adminEnrollment.batch);
+    if (!selectedBatchObj) return [];
+
+    const batchCourseIds = selectedBatchObj.courses?.map(c => c._id ? c._id.toString() : c.toString()) || [];
+    const legacyCourseId = selectedBatchObj.course?._id ? selectedBatchObj.course._id.toString() : selectedBatchObj.course?.toString();
+    if (legacyCourseId && !batchCourseIds.includes(legacyCourseId)) {
+      batchCourseIds.push(legacyCourseId);
+    }
+
+    return courses.filter(c => batchCourseIds.includes(c._id.toString()));
+  };
+
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = ['admin', 'center', 'hr'].includes(user?.role) || ['admin', 'center', 'hr'].includes(storedUser?.role);
   const hasFeesStep = isAdmin && registrationType !== 'online';
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      const maxSteps = hasFeesStep ? 6 : 5;
+      const maxSteps = hasFeesStep ? 5 : 4;
       setCurrentStep((prev) => Math.min(prev + 1, maxSteps));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -291,7 +306,7 @@ const StudentRegistration = () => {
   };
 
   const validateStep = (step) => {
-    if (hasFeesStep && step === 6) {
+    if (hasFeesStep && step === 5) {
       if (Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
         toast.error("Please select a course fee payment scheme!");
         return false;
@@ -387,13 +402,12 @@ const StudentRegistration = () => {
   const steps = [
     { title: "Identity", icon: <User size={20} /> },
     { title: "Contact", icon: <MapPin size={20} /> },
-    { title: "Background", icon: <GraduationCap size={20} /> },
-    { title: "Marksheet", icon: <BookOpen size={20} /> },
+    { title: "Academics", icon: <GraduationCap size={20} /> },
     { title: "Family", icon: <Users size={20} /> },
     ...(hasFeesStep ? [{ title: "Fees", icon: <CreditCard size={20} /> }] : [])
   ];
 
-  if (currentStep === (hasFeesStep ? 7 : 6)) {
+  if (currentStep === (hasFeesStep ? 6 : 5)) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="max-w-2xl w-full bg-white rounded-3xl p-12 text-center shadow-2xl border-t-8 border-brand-700">
@@ -434,7 +448,7 @@ const StudentRegistration = () => {
 
       <div className="max-w-6xl mx-auto px-4 pb-20">
         {/* Professional Stepper Indicator */}
-        <div className={`grid ${hasFeesStep ? 'grid-cols-6' : 'grid-cols-5'} gap-2 md:gap-4 -mt-8 mb-10`}>
+        <div className="flex justify-center gap-8 md:gap-16 -mt-8 mb-10 px-4 flex-wrap">
           {steps.map((s, i) => (
             <div key={i}
               onClick={() => {
@@ -460,7 +474,7 @@ const StudentRegistration = () => {
               <span className="text-[10px] font-bold tracking-widest">Fields marked with (*) are mandatory</span>
             </div>
             <div className="text-[10px] font-bold text-slate-400 tracking-widest">
-              Step {currentStep} of {hasFeesStep ? 6 : 5}
+              Step {currentStep} of {hasFeesStep ? 5 : 4}
             </div>
           </div>
 
@@ -471,8 +485,7 @@ const StudentRegistration = () => {
               <div className="space-y-12 animate-in fade-in duration-700">
                 <StepHeader title="Personal Information" icon={<User className="text-brand-700" />} />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-8">
-                  <FormInput label="Name of Student (English) *" name="studentNameEnglish" value={formData.studentNameEnglish} onChange={handleChange} />
-                  <FormInput label="Name of Student (Mother Tongue)" name="studentNameMotherTongue" value={formData.studentNameMotherTongue} onChange={handleChange} />
+                  <FormInput label="Name of Student *" name="studentNameEnglish" value={formData.studentNameEnglish} onChange={handleChange} />
 
                   <div className="grid grid-cols-2 gap-6">
                     <FormInput label="Date of Birth *" type="date" name="dob" value={formData.dob} onChange={handleChange} />
@@ -684,52 +697,12 @@ const StudentRegistration = () => {
               </div>
             )}
 
-            {/* STEP 3: EDUCATIONAL HISTORY */}
+            {/* STEP 3: ACADEMICS (Merged Background & Marksheets) */}
             {currentStep === 3 && (
-              <div className="space-y-12 animate-in fade-in duration-700">
-                <StepHeader title="Academic Background" subtitle="History of examinations completed before SSLC/HSC" icon={<GraduationCap className="text-brand-700" />} />
-
-                <div className="overflow-hidden rounded-2xl border border-slate-200">
-                  <table className="w-full text-xs min-w-[700px]">
-                    <thead className="bg-slate-900 text-white text-[10px] tracking-widest">
-                      <tr>
-                        <th className="p-4 text-left font-bold">Examination Passed</th>
-                        <th className="p-4 text-left font-bold">Institute / School</th>
-                        <th className="p-4 text-left font-bold">Group</th>
-                        <th className="p-4 text-left font-bold">Year</th>
-                        <th className="p-4 text-left font-bold">Mark %</th>
-                        <th className="p-4 text-left font-bold">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {[1, 2, 3].map(i => (
-                        <tr key={i}>
-                          <td className="p-2"><input autoComplete="off" name={`exam${i}`} value={formData[`exam${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`school${i}`} value={formData[`school${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`group${i}`} value={formData[`group${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`year${i}`} value={formData[`year${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`percentage${i}`} value={formData[`percentage${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
-                          <td className="p-2"><input autoComplete="off" name={`remarks${i}`} value={formData[`remarks${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex items-center gap-4 p-8 bg-brand-50 rounded-3xl border border-brand-100">
-                  <div className="w-12 h-12 bg-brand-700 text-white rounded-full flex items-center justify-center shrink-0">
-                    <AlertCircle size={24} />
-                  </div>
-                  <p className="text-brand-900 text-sm font-medium leading-relaxed">Please ensure all educational records are accurate as per your original certificates. Verification will be performed during document submission.</p>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 4: MARKSHEETS */}
-            {currentStep === 4 && (
               <div className="space-y-16 animate-in fade-in duration-700">
+                <StepHeader title="Academic Details" subtitle="Enter your SSLC, HSC, and other educational history" icon={<GraduationCap className="text-brand-700" />} />
 
-                {/* COMMON TABLE COMPONENT STYLE */}
+                {/* COMMON TABLE COMPONENT STYLE (SSLC & HSC) */}
                 {[
                   { title: "SSLC Details", prefix: "sslc", count: 6 },
                   { title: "HSC / PU Details", prefix: "hsc", count: 7 }
@@ -843,11 +816,54 @@ const StudentRegistration = () => {
                   </div>
                 ))}
 
+                {/* OTHER EDUCATIONAL HISTORY */}
+                <div className="space-y-6 pt-6 border-t border-slate-200">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Other Academic History</h3>
+                    <p className="text-xs text-slate-500 mt-1">History of other examinations completed before SSLC/HSC</p>
+                    <div className="h-1 w-16 bg-brand-700 mt-2 rounded-full"></div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-slate-200">
+                    <table className="w-full text-xs min-w-[700px]">
+                      <thead className="bg-slate-900 text-white text-[10px] tracking-widest">
+                        <tr>
+                          <th className="p-4 text-left font-bold">Examination Passed</th>
+                          <th className="p-4 text-left font-bold">Institute / School</th>
+                          <th className="p-4 text-left font-bold">Group</th>
+                          <th className="p-4 text-left font-bold">Year</th>
+                          <th className="p-4 text-left font-bold">Mark %</th>
+                          <th className="p-4 text-left font-bold">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {[1, 2, 3].map(i => (
+                          <tr key={i}>
+                            <td className="p-2"><input autoComplete="off" name={`exam${i}`} value={formData[`exam${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                            <td className="p-2"><input autoComplete="off" name={`school${i}`} value={formData[`school${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                            <td className="p-2"><input autoComplete="off" name={`group${i}`} value={formData[`group${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                            <td className="p-2"><input autoComplete="off" name={`year${i}`} value={formData[`year${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                            <td className="p-2"><input autoComplete="off" name={`percentage${i}`} value={formData[`percentage${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                            <td className="p-2"><input autoComplete="off" name={`remarks${i}`} value={formData[`remarks${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex items-center gap-4 p-6 bg-brand-50 rounded-2xl border border-brand-100">
+                    <div className="w-10 h-10 bg-brand-700 text-white rounded-full flex items-center justify-center shrink-0">
+                      <AlertCircle size={20} />
+                    </div>
+                    <p className="text-brand-900 text-sm font-medium leading-relaxed">Please ensure all educational records are accurate as per your original certificates. Verification will be performed during document submission.</p>
+                  </div>
+                </div>
+
               </div>
             )}
 
-            {/* STEP 5: FAMILY */}
-            {currentStep === 5 && (
+            {/* STEP 4: FAMILY */}
+            {currentStep === 4 && (
               <div className="space-y-12 animate-in fade-in duration-700">
                 <StepHeader title="Family Background" subtitle="Details of parents and siblings" icon={<Users className="text-brand-700" />} />
 
@@ -940,9 +956,9 @@ const StudentRegistration = () => {
               </div>
             )}
 
-            {currentStep === 6 && hasFeesStep && (
+            {currentStep === 5 && hasFeesStep && (
               <div className="space-y-8 animate-fade-in-up">
-                <StepHeader title="Fee Structure & Course Assignment" subtitle="Assign Course, Batch, Council Fees, and Course Fee Schemes (Step 6)" icon={<CreditCard className="text-brand-700" />} />
+                <StepHeader title="Fee Structure & Course Assignment" subtitle="Assign Course, Batch, Council Fees, and Course Fee Schemes (Step 5)" icon={<CreditCard className="text-brand-700" />} />
                 
                 {/* Course & Batch Selection */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50/70 rounded-2xl border border-slate-100 shadow-sm">
@@ -976,16 +992,17 @@ const StudentRegistration = () => {
                     options={[{value: '', label: 'Select a Batch'}, ...getFilteredBatches().map(b => ({value: b._id, label: b.name}))]} 
                     isObjectOptions 
                   />
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-black tracking-widest text-slate-700 ml-1">
-                      Assign Course
-                    </label>
-                    <div className="w-full px-3 py-2 bg-slate-100 border-2 border-transparent rounded-lg text-[12px] font-bold text-slate-500 min-h-[36px] flex items-center cursor-not-allowed">
-                      {adminEnrollment.course 
-                        ? (courses.find(c => c._id === adminEnrollment.course)?.title || adminEnrollment.course)
-                        : "Select a batch to auto-assign course"}
-                    </div>
-                  </div>
+                  <SelectBox 
+                    label="Assign Course" 
+                    value={adminEnrollment.course} 
+                    onChange={(e) => setAdminEnrollment(prev => ({ ...prev, course: e.target.value }))} 
+                    options={
+                      !adminEnrollment.batch 
+                        ? [{value: '', label: 'Select a batch first'}]
+                        : [{value: '', label: 'Select a Course'}, ...getAvailableCoursesForBatch().map(c => ({value: c._id, label: c.title || "Unknown Course"}))]
+                    } 
+                    isObjectOptions 
+                  />
                 </div>
 
                 {/* Fees Input Section */}
@@ -1216,7 +1233,7 @@ const StudentRegistration = () => {
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-4 w-full md:w-auto">
-                {currentStep < (hasFeesStep ? 6 : 5) ? (
+                {currentStep < (hasFeesStep ? 5 : 4) ? (
                   <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
                     Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </button>
