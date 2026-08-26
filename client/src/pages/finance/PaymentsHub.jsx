@@ -101,6 +101,7 @@ const PaymentsHub = () => {
     online_course: { label: "Online Course", icon: <MonitorPlay size={18} /> },
     course_fees: { label: "Course Fees", icon: <FileText size={18} /> },
     council_fees: { label: "Council Fees", icon: <FileText size={18} /> },
+    exam_fees: { label: "Exam Fees", icon: <FileText size={18} /> },
     vendor_payments: { label: "Vendor Payments", icon: <Building size={18} /> },
     others: { label: "Others", icon: <MoreHorizontal size={18} /> },
   };
@@ -197,6 +198,7 @@ const PaymentsHub = () => {
             {inwardTab === "online_course" && <OnlineCoursePayments />}
             {inwardTab === "course_fees" && <StudentFeesList feeType="Course" paidOnly={true} />}
             {inwardTab === "council_fees" && <StudentFeesList feeType="Council" paidOnly={true} />}
+            {inwardTab === "exam_fees" && <StudentFeesList feeType="Exam" paidOnly={true} />}
             {inwardTab === "vendor_payments" && (
               <VendorPaymentsList paidOnly={true} />
             )}

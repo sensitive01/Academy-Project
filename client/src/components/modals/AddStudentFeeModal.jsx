@@ -39,6 +39,10 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
     let centerId = "";
 
     if (selectedStudent) {
+      const enrolledCourse = selectedStudent.enrolledCourses?.[0]?.course;
+      courseId = enrolledCourse?._id || enrolledCourse || "";
+      const enrolledBatch = selectedStudent.enrolledCourses?.[0]?.batch;
+
       // Find any batch that contains this student first
       const studentBatch = batches.find(b => 
         b.students && b.students.some(sid => {
@@ -49,14 +53,13 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
 
       if (studentBatch) {
         batchId = studentBatch._id;
-        courseId = studentBatch.course?._id || studentBatch.course;
+        if (!courseId && studentBatch.courses?.length > 0) {
+          courseId = studentBatch.courses[0]?._id || studentBatch.courses[0];
+        }
         centerId = selectedStudent.center?._id || selectedStudent.center || "";
       } else {
         // Fallback to student's profile settings if they have no assigned batch
         centerId = selectedStudent.center?._id || selectedStudent.center || "";
-        const enrolledCourse = selectedStudent.enrolledCourses?.[0]?.course;
-        courseId = enrolledCourse?._id || enrolledCourse || "";
-        const enrolledBatch = selectedStudent.enrolledCourses?.[0]?.batch;
         batchId = enrolledBatch?._id || enrolledBatch || "";
       }
     }
@@ -120,7 +123,7 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
                 {batches?.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
               </select>
             </div>
-            {initialFeeType !== 'Council' && initialFeeType !== 'Other' && (
+            {initialFeeType !== 'Council' && initialFeeType !== 'Other' && initialFeeType !== 'Exam' && (
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Fee Type</label>
                 <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.feeType} onChange={e => setFormData({...formData, feeType: e.target.value})}>

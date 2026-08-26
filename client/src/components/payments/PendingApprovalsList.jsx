@@ -167,12 +167,13 @@ const PendingApprovalsList = () => {
       cell: row => {
         const pendingPayment = row.payments ? row.payments.find(p => p.status === 'Pending') : null;
         const displayAmount = pendingPayment ? pendingPayment.amount : (row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0));
+        const paymentMode = pendingPayment ? pendingPayment.paymentMode : row.paymentMode;
           
         return (
           <div className="flex flex-col gap-1 py-3">
             <span className="text-sm font-black text-slate-800">₹{displayAmount?.toLocaleString("en-IN")}</span>
             <span className="text-[10px] text-slate-500 font-bold uppercase">
-              Mode: {row.paymentMode}
+              Mode: {paymentMode}
             </span>
           </div>
         );
@@ -180,13 +181,21 @@ const PendingApprovalsList = () => {
     },
     {
       name: "Reference / Proof", width: "200px",
-      selector: row => row.bankReference || row.proofOfPayment,
+      selector: row => {
+        const pendingPayment = row.payments ? row.payments.find(p => p.status === 'Pending') : null;
+        return pendingPayment ? (pendingPayment.bankReference || pendingPayment.proofOfPayment) : (row.bankReference || row.proofOfPayment);
+      },
       sortable: true,
       cell: row => {
-        if (row.paymentMode === 'Online' && row.proofOfPayment) {
+        const pendingPayment = row.payments ? row.payments.find(p => p.status === 'Pending') : null;
+        const paymentMode = pendingPayment ? pendingPayment.paymentMode : row.paymentMode;
+        const proofOfPayment = pendingPayment ? pendingPayment.proofOfPayment : row.proofOfPayment;
+        const bankReference = pendingPayment ? pendingPayment.bankReference : row.bankReference;
+
+        if (paymentMode === 'Online' && proofOfPayment) {
           return (
             <a 
-              href={row.proofOfPayment} 
+              href={proofOfPayment} 
               target="_blank" 
               rel="noopener noreferrer"
               className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm whitespace-nowrap"
@@ -197,7 +206,7 @@ const PendingApprovalsList = () => {
         }
         return (
           <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">
-            {row.bankReference || 'N/A'}
+            {bankReference || 'N/A'}
           </span>
         );
       }

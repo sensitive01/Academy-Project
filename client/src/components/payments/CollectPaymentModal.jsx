@@ -58,7 +58,8 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
     } else if (paymentMode === 'Online') {
       data.proofOfPayment = proofOfPayment;
     }
-    onSave(fee.studentId, data, isBoth ? targetFeeType : undefined, fee.year);
+    const actualStudentId = fee.studentId || fee.student?._id || fee.student;
+    onSave(actualStudentId, data, isBoth ? targetFeeType : undefined, fee.year);
   };
 
   const [globalBank, setGlobalBank] = useState(null);

@@ -140,9 +140,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         api.get("/courses"),
         api.get("/batches")
       ]);
-      setStudents(studentsRes.data.students || studentsRes.data || []);
+      const allStudents = studentsRes.data.students || studentsRes.data || [];
+      setStudents(allStudents.filter(s => !!s.center));
       setCenters(centersRes.data || []);
-      setCourses(coursesRes.data?.filter(c => c.type === "Center Courses") || []);
+      setCourses(coursesRes.data || []);
       setBatches(batchesRes.data || []);
     } catch (err) {
       console.error(err);
@@ -223,6 +224,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         // Sort transactions by date descending (newest first)
         transactions.sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt));
         setFees(transactions);
+      } else if (feeType === 'Exam') {
+        const sorted = [...filteredData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setFees(sorted);
       } else {
         // Group by student for Fees Collection (excludePaid)
         const grouped = [];
@@ -523,9 +527,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
           "Total Fee": totalDue || 0,
         };
 
-        ["July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June"].forEach(month => {
-          exportRow[month] = getAmountForMonth(f, month);
-        });
+        if (feeType !== 'Exam') {
+          ["July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June"].forEach(month => {
+            exportRow[month] = getAmountForMonth(f, month);
+          });
+        }
 
         exportRow["Balance"] = getRemainingBalance(f);
         exportRow["Status"] = f.status || "-";
@@ -542,7 +548,12 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
       const doc = new jsPDF({ orientation: "landscape" });
       doc.text(`${feeType} Fees Report`, 14, 15);
       
-      const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Total Fee", "July", "August", "Sept", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "June", "Balance", "Status"];
+      const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Total Fee"];
+      if (feeType !== 'Exam') {
+        tableColumn.push("July", "August", "Sept", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "June");
+      }
+      tableColumn.push("Balance", "Status");
+      
       const tableRows = [];
       filtered.forEach((f, index) => {
         const totalDue = f.amount + 
@@ -554,22 +565,30 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
           `${f.student?.studentNameEnglish || "N/A"} (${f.student?.studentId || "-"})`,
           `${f.course?.title || "-"} / ${f.batch?.name || "-"}`,
           f.center?.name || "-",
-          `Rs. ${totalDue.toLocaleString("en-IN")}`,
-          getAmountForMonth(f, "July"),
-          getAmountForMonth(f, "August"),
-          getAmountForMonth(f, "September"),
-          getAmountForMonth(f, "October"),
-          getAmountForMonth(f, "November"),
-          getAmountForMonth(f, "December"),
-          getAmountForMonth(f, "January"),
-          getAmountForMonth(f, "February"),
-          getAmountForMonth(f, "March"),
-          getAmountForMonth(f, "April"),
-          getAmountForMonth(f, "May"),
-          getAmountForMonth(f, "June"),
+          `Rs. ${totalDue.toLocaleString("en-IN")}`
+        ];
+        
+        if (feeType !== 'Exam') {
+          rowData.push(
+            getAmountForMonth(f, "July"),
+            getAmountForMonth(f, "August"),
+            getAmountForMonth(f, "September"),
+            getAmountForMonth(f, "October"),
+            getAmountForMonth(f, "November"),
+            getAmountForMonth(f, "December"),
+            getAmountForMonth(f, "January"),
+            getAmountForMonth(f, "February"),
+            getAmountForMonth(f, "March"),
+            getAmountForMonth(f, "April"),
+            getAmountForMonth(f, "May"),
+            getAmountForMonth(f, "June")
+          );
+        }
+        
+        rowData.push(
           `Rs. ${getRemainingBalance(f).toLocaleString("en-IN")}`,
           f.status || "-"
-        ];
+        );
         tableRows.push(rowData);
       });
       
@@ -774,7 +793,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         );
       }
     },
-    ...monthColumns,
+    ...(feeType !== 'Exam' ? monthColumns : []),
     ...(feeType === 'Both' ? [
       {
         name: "Course Fees", width: "140px",
