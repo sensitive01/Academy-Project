@@ -7,6 +7,7 @@ const Course = require('../models/Course');
 const Vendor = require('../models/Vendor');
 const StudentFee = require('../models/StudentFee');
 const Batch = require('../models/Batch');
+const Center = require('../models/Center');
 
 // ======================================================
 // PUBLIC REGISTRATION (Apply Now)
@@ -767,6 +768,243 @@ router.post("/bulk-promote-academic", protect, async (req, res) => {
     }
 
     res.json({ message: `${promotedCount} students academically promoted successfully` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// BULK UPLOAD PREVIEW
+//////////////////////////////////////////////////////
+router.post("/bulk-upload-preview", protect, async (req, res) => {
+  try {
+    const { students } = req.body;
+    
+    if (req.user.role !== 'admin' && req.user.role !== 'hr' && req.user.role !== 'center') {
+      return res.status(403).json({ message: "Not authorized to perform bulk upload" });
+    }
+
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "No student data provided" });
+    }
+
+    const validRecords = [];
+    const duplicateRecords = [];
+    const invalidRecords = [];
+
+    for (let i = 0; i < students.length; i++) {
+      const record = students[i];
+      const name = record["Name"];
+      const studentId = record["Student ID"];
+      const dob = record["DOB"];
+      const courseIdStr = record["Course ID"];
+      const batchIdStr = record["Batch ID"];
+      const centerIdStr = record["Center ID"];
+      const year = record["Year"];
+      const email = record["Email"];
+      
+      const recordId = `row-${i}`;
+
+      // 1. Mandatory Check
+      if (!name || !dob || !courseIdStr || !batchIdStr || !centerIdStr || !year) {
+        invalidRecords.push({
+          id: recordId,
+          ...record,
+          reason: "Missing mandatory fields (Name, DOB, Course ID, Batch ID, Center ID, Year)"
+        });
+        continue;
+      }
+
+      // 2. Resolve References
+      const center = await Center.findOne({ centerId: centerIdStr });
+      if (!center) {
+        invalidRecords.push({ id: recordId, ...record, reason: `Center ID not found: ${centerIdStr}` });
+        continue;
+      }
+
+      const batch = await Batch.findOne({ batchId: batchIdStr });
+      if (!batch) {
+        invalidRecords.push({ id: recordId, ...record, reason: `Batch ID not found: ${batchIdStr}` });
+        continue;
+      }
+
+      const course = await Course.findOne({ courseId: courseIdStr });
+      if (!course) {
+        invalidRecords.push({ id: recordId, ...record, reason: `Course ID not found: ${courseIdStr}` });
+        continue;
+      }
+
+      let isDuplicate = false;
+      let duplicateReason = "";
+
+      // 3. Duplicate Check
+      if (studentId) {
+        const existingStudent = await Student.findOne({ studentId });
+        if (existingStudent) {
+          isDuplicate = true;
+          duplicateReason = "Student ID already exists";
+        }
+      }
+      
+      if (!isDuplicate && email && email.trim()) {
+        const existingUser = await User.findOne({ email: email.trim() });
+        if (existingUser) {
+          isDuplicate = true;
+          duplicateReason = `Email already exists: ${email}`;
+        }
+      }
+
+      const enrichedRecord = {
+        id: recordId,
+        ...record,
+        resolvedCenterId: center._id,
+        resolvedBatchId: batch._id,
+        resolvedCourseId: course._id
+      };
+
+      if (isDuplicate) {
+        duplicateRecords.push({ ...enrichedRecord, reason: duplicateReason });
+      } else {
+        validRecords.push(enrichedRecord);
+      }
+    }
+
+    res.json({ validRecords, duplicateRecords, invalidRecords });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// BULK UPLOAD COMMIT
+//////////////////////////////////////////////////////
+router.post("/bulk-upload", protect, async (req, res) => {
+  try {
+    const { recordsToProcess } = req.body;
+    
+    if (req.user.role !== 'admin' && req.user.role !== 'hr' && req.user.role !== 'center') {
+      return res.status(403).json({ message: "Not authorized to perform bulk upload" });
+    }
+
+    if (!Array.isArray(recordsToProcess) || recordsToProcess.length === 0) {
+      return res.status(400).json({ message: "No records to process" });
+    }
+
+    let successCount = 0;
+    const skippedRecords = [];
+
+    for (const record of recordsToProcess) {
+      try {
+        const name = record["Name"];
+        let studentId = record["Student ID"];
+        const dob = record["DOB"];
+        const year = record["Year"];
+        const email = record["Email"];
+        
+        const isUpdate = record.isUpdate;
+        const centerId = record.resolvedCenterId;
+        const batchId = record.resolvedBatchId;
+        const courseId = record.resolvedCourseId;
+
+        let parsedDob = new Date(dob);
+        if (isNaN(parsedDob.getTime())) {
+          parsedDob = new Date();
+        }
+
+        const finalEmail = (email && email.trim()) ? email.trim() : `student_${Date.now()}_${Math.floor(Math.random()*1000)}@dracademy.internal`;
+
+        if (isUpdate && studentId) {
+          // Overwrite existing student
+          const existingStudent = await Student.findOne({ studentId }).populate("user");
+          if (!existingStudent) {
+            skippedRecords.push({ name, studentId, reason: "Attempted to update but student not found" });
+            continue;
+          }
+
+          // Update User
+          if (existingStudent.user) {
+            await User.findByIdAndUpdate(existingStudent.user._id, {
+              name,
+              email: finalEmail
+            });
+          }
+
+          // Update Student
+          // Check if course already enrolled
+          let enrolled = existingStudent.enrolledCourses || [];
+          const courseAlreadyEnrolled = enrolled.some(c => String(c.course) === String(courseId));
+          if (!courseAlreadyEnrolled) {
+            enrolled.push({
+              course: courseId,
+              batch: batchId,
+              completed: false,
+              progress: 0
+            });
+          }
+
+          await Student.findByIdAndUpdate(existingStudent._id, {
+            studentNameEnglish: name,
+            dob: parsedDob,
+            email: finalEmail,
+            center: centerId,
+            year,
+            enrolledCourses: enrolled
+          });
+
+          // Update batch
+          const batch = await Batch.findById(batchId);
+          if (batch && !batch.students.includes(existingStudent._id)) {
+            batch.students.push(existingStudent._id);
+            await batch.save();
+          }
+
+          successCount++;
+        } else {
+          // Create new student
+          if (!studentId) {
+            const d = new Date();
+            studentId = `STU-${d.getFullYear()}-${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 100)}`;
+          }
+
+          const user = await User.create({
+            name,
+            email: finalEmail,
+            password: "Student@123",
+            role: "student",
+          });
+
+          const newStudent = await Student.create({
+            user: user._id,
+            studentId,
+            studentNameEnglish: name,
+            dob: parsedDob,
+            email: finalEmail,
+            center: centerId,
+            year,
+            enrolledCourses: [{
+              course: courseId,
+              batch: batchId,
+              completed: false,
+              progress: 0
+            }]
+          });
+
+          const batch = await Batch.findById(batchId);
+          if (batch && !batch.students.includes(newStudent._id)) {
+            batch.students.push(newStudent._id);
+            await batch.save();
+          }
+
+          successCount++;
+        }
+      } catch (err) {
+        skippedRecords.push({ 
+          name: record["Name"] || "Unknown", 
+          studentId: record["Student ID"] || "", 
+          reason: `System error: ${err.message}` 
+        });
+      }
+    }
+
+    res.json({ successCount, skippedRecords });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

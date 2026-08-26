@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import {
   Eye,
@@ -329,8 +329,21 @@ const Students = () => {
     vendorPayment: "",
     salary: "",
     referralCharge: "",
+    referralCharge: "",
     isNewPeriod: false
   });
+
+  const fileInputRef = useRef(null);
+  const [bulkUploadResult, setBulkUploadResult] = useState({ isOpen: false, result: null, isLoading: false });
+  const [previewModal, setPreviewModal] = useState({ 
+    isOpen: false, 
+    validRecords: [], 
+    duplicateRecords: [], 
+    invalidRecords: [], 
+    isLoading: false,
+    selectedDuplicates: []
+  });
+  const [activePreviewTab, setActivePreviewTab] = useState('valid');
 
   useEffect(() => {
     sessionStorage.setItem("studentsActiveTab", activeTab);
@@ -401,6 +414,91 @@ const Students = () => {
       const { data } = await api.get("/batches");
       setBatches(data.batches || data || []);
     } catch { /* Fail silently */ }
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Student ID": "",
+        "Name": "John Doe",
+        "Email": "john@example.com",
+        "DOB": "2000-01-01",
+        "Course ID": "CRS-XXXX",
+        "Batch ID": "B-001",
+        "Center ID": "CEN-2024-XXXX",
+        "Year": "1st Year"
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Student_Bulk_Upload_Template.xlsx");
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setPreviewModal(prev => ({ ...prev, isOpen: true, isLoading: true }));
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+            toast.error("File is empty.");
+            setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+            return;
+        }
+
+        const res = await api.post("/students/bulk-upload-preview", { students: data });
+        setPreviewModal(prev => ({ 
+          ...prev, 
+          isOpen: true, 
+          validRecords: res.data.validRecords,
+          duplicateRecords: res.data.duplicateRecords,
+          invalidRecords: res.data.invalidRecords,
+          isLoading: false,
+          selectedDuplicates: []
+        }));
+        setActivePreviewTab('valid');
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Error processing file.");
+        setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleCommitUpload = async () => {
+    const recordsToProcess = [
+      ...previewModal.validRecords,
+      ...previewModal.duplicateRecords
+        .filter(d => previewModal.selectedDuplicates.includes(d.id))
+        .map(d => ({ ...d, isUpdate: true }))
+    ];
+
+    if (recordsToProcess.length === 0) {
+      toast.error("No records selected to upload.");
+      return;
+    }
+
+    setPreviewModal(prev => ({ ...prev, isLoading: true }));
+    try {
+      const res = await api.post("/students/bulk-upload", { recordsToProcess });
+      setPreviewModal({ isOpen: false, validRecords: [], duplicateRecords: [], invalidRecords: [], isLoading: false, selectedDuplicates: [] });
+      setBulkUploadResult({ isOpen: true, result: res.data, isLoading: false });
+      fetchStudents();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Error uploading records.");
+      setPreviewModal(prev => ({ ...prev, isLoading: false }));
+    }
   };
 
   useEffect(() => {
@@ -886,11 +984,33 @@ const Students = () => {
                   >
                     <UserPlus size={18} /> Add Student
                   </button>
-                  <button
-                    className="flex items-center gap-2 px-5 py-2.5 font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 transition-all cursor-default"
-                  >
-                    <UploadCloud size={18} /> Bulk Upload
-                  </button>
+                  <div className="relative group">
+                    <button className="flex items-center gap-2 px-5 py-2.5 font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 transition-all cursor-pointer">
+                      <UploadCloud size={18} /> Bulk Upload <ChevronDown size={16} />
+                    </button>
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                      <button
+                        onClick={handleDownloadTemplate}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50 transition-colors text-left"
+                      >
+                        <Download size={16} /> Download Template
+                      </button>
+                      <div className="h-px bg-slate-50 w-full"></div>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-brand-700 hover:bg-brand-50 transition-colors text-left"
+                      >
+                        <UploadCloud size={16} /> Upload Excel/CSV
+                      </button>
+                      <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv" 
+                        ref={fileInputRef} 
+                        onChange={handleFileUpload} 
+                        className="hidden" 
+                      />
+                    </div>
+                  </div>
                   <button
                     onClick={() => setShowExportModal(true)}
                     className="flex items-center gap-2 px-5 py-2.5 font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-2xl hover:bg-brand-100 transition-all active:scale-95 cursor-pointer"
@@ -1220,6 +1340,207 @@ const Students = () => {
                 Delete
               </button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Bulk Upload Result Modal */}
+      {bulkUploadResult.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-slate-900">Bulk Upload Results</h3>
+              <button onClick={() => setBulkUploadResult({ isOpen: false, result: null, isLoading: false })} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            {bulkUploadResult.isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
+                <p className="text-slate-500 font-medium">Processing records, please wait...</p>
+              </div>
+            ) : bulkUploadResult.result ? (
+              <div className="flex-1 overflow-y-auto pr-2">
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-green-50 border border-green-100 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center"><CheckCircle size={24} /></div>
+                    <div>
+                      <p className="text-sm text-green-800 font-semibold mb-1">Successfully Uploaded</p>
+                      <p className="text-2xl font-black text-green-700">{bulkUploadResult.result.successCount}</p>
+                    </div>
+                  </div>
+                  <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center"><AlertCircle size={24} /></div>
+                    <div>
+                      <p className="text-sm text-red-800 font-semibold mb-1">Skipped Records</p>
+                      <p className="text-2xl font-black text-red-700">{bulkUploadResult.result.skippedRecords?.length || 0}</p>
+                    </div>
+                  </div>
+                </div>
+                {bulkUploadResult.result.skippedRecords?.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><AlertCircle size={16} className="text-red-500" /> Skipped Records Details</h4>
+                    <div className="space-y-3">
+                      {bulkUploadResult.result.skippedRecords.map((skip, idx) => (
+                        <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center justify-between">
+                          <div className="font-medium text-slate-700 text-sm">{skip.name || "Unknown row"} {skip.studentId ? `(${skip.studentId})` : ""}</div>
+                          <div className="text-xs font-bold px-3 py-1 bg-red-100 text-red-700 rounded-full">{skip.reason}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500">Something went wrong.</div>
+            )}
+            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+              <button onClick={() => setBulkUploadResult({ isOpen: false, result: null, isLoading: false })} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Close</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* Preview Modal */}
+      {previewModal.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-4xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Preview Upload</h3>
+                <p className="text-sm text-slate-500">Review your data before finalizing</p>
+              </div>
+              <button onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }))} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            {previewModal.isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 flex-1">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
+                <p className="text-slate-500 font-medium">Analyzing records...</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-4 border-b border-slate-200 mb-4">
+                  <button 
+                    onClick={() => setActivePreviewTab('valid')}
+                    className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'valid' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Ready ({previewModal.validRecords.length})
+                    {activePreviewTab === 'valid' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full"></div>}
+                  </button>
+                  <button 
+                    onClick={() => setActivePreviewTab('duplicates')}
+                    className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'duplicates' ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Duplicates ({previewModal.duplicateRecords.length})
+                    {activePreviewTab === 'duplicates' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-orange-600 rounded-t-full"></div>}
+                  </button>
+                  <button 
+                    onClick={() => setActivePreviewTab('invalid')}
+                    className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'invalid' ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Invalid ({previewModal.invalidRecords.length})
+                    {activePreviewTab === 'invalid' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-600 rounded-t-full"></div>}
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  {activePreviewTab === 'valid' && (
+                    <div className="space-y-3">
+                      {previewModal.validRecords.length === 0 ? (
+                        <div className="text-center py-8 text-slate-500">No valid records found.</div>
+                      ) : (
+                        previewModal.validRecords.map(r => (
+                          <div key={r.id} className="bg-white border border-slate-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
+                            <div>
+                              <p className="font-bold text-slate-800 text-sm">{r["Name"]}</p>
+                              <p className="text-xs text-slate-500">{r["Email"] || "No Email"} | {r["Student ID"] || "New ID will be generated"}</p>
+                            </div>
+                            <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center gap-1"><CheckCircle size={14}/> Ready</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {activePreviewTab === 'duplicates' && (
+                    <div>
+                      <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs flex gap-2 items-start">
+                        <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                        <p>These records conflict with existing students. <strong>Check the box</strong> to overwrite their existing data, or leave unchecked to safely skip them.</p>
+                      </div>
+                      <div className="space-y-3">
+                        {previewModal.duplicateRecords.length === 0 ? (
+                          <div className="text-center py-8 text-slate-500">No duplicates found.</div>
+                        ) : (
+                          previewModal.duplicateRecords.map(r => {
+                            const isSelected = previewModal.selectedDuplicates.includes(r.id);
+                            return (
+                              <label key={r.id} className={`flex items-center gap-3 bg-white border p-3 rounded-xl cursor-pointer transition-all ${isSelected ? 'border-orange-400 ring-1 ring-orange-400 shadow-md' : 'border-slate-200 hover:border-orange-300'}`}>
+                                <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setPreviewModal(prev => ({ ...prev, selectedDuplicates: [...prev.selectedDuplicates, r.id] }));
+                                    } else {
+                                      setPreviewModal(prev => ({ ...prev, selectedDuplicates: prev.selectedDuplicates.filter(id => id !== r.id) }));
+                                    }
+                                  }}
+                                />
+                                <div className="flex-1">
+                                  <p className="font-bold text-slate-800 text-sm">{r["Name"]}</p>
+                                  <p className="text-xs text-slate-500">{r["Email"]} | {r["Student ID"]}</p>
+                                </div>
+                                <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold text-right max-w-[200px] truncate">{r.reason}</div>
+                              </label>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activePreviewTab === 'invalid' && (
+                    <div>
+                      <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex gap-2 items-start">
+                        <XCircle size={16} className="mt-0.5 shrink-0" />
+                        <p>These records cannot be uploaded due to missing data or invalid references. Please fix them in your spreadsheet and re-upload.</p>
+                      </div>
+                      <div className="space-y-3">
+                        {previewModal.invalidRecords.length === 0 ? (
+                          <div className="text-center py-8 text-slate-500">No invalid records found.</div>
+                        ) : (
+                          previewModal.invalidRecords.map(r => (
+                            <div key={r.id} className="bg-white border border-red-100 p-3 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm">
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{r["Name"] || "Unknown"}</p>
+                                <p className="text-xs text-slate-500">Row ID: {r.id}</p>
+                              </div>
+                              <div className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold text-right">{r.reason}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
+                  <div className="text-sm font-semibold text-slate-600">
+                    Will upload: <span className="text-brand-600 font-bold">{previewModal.validRecords.length + previewModal.selectedDuplicates.length}</span> records
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }))} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Cancel</button>
+                    <button onClick={handleCommitUpload} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/20 transition-all">Confirm & Upload</button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>,
         document.body
