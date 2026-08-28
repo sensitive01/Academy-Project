@@ -80,12 +80,15 @@ const ExamManagement = () => {
     batch: "",
     semester: 1,
     course: "",
-    subjects: [], // array of { subject, theoryMark, internalMark, practicalMark }
+    subjects: [],
     template: "rg_modern"
   });
 
   const [viewingBatch, setViewingBatch] = useState(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
+
+  const [viewingMarkBatch, setViewingMarkBatch] = useState(null);
+  const [markSearchQuery, setMarkSearchQuery] = useState("");
 
   const fileInputRef = React.useRef(null);
 
@@ -811,6 +814,79 @@ const ExamManagement = () => {
 
   const groupedMarksArray = Object.values(groupedMarksMap);
 
+  const batchMarksMap = {};
+  groupedMarksArray.forEach(m => {
+    const batchId = m.batch?._id || m.batch || "unknown_batch";
+    const courseId = m.course?._id || m.course || "unknown_course";
+    const semester = m.semester || 1;
+    const key = `${batchId}_${courseId}_${semester}`;
+    
+    if (!batchMarksMap[key]) {
+      batchMarksMap[key] = {
+        key,
+        batch: m.batch,
+        course: m.course,
+        semester,
+        students: [],
+        totalPass: 0,
+        totalFail: 0
+      };
+    }
+    
+    batchMarksMap[key].students.push(m);
+    if (m.failCount === 0) batchMarksMap[key].totalPass += 1;
+    else batchMarksMap[key].totalFail += 1;
+  });
+  
+  const batchMarksArray = Object.values(batchMarksMap).sort((a, b) => {
+    if (a.batch?.name !== b.batch?.name) return (a.batch?.name || "").localeCompare(b.batch?.name || "");
+    if (a.course?.title !== b.course?.title) return (a.course?.title || "").localeCompare(b.course?.title || "");
+    return a.semester - b.semester;
+  });
+
+  const markBatchColumns = [
+    { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
+    {
+      name: "Batch / Exam",
+      selector: row => row.batch?.name,
+      sortable: true,
+      cell: row => (
+        <button onClick={() => setViewingMarkBatch(row)} className="font-bold text-brand-600 hover:underline text-left cursor-pointer">
+          {row.batch?.name || "N/A"}
+        </button>
+      )
+    },
+    {
+      name: "Course",
+      selector: row => row.course?.title,
+      sortable: true,
+      cell: row => <span className="font-semibold text-slate-700">{row.course?.title || "N/A"}</span>
+    },
+    {
+      name: "Semester",
+      selector: row => row.semester,
+      sortable: true,
+      center: true,
+      cell: row => <span className="font-bold text-slate-700">Sem {row.semester}</span>
+    },
+    {
+      name: "Total Students",
+      selector: row => row.students?.length || 0,
+      center: true,
+      cell: row => <span className="px-3 py-1 bg-brand-50 text-brand-700 font-bold rounded-full text-xs">{row.students?.length || 0}</span>
+    },
+    {
+      name: "Overall Result",
+      cell: row => (
+        <div className="flex flex-col gap-1 py-1 text-xs">
+          <span className="text-emerald-600 font-bold">Pass: {row.totalPass}</span>
+          {row.totalFail > 0 && <span className="text-red-600 font-bold">Fail: {row.totalFail}</span>}
+        </div>
+      ),
+      width: "120px"
+    }
+  ];
+
   const hallTicketColumns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     {
@@ -1108,6 +1184,11 @@ const ExamManagement = () => {
     String(m.semester).includes(searchQuery)
   );
 
+  const filteredBatchMarks = batchMarksArray.filter(b => 
+    b.batch?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    b.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -1338,14 +1419,49 @@ const ExamManagement = () => {
             )}
           </div>
         ) : (
-          <CustomDataTable
-            columns={markColumns}
-            data={filteredGroupedMarks}
-            progressPending={loading}
-            search={searchQuery}
-            setSearch={setSearchQuery}
-            searchPlaceholder="Search results by student name, ID or semester..."
-          />
+          <div className="p-6">
+            {viewingMarkBatch ? (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Results - {viewingMarkBatch.batch?.name}</h3>
+                    <p className="text-sm text-slate-500">{viewingMarkBatch.course?.title} (Sem {viewingMarkBatch.semester})</p>
+                  </div>
+                  <button
+                    onClick={() => { setViewingMarkBatch(null); setMarkSearchQuery(""); }}
+                    className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
+                  >
+                    Back
+                  </button>
+                </div>
+                <CustomDataTable
+                  columns={markColumns}
+                  data={(viewingMarkBatch.students || []).filter(m => 
+                    (m.student?.studentNameEnglish || "").toLowerCase().includes(markSearchQuery.toLowerCase()) || 
+                    (m.student?.studentId || "").toLowerCase().includes(markSearchQuery.toLowerCase())
+                  )}
+                  progressPending={false}
+                  search={markSearchQuery}
+                  setSearch={setMarkSearchQuery}
+                  searchPlaceholder="Search students by name or ID..."
+                />
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold text-slate-800">Exam Results</h3>
+                </div>
+                <CustomDataTable
+                  columns={markBatchColumns}
+                  data={filteredBatchMarks}
+                  progressPending={loading}
+                  search={searchQuery}
+                  setSearch={setSearchQuery}
+                  searchPlaceholder="Search results by batch or course name..."
+                />
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -1813,27 +1929,13 @@ const ExamManagement = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Center</label>
-                <select
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
-                  value={sampleCsvForm.centerId}
-                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, centerId: e.target.value })}
-                >
-                  <option value="">All Centers</option>
-                  {centers.map(c => (
-                    <option key={c._id} value={c._id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Batch</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Batch <span className="text-red-500">*</span></label>
                 <select
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
                   value={sampleCsvForm.batchId}
-                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, batchId: e.target.value, courseId: "" })}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, batchId: e.target.value, courseId: "", centerId: "" })}
                 >
-                  <option value="">All Batches</option>
+                  <option value="">Select Batch</option>
                   {batches.map(b => (
                     <option key={b._id} value={b._id}>{b.name}</option>
                   ))}
@@ -1845,7 +1947,8 @@ const ExamManagement = () => {
                 <select
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
                   value={sampleCsvForm.courseId}
-                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, courseId: e.target.value })}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, courseId: e.target.value, centerId: "" })}
+                  disabled={!sampleCsvForm.batchId}
                 >
                   <option value="">Select Course</option>
                   {(sampleCsvForm.batchId
@@ -1853,6 +1956,32 @@ const ExamManagement = () => {
                     : courses
                   ).map(c => (
                     <option key={c._id} value={c._id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Center</label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  value={sampleCsvForm.centerId}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, centerId: e.target.value })}
+                  disabled={!sampleCsvForm.batchId || !sampleCsvForm.courseId}
+                >
+                  <option value="">{(!sampleCsvForm.batchId || !sampleCsvForm.courseId) ? "Select Batch and Course first" : "All Available Centers"}</option>
+                  {(sampleCsvForm.batchId && sampleCsvForm.courseId
+                    ? centers.filter(c => 
+                        students.some(s => 
+                          (String(s.center?._id || s.center) === String(c._id)) &&
+                          s.enrolledCourses?.some(ec => 
+                            String(ec.batch?._id || ec.batch) === String(sampleCsvForm.batchId) &&
+                            String(ec.course?._id || ec.course) === String(sampleCsvForm.courseId)
+                          )
+                        )
+                      )
+                    : []
+                  ).map(c => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
                 </select>
               </div>
