@@ -24,6 +24,10 @@ const markSchema = new mongoose.Schema({
     ref: 'Subject',
     required: true,
   },
+  exam: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Exam',
+  },
   theoryMark: {
     type: Number,
     default: 0,
@@ -38,6 +42,10 @@ const markSchema = new mongoose.Schema({
   },
   marksheetUrl: {
     type: String
+  },
+  template: {
+    type: String,
+    default: 'rg_modern'
   }
 }, { timestamps: true });
 

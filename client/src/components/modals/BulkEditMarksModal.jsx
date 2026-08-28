@@ -84,7 +84,6 @@ const BulkEditMarksModal = ({ data, onClose, onSave, students, batches, courses,
                   <th className="p-4">Subject</th>
                   <th className="p-4">Theory Mark</th>
                   <th className="p-4">Internal Mark</th>
-                  <th className="p-4">Practical Mark</th>
                   <th className="p-4 text-center">Total</th>
                 </tr>
               </thead>
@@ -115,17 +114,8 @@ const BulkEditMarksModal = ({ data, onClose, onSave, students, batches, courses,
                         required
                       />
                     </td>
-                    <td className="p-4">
-                      <input 
-                        type="number" 
-                        className="w-24 rounded-lg border-slate-200 focus:border-brand-500 focus:ring-brand-500 p-2 text-center"
-                        value={m.practicalMark} 
-                        onChange={(e) => handleChange(m._id, 'practicalMark', e.target.value)} 
-                        required
-                      />
-                    </td>
                     <td className="p-4 text-center font-bold text-brand-600 bg-brand-50">
-                      {m.theoryMark + m.internalMark + m.practicalMark}
+                      {m.theoryMark + m.internalMark + (m.practicalMark || 0)}
                     </td>
                   </tr>
                 ))}

@@ -9,7 +9,6 @@ const Batch = require('../models/Batch');
 const { protect } = require('../middleware/authMiddleware');
 const { createInAppNotification } = require('../utils/notificationUtils');
 
-
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     next();
@@ -18,15 +17,70 @@ const isAdmin = (req, res, next) => {
   }
 };
 
+// Helper to validate mark limits against Exam configuration
+const validateMarkLimits = async (courseId, semester, batchId, subjectId, theoryMark, internalMark, practicalMark) => {
+  const examQuery = { course: courseId, semester };
+  if (batchId) examQuery.batch = batchId;
+  
+  const exam = await Exam.findOne(examQuery).sort({ createdAt: -1 }).lean();
+  if (!exam || !exam.subjects) return null; // No limit checks if exam doesn't exist
+  
+  const examSubject = exam.subjects.find(s => s.subject.toString() === subjectId.toString());
+  if (!examSubject) return null; // Subject not in exam
+  
+  const errors = [];
+  if (internalMark > examSubject.internalMark) {
+    errors.push(`Internal mark (${internalMark}) exceeds maximum allowed (${examSubject.internalMark})`);
+  }
+  
+  // External mark is compared against theoryMark or practicalMark depending on subject type
+  // Since we don't have subject type here, we just check whichever one is provided > 0 against externalMark
+  const providedExternal = Math.max(theoryMark || 0, practicalMark || 0);
+  const maxExternal = examSubject.externalMark || examSubject.theoryMark || 0;
+  if (maxExternal > 0 && providedExternal > maxExternal) {
+    errors.push(`External mark (${providedExternal}) exceeds maximum allowed (${maxExternal})`);
+  }
+  
+  if (errors.length > 0) return errors.join(', ');
+  return null;
+};
+
 // GET all marks
 router.get('/', protect, async (req, res) => {
   try {
-    const marks = await Mark.find()
-      .populate('student', 'studentNameEnglish studentId')
+    let marks = await Mark.find()
+      .populate({ path: 'student', select: 'studentNameEnglish studentId center year dob', populate: { path: 'center', select: 'name centerId' } })
       .populate('course', 'title')
       .populate('batch', 'name')
       .populate('subject', 'name code type')
+      .populate({ path: 'exam', select: 'name date subjects' })
+      .lean()
       .sort({ createdAt: -1 });
+
+    const exams = await Exam.find().sort({ createdAt: -1 }).lean();
+
+    marks = marks.map(mark => {
+      let passMark = 40; // fallback default
+      if (mark.course && mark.subject) {
+        const exam = exams.find(e => 
+          e.course.toString() === mark.course._id.toString() &&
+          e.semester === mark.semester &&
+          (!e.batch || !mark.batch || e.batch.toString() === mark.batch._id.toString())
+        );
+        if (exam && exam.subjects) {
+          const examSub = exam.subjects.find(s => s.subject.toString() === mark.subject._id.toString());
+          if (examSub && examSub.passMark !== undefined) {
+            passMark = examSub.passMark;
+          }
+        }
+      }
+      // Calculate isPass dynamically here as well
+      const obtained = mark.subject?.type === "Practical" ? (mark.practicalMark || 0) : ((mark.theoryMark || 0) + (mark.internalMark || 0));
+      const isPass = obtained >= passMark;
+      
+      return { ...mark, passMark, isPass };
+    });
+
     res.json(marks);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -36,9 +90,35 @@ router.get('/', protect, async (req, res) => {
 // GET marks for a specific student
 router.get('/student/:studentId', protect, async (req, res) => {
   try {
-    const marks = await Mark.find({ student: req.params.studentId })
+    let marks = await Mark.find({ student: req.params.studentId })
       .populate('course', 'title')
-      .populate('subject', 'name code type');
+      .populate('subject', 'name code type')
+      .populate({ path: 'exam', select: 'name date subjects' })
+      .lean();
+
+    const exams = await Exam.find().sort({ createdAt: -1 }).lean();
+
+    marks = marks.map(mark => {
+      let passMark = 40; // fallback default
+      if (mark.course && mark.subject) {
+        const exam = exams.find(e => 
+          e.course.toString() === mark.course._id.toString() &&
+          e.semester === mark.semester &&
+          (!e.batch || !mark.batch || e.batch.toString() === mark.batch.toString())
+        );
+        if (exam && exam.subjects) {
+          const examSub = exam.subjects.find(s => s.subject.toString() === mark.subject._id.toString());
+          if (examSub && examSub.passMark !== undefined) {
+            passMark = examSub.passMark;
+          }
+        }
+      }
+      const obtained = mark.subject?.type === "Practical" ? (mark.practicalMark || 0) : ((mark.theoryMark || 0) + (mark.internalMark || 0));
+      const isPass = obtained >= passMark;
+      
+      return { ...mark, passMark, isPass };
+    });
+
     res.json(marks);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -48,7 +128,7 @@ router.get('/student/:studentId', protect, async (req, res) => {
 // POST create marks for a student's entire semester (Admin only)
 router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
   try {
-    const { student, batch, course, semester, subjects } = req.body;
+    const { student, batch, course, semester, subjects, template } = req.body;
     
     if (!student || !course || !semester || !Array.isArray(subjects)) {
       return res.status(400).json({ message: 'Missing required fields or invalid format' });
@@ -57,6 +137,11 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
     const createdMarks = [];
 
     for (const sub of subjects) {
+      const validationError = await validateMarkLimits(course, semester, batch, sub.subject, Number(sub.theoryMark || 0), Number(sub.internalMark || 0), Number(sub.practicalMark || 0));
+      if (validationError) {
+        return res.status(400).json({ message: validationError });
+      }
+
       // Check if it already exists
       const existing = await Mark.findOne({ student, semester, subject: sub.subject });
       if (existing) {
@@ -64,6 +149,7 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
         existing.theoryMark = Number(sub.theoryMark || 0);
         existing.internalMark = Number(sub.internalMark || 0);
         existing.practicalMark = Number(sub.practicalMark || 0);
+        if (template) existing.template = template;
         await existing.save();
         createdMarks.push(existing);
       } else {
@@ -76,7 +162,8 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
           subject: sub.subject,
           theoryMark: Number(sub.theoryMark || 0),
           internalMark: Number(sub.internalMark || 0),
-          practicalMark: Number(sub.practicalMark || 0)
+          practicalMark: Number(sub.practicalMark || 0),
+          template: template || 'rg_modern'
         });
         createdMarks.push(newMark);
       }
@@ -91,7 +178,7 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
 // POST create a new mark (Admin only)
 router.post('/', protect, isAdmin, async (req, res) => {
   try {
-    const { student, semester, batch, course, subject, theoryMark, internalMark, practicalMark } = req.body;
+    const { student, semester, batch, course, exam, subject, theoryMark, internalMark, practicalMark, template } = req.body;
     
     // Check if mark for this student, semester and subject already exists
     const existing = await Mark.findOne({ student, semester, subject });
@@ -99,15 +186,23 @@ router.post('/', protect, isAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Mark for this student and subject already exists in this semester.' });
     }
 
+    // Validate limits
+    const validationError = await validateMarkLimits(course, Number(semester), batch, subject, Number(theoryMark || 0), Number(internalMark || 0), Number(practicalMark || 0));
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
     const markData = {
       student,
       semester: Number(semester),
       batch,
       course,
+      exam,
       subject,
       theoryMark: Number(theoryMark || 0),
       internalMark: Number(internalMark || 0),
-      practicalMark: Number(practicalMark || 0)
+      practicalMark: Number(practicalMark || 0),
+      template: template || 'rg_modern'
     };
 
 
@@ -136,21 +231,37 @@ router.post('/', protect, isAdmin, async (req, res) => {
 // PUT update a mark (Admin only)
 router.put('/:id', protect, isAdmin, async (req, res) => {
   try {
-    const { student, semester, batch, course, subject, theoryMark, internalMark, practicalMark } = req.body;
+    const { student, semester, batch, course, exam, subject, theoryMark, internalMark, practicalMark, template } = req.body;
     const mark = await Mark.findById(req.params.id);
     
     if (!mark) {
       return res.status(404).json({ message: 'Mark not found' });
     }
 
+    // Validate limits
+    const validationError = await validateMarkLimits(
+      course || mark.course,
+      semester !== undefined ? Number(semester) : mark.semester,
+      batch || mark.batch,
+      subject || mark.subject,
+      theoryMark !== undefined ? Number(theoryMark) : mark.theoryMark,
+      internalMark !== undefined ? Number(internalMark) : mark.internalMark,
+      practicalMark !== undefined ? Number(practicalMark) : mark.practicalMark
+    );
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
     if (student) mark.student = student;
     if (semester !== undefined) mark.semester = Number(semester);
     if (batch) mark.batch = batch;
     if (course) mark.course = course;
+    if (exam) mark.exam = exam;
     if (subject) mark.subject = subject;
     if (theoryMark !== undefined) mark.theoryMark = Number(theoryMark);
     if (internalMark !== undefined) mark.internalMark = Number(internalMark);
     if (practicalMark !== undefined) mark.practicalMark = Number(practicalMark);
+    if (template !== undefined) mark.template = template;
 
 
 
@@ -178,7 +289,7 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
 // POST bulk upload marks via JSON array (Admin only)
 router.post('/bulk', protect, isAdmin, async (req, res) => {
   try {
-    const { marks } = req.body; // Array of objects
+    const { marks, template } = req.body; // Array of objects and template
     if (!marks || !Array.isArray(marks)) {
       return res.status(400).json({ message: 'Invalid data format' });
     }
@@ -193,7 +304,13 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
       const row = marks[i];
       try {
         const studentDoc = await Student.findOne({ studentId: row['Student ID'] });
-        const courseDoc = await Course.findOne({ title: row['Course Title'] });
+        let actualCourseTitle = row['Course Title'];
+        if (actualCourseTitle && String(actualCourseTitle).includes(' - ')) {
+          // Extracts everything after the first ' - ' in case of "CRS-123 - Course Name"
+          const parts = String(actualCourseTitle).split(' - ');
+          actualCourseTitle = parts.slice(1).join(' - ').trim();
+        }
+        const courseDoc = await Course.findOne({ title: actualCourseTitle });
         let batchDoc = null;
         if (row['Batch Name']) {
           batchDoc = await Batch.findOne({ name: row['Batch Name'] });
@@ -228,11 +345,19 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
           
           const internalMark = Number(row[internalKey] || 0);
 
+          const validationError = await validateMarkLimits(courseDoc._id, semester, batchDoc ? batchDoc._id : null, subjectDoc._id, theoryMark, internalMark, practicalMark);
+          if (validationError) {
+            results.failed += 1;
+            results.errors.push(`Row ${i + 1} (${actualCode}): ${validationError}`);
+            return true;
+          }
+
           const existing = await Mark.findOne({ student: studentDoc._id, semester, subject: subjectDoc._id });
           if (existing) {
             existing.theoryMark = theoryMark;
             existing.internalMark = internalMark;
             existing.practicalMark = practicalMark;
+            if (template) existing.template = template;
             if (batchDoc) existing.batch = batchDoc._id;
             await existing.save();
             results.success += 1;
@@ -245,7 +370,8 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
               subject: subjectDoc._id,
               theoryMark,
               internalMark,
-              practicalMark
+              practicalMark,
+              template: template || 'rg_modern'
             });
             results.success += 1;
           }

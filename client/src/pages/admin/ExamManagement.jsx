@@ -10,6 +10,16 @@ import BulkEditMarksModal from "../../components/modals/BulkEditMarksModal";
 import HallTicketModal from "../../components/modals/HallTicketModal";
 import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
 import StudentFeesList from "../../components/payments/StudentFeesList";
+import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
+
+const templates = [
+  { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
+  { id: 'bglrgm', name: 'BGLRGM' },
+  { id: 'rgmtn', name: 'RGMTN' },
+  { id: 'dr_rg_academy', name: 'DR RG ACADEMY' },
+  { id: 'unicarewel', name: 'UNICAREWEL' },
+  { id: 'vocational_council', name: 'VOCATIONAL COUNCIL' }
+];
 
 const ExamManagement = () => {
   const { user } = useAuth();
@@ -35,6 +45,8 @@ const ExamManagement = () => {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showHallTicketModal, setShowHallTicketModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showBulkUploadPreviewModal, setShowBulkUploadPreviewModal] = useState(false);
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
 
   // Hall ticket generation states
   const [selectedHallTicketExam, setSelectedHallTicketExam] = useState("");
@@ -68,8 +80,12 @@ const ExamManagement = () => {
     batch: "",
     semester: 1,
     course: "",
-    subjects: [] // array of { subject, theoryMark, internalMark, practicalMark }
+    subjects: [], // array of { subject, theoryMark, internalMark, practicalMark }
+    template: "rg_modern"
   });
+
+  const [viewingBatch, setViewingBatch] = useState(null);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
 
   const fileInputRef = React.useRef(null);
 
@@ -83,8 +99,8 @@ const ExamManagement = () => {
         api.get("/batches"),
         api.get("/subjects"),
         api.get("/marks"),
-        isAdmin ? api.get("/students") : Promise.resolve({ data: [] }),
-        isAdmin ? api.get("/student-fees") : Promise.resolve({ data: [] }),
+        api.get("/students"),
+        api.get("/student-fees"),
         api.get("/hall-tickets")
       ]);
       setExams(examsRes.data);
@@ -94,8 +110,10 @@ const ExamManagement = () => {
       setSubjects(subjectsRes.data);
       setMarks(marksRes.data);
       setHallTickets(hallTicketsRes.data);
-      if (isAdmin) setStudents(studentsRes.data.students || []);
-      if (isAdmin) setStudentFees(feesRes.data || []);
+      // Filter out online students (those without a center)
+      const centerStudents = (studentsRes.data.students || []).filter(s => s.center);
+      setStudents(centerStudents);
+      setStudentFees(feesRes.data || []);
     } catch (error) {
       toast.error("Failed to load data");
     } finally {
@@ -196,10 +214,25 @@ const ExamManagement = () => {
   const getFilteredSubjects = (batchId, semesterNumber, courseId) => {
     if (!batchId || !semesterNumber || !courseId) return [];
 
-    return subjects.filter(sub => {
+    const batch = batches.find(b => String(b._id) === String(batchId));
+
+    // Default course/semester filtering
+    const defaultFilter = subjects.filter(sub => {
       const subCourseId = sub.course?._id ? String(sub.course._id) : (sub.course ? String(sub.course) : "");
       return subCourseId === String(courseId) && Number(sub.semester) === Number(semesterNumber);
     });
+
+    if (!batch || !batch.semesters || batch.semesters.length === 0) {
+      return defaultFilter;
+    }
+
+    const batchSemester = batch.semesters.find(s => Number(s.semesterNumber) === Number(semesterNumber));
+    if (!batchSemester || !batchSemester.subjects || batchSemester.subjects.length === 0) {
+      return defaultFilter;
+    }
+
+    const allowedSubjectIds = batchSemester.subjects.map(s => (s._id ? String(s._id) : String(s)));
+    return subjects.filter(sub => allowedSubjectIds.includes(String(sub._id)));
   };
 
   const getAvailableSemesters = (batchId) => {
@@ -295,7 +328,8 @@ const ExamManagement = () => {
           theoryMark: mark.theoryMark,
           internalMark: mark.internalMark,
           practicalMark: mark.practicalMark || 0
-        }]
+        }],
+        template: mark.template || "rg_modern"
       });
       setCurrentId(mark._id);
       setIsEditing(true);
@@ -305,7 +339,8 @@ const ExamManagement = () => {
         batch: "",
         semester: 1,
         course: "",
-        subjects: []
+        subjects: [],
+        template: "rg_modern"
       });
       setCurrentId(null);
       setIsEditing(false);
@@ -326,7 +361,8 @@ const ExamManagement = () => {
           subject: markFormData.subjects[0]?.subject,
           theoryMark: markFormData.subjects[0]?.theoryMark,
           internalMark: markFormData.subjects[0]?.internalMark,
-          practicalMark: markFormData.subjects[0]?.practicalMark
+          practicalMark: markFormData.subjects[0]?.practicalMark,
+          template: markFormData.template
         };
         await api.put(`/marks/${currentId}`, payload);
         toast.success("Mark updated successfully");
@@ -346,7 +382,7 @@ const ExamManagement = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const toastId = toast.loading("Processing bulk upload...");
+    const toastId = toast.loading("Processing Excel file...");
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -358,17 +394,13 @@ const ExamManagement = () => {
         const data = XLSX.utils.sheet_to_json(ws);
 
         if (data.length === 0) {
-           toast.error("Excel sheet is empty", { id: toastId });
-           return;
+          toast.error("Excel sheet is empty", { id: toastId });
+          return;
         }
 
-        const res = await api.post('/marks/bulk', { marks: data });
-        toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`, { id: toastId });
-        if (res.data.results.failed > 0) {
-          console.error("Bulk Upload Errors:", res.data.results.errors);
-          toast.error("Some records failed. Check console for details.");
-        }
-        fetchData();
+        toast.dismiss(toastId);
+        setBulkPreviewData(data);
+        setShowBulkUploadPreviewModal(true);
       } catch (err) {
         toast.error("Failed to process Excel file", { id: toastId });
       }
@@ -377,14 +409,83 @@ const ExamManagement = () => {
     reader.readAsBinaryString(file);
   };
 
+  const handleBulkUploadConfirm = async (payload) => {
+    const toastId = toast.loading("Uploading bulk data...");
+    try {
+      const res = await api.post('/marks/bulk', { marks: payload.data, template: payload.template });
+      toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`, { id: toastId });
+      if (res.data.results.failed > 0) {
+        console.error("Bulk Upload Errors:", res.data.results.errors);
+        toast.error("Some records failed. Check console for details.");
+      }
+      setShowBulkUploadPreviewModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to upload bulk data", { id: toastId });
+    }
+  };
+
+  const handlePreviewRow = (row, templateId) => {
+    const studentData = students.find(s => s.studentId === row["Student ID"]) || { studentNameEnglish: 'Student Name', studentId: row["Student ID"], year: 'I Year' };
+
+    const mockMarks = [];
+    for (let i = 1; i <= 10; i++) {
+      if (row[`Subject ${i} Code`] || row[`Subject ${i} Theory`] !== undefined) {
+        let rawTitle = String(row[`Subject ${i} Code`] || `Subject ${i}`);
+        let subCode = "";
+        let subName = rawTitle;
+        if (rawTitle.includes(' - ')) {
+          const parts = rawTitle.split(' - ');
+          subCode = parts[0];
+          subName = parts.slice(1).join(' - ');
+          if (subName.includes(' (')) {
+            subName = subName.substring(0, subName.lastIndexOf(' ('));
+          }
+        }
+
+        const ext = Number(row[`Subject ${i} Theory`] || 0) + Number(row[`Subject ${i} Practical`] || 0);
+        const int = Number(row[`Subject ${i} Internal`] || 0);
+        mockMarks.push({
+          _id: `mock_${i}`,
+          subject: { code: subCode, name: subName, type: row[`Subject ${i} Practical`] ? 'Practical' : 'Theory' },
+          theoryMark: Number(row[`Subject ${i} Theory`] || 0),
+          internalMark: int,
+          practicalMark: Number(row[`Subject ${i} Practical`] || 0),
+          passMark: 40,
+          isPass: (ext + int) >= 40
+        });
+      }
+    }
+
+    let extractedCourseId = "";
+    let extractedTitle = row["Course Title"] || 'Course';
+    if (extractedTitle.includes(' - ')) {
+      const parts = extractedTitle.split(' - ');
+      extractedCourseId = parts[0];
+      extractedTitle = parts.slice(1).join(' - ');
+    }
+
+    const mockData = {
+      student: studentData,
+      semester: row["Semester"] || 1,
+      course: { title: extractedTitle, courseId: extractedCourseId },
+      batch: { name: 'Preview Batch' },
+      marks: mockMarks,
+      templateId: templateId || 'rg_modern'
+    };
+
+    setSelectedGroupData(mockData);
+    setShowMarksheetModal(true);
+  };
+
   const handleDownloadDynamicCSV = () => {
     const { courseId, batchId, centerId, semester } = sampleCsvForm;
-    
+
     if (!courseId || !semester) {
       toast.error("Course and Semester are required!");
       return;
     }
-    
+
     // Filter students
     let filteredStudents = students;
     if (courseId) {
@@ -396,56 +497,57 @@ const ExamManagement = () => {
     if (centerId) {
       filteredStudents = filteredStudents.filter(s => s.center?._id === centerId || s.center === centerId);
     }
-    
+
     // Filter subjects
-    const filteredSubjects = subjects.filter(sub => (sub.course?._id === courseId || sub.course === courseId) && sub.semester === Number(semester));
-    
+    const filteredSubjects = getFilteredSubjects(batchId, semester, courseId);
+
     if (filteredSubjects.length === 0) {
-      toast.error("No subjects found for the selected course and semester.");
+      toast.error("No subjects found for the selected batch, course, and semester.");
       return;
     }
     if (filteredStudents.length === 0) {
       toast.error("No students found matching the selected criteria.");
       return;
     }
-    
+
     // Construct Headers
-    let headers = ["Student ID", "Student Name", "Batch Name", "Course Title", "Semester"];
+    let headers = ["Student ID", "Student Name", "Center Code", "Batch Name", "Course Title", "Semester"];
     filteredSubjects.forEach((sub, index) => {
       const i = index + 1;
       headers.push(`Subject ${i} Code`, `Subject ${i} Mark`, `Subject ${i} Internal`);
     });
-    
+
     let rowsData = [];
-    
+
     // Find course and batch names for reference
     const courseObj = courses.find(c => c._id === courseId);
-    const courseTitle = courseObj ? courseObj.title : "";
+    const courseTitle = courseObj ? `${courseObj.courseId || ''} - ${courseObj.title}` : "";
     const batchObj = batches.find(b => b._id === batchId);
     const batchName = batchObj ? batchObj.name : "";
-    
+
     filteredStudents.forEach(student => {
       let row = [
         student.studentId,
         student.studentNameEnglish || "",
+        student.center?.centerId || "",
         batchName,
         courseTitle,
         semester
       ];
-      
+
       filteredSubjects.forEach(sub => {
         row.push(`${sub.code} - ${sub.name} (${sub.type || "Theory"})`, "", "");
       });
       rowsData.push(row);
     });
-    
+
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsData]);
     const wscols = headers.map(h => ({ wch: Math.max(15, h.length + 2) }));
     ws['!cols'] = wscols;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sample");
-    
+
     XLSX.writeFile(wb, `prefilled_marks_sem${semester}.xlsx`);
     setShowSampleCsvModal(false);
   };
@@ -504,19 +606,28 @@ const ExamManagement = () => {
     const st = students.find(s => s._id === studentId);
     let courseId = "";
     let batchId = "";
+
     if (st) {
-      const studentBatch = batches.find(b =>
-        b.students && b.students.some(sid => {
-          const idStr = typeof sid === 'object' ? (sid._id || sid).toString() : sid.toString();
-          return idStr === studentId;
-        })
-      );
-      if (studentBatch) {
-        batchId = studentBatch._id;
-        courseId = studentBatch.course?._id || studentBatch.course || "";
-      } else if (st.enrolledCourses && st.enrolledCourses.length > 0) {
+      // First try to get from enrolledCourses which is the modern standard
+      if (st.enrolledCourses && st.enrolledCourses.length > 0) {
         courseId = st.enrolledCourses[0].course?._id || st.enrolledCourses[0].course || "";
         batchId = st.enrolledCourses[0].batch?._id || st.enrolledCourses[0].batch || "";
+      } else {
+        // Fallback to searching through batches
+        const studentBatch = batches.find(b =>
+          b.students && b.students.some(sid => {
+            const idStr = typeof sid === 'object' ? (sid._id || sid).toString() : sid.toString();
+            return idStr === studentId;
+          })
+        );
+        if (studentBatch) {
+          batchId = studentBatch._id;
+          courseId = studentBatch.course?._id || studentBatch.course || "";
+
+          if (!courseId && studentBatch.courses && studentBatch.courses.length > 0) {
+            courseId = studentBatch.courses[0]._id || studentBatch.courses[0] || "";
+          }
+        }
       }
     }
 
@@ -664,22 +775,33 @@ const ExamManagement = () => {
     }
 
     // Look up exam config to find pass/fail
-    const examConfig = exams.find(e => {
-      const eSubId = (e.subject && e.subject._id) ? e.subject._id : e.subject;
+    let examConfig = null;
+    
+    if (m.exam && m.exam.subjects) {
       const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
-      const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
-      const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
-      return String(eSubId) === String(mSubId) && String(eCourseId) === String(mCourseId) && e.semester === m.semester;
-    });
-
-    let isPass = false;
-    let totalSecured = (m.theoryMark || 0) + (m.internalMark || 0) + (m.practicalMark || 0);
-
-    if (examConfig) {
-      isPass = totalSecured >= (examConfig.passMark || 0);
-    } else {
-      isPass = totalSecured >= 35; // default fallback
+      examConfig = m.exam.subjects.find(s => String(s.subject?._id || s.subject) === String(mSubId));
     }
+
+    if (!examConfig) {
+      for (const e of exams) {
+        const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
+        const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
+        if (String(eCourseId) === String(mCourseId) && e.semester === m.semester) {
+          if (!e.batch || !m.batch || String(e.batch._id || e.batch) === String(m.batch._id || m.batch)) {
+            const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
+            const subConf = e.subjects?.find(s => String(s.subject?._id || s.subject) === String(mSubId));
+            if (subConf) {
+              examConfig = subConf;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    let totalSecured = (m.subject?.type === "Practical" ? Number(m.practicalMark || 0) : (Number(m.theoryMark || 0) + Number(m.internalMark || 0)));
+    const effectivePassMark = (examConfig && examConfig.passMark !== undefined) ? Number(examConfig.passMark) : (m.passMark !== undefined ? Number(m.passMark) : 40);
+    const isPass = totalSecured >= effectivePassMark;
 
     groupedMarksMap[key].marks.push({ ...m, isPass, examConfig });
     groupedMarksMap[key].totalSubjects += 1;
@@ -696,7 +818,9 @@ const ExamManagement = () => {
       selector: row => row.exam?.name,
       sortable: true,
       cell: row => (
-        <span className="font-bold text-slate-900">{row.exam?.name || "N/A"}</span>
+        <button onClick={() => setViewingBatch(row)} className="font-bold text-brand-600 hover:underline text-left cursor-pointer">
+          {row.exam?.name || "N/A"}
+        </button>
       )
     },
     {
@@ -752,6 +876,40 @@ const ExamManagement = () => {
             <Trash2 size={18} /> Delete
           </button>
         </div>
+      )
+    }
+  ];
+
+  const batchStudentColumns = [
+    { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
+    {
+      name: "Student Name",
+      selector: row => row.studentNameEnglish,
+      sortable: true,
+      cell: row => <span className="font-bold text-slate-900">{row.studentNameEnglish || "N/A"}</span>
+    },
+    {
+      name: "Student ID",
+      selector: row => row.studentId,
+      sortable: true,
+      cell: row => <span className="text-slate-700">{row.studentId || "N/A"}</span>
+    },
+    {
+      name: "Action",
+      center: true,
+      width: "120px",
+      cell: row => (
+        <button
+          onClick={() => {
+            setSelectedHallTicketStudents([row]);
+            setSelectedHallTicketExam(viewingBatch?.exam?._id || "");
+            setShowHallTicketModal(true);
+          }}
+          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-semibold text-xs w-full"
+          title="View Hall Ticket"
+        >
+          <FileText size={16} /> View
+        </button>
       )
     }
   ];
@@ -919,8 +1077,8 @@ const ExamManagement = () => {
         <button
           onClick={() => handleTogglePaymentStatus(row._id)}
           className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${row.status === 'paid'
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-              : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
             }`}
         >
           {row.status === 'paid' ? 'PAID' : 'UNPAID'}
@@ -957,26 +1115,26 @@ const ExamManagement = () => {
           <h1 className="text-2xl font-bold text-slate-900">Examination Management</h1>
           <p className="text-sm text-slate-500">Manage academy examinations, schedules, and student results</p>
         </div>
-        <div className="flex gap-2">
-        {isAdmin && activeTab === "exams" && (
-          <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
-            <Plus size={20} /> Add Exam
-          </button>
-        )}
-        {isAdmin && activeTab === "marks" && (
-          <>
-            <button onClick={() => setShowSampleCsvModal(true)} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
-              <Download size={20} /> Sample CSV
+        <div className="flex gap-2 items-center">
+          {isAdmin && activeTab === "exams" && (
+            <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
+              <Plus size={20} /> Add Exam
             </button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
-              <Upload size={20} /> Bulk Excel
-            </button>
-            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
-            <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
-              <Plus size={20} /> Upload Result
-            </button>
-          </>
-        )}
+          )}
+          {isAdmin && activeTab === "marks" && (
+            <>
+              <button onClick={() => setShowSampleCsvModal(true)} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
+                <Download size={20} /> Sample CSV
+              </button>
+              <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
+                <Upload size={20} /> Bulk Upload
+              </button>
+              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
+              <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
+                <Plus size={20} /> Upload Result
+              </button>
+            </>
+          )}
 
         </div>
       </div>
@@ -1033,7 +1191,33 @@ const ExamManagement = () => {
           <StudentFeesList feeType="Exam" />
         ) : activeTab === "hall_tickets" ? (
           <div className="p-6">
-            {!showGenerateView ? (
+            {viewingBatch ? (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Students - {viewingBatch.exam?.name}</h3>
+                    <p className="text-sm text-slate-500">Hall tickets generated on {new Date(viewingBatch.generatedAt).toLocaleDateString()}</p>
+                  </div>
+                  <button
+                    onClick={() => { setViewingBatch(null); setStudentSearchQuery(""); }}
+                    className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
+                  >
+                    Back
+                  </button>
+                </div>
+                <CustomDataTable
+                  columns={batchStudentColumns}
+                  data={(viewingBatch.students || []).filter(s => 
+                    (s.studentNameEnglish || "").toLowerCase().includes(studentSearchQuery.toLowerCase()) || 
+                    (s.studentId || "").toLowerCase().includes(studentSearchQuery.toLowerCase())
+                  )}
+                  progressPending={false}
+                  search={studentSearchQuery}
+                  setSearch={setStudentSearchQuery}
+                  searchPlaceholder="Search students by name or ID..."
+                />
+              </div>
+            ) : !showGenerateView ? (
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-slate-800">Generated Hall Tickets</h3>
@@ -1294,8 +1478,8 @@ const ExamManagement = () => {
                               <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.passMark} onChange={(e) => handleSubjectChange(subConf.subject, 'passMark', Number(e.target.value))} />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Theory</label>
-                              <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.theoryMark} onChange={(e) => handleSubjectChange(subConf.subject, 'theoryMark', Number(e.target.value))} />
+                              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">External</label>
+                              <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.externalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'externalMark', Number(e.target.value))} />
                             </div>
                             <div>
                               <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Internal</label>
@@ -1487,7 +1671,7 @@ const ExamManagement = () => {
                             <span>{subjectDetails.name} ({subjectDetails.code})</span>
                             <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase">{subjectDetails.type}</span>
                           </div>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Theory Mark</label>
                               <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.theoryMark} onChange={(e) => handleMarkSubjectChange(subConf.subject, 'theoryMark', Number(e.target.value))} />
@@ -1496,10 +1680,6 @@ const ExamManagement = () => {
                               <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Internal Mark</label>
                               <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.internalMark} onChange={(e) => handleMarkSubjectChange(subConf.subject, 'internalMark', Number(e.target.value))} />
                             </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Practical Mark</label>
-                              <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.practicalMark} onChange={(e) => handleMarkSubjectChange(subConf.subject, 'practicalMark', Number(e.target.value))} />
-                            </div>
                           </div>
                         </div>
                       );
@@ -1507,6 +1687,14 @@ const ExamManagement = () => {
                   </div>
                 </div>
               )}
+              
+              <div className="mt-4">
+                <label className="block text-sm font-bold text-slate-700 mb-1">Marksheet Template</label>
+                <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.template} onChange={(e) => setMarkFormData({ ...markFormData, template: e.target.value })}>
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+
               <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setShowMarkModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20">
@@ -1522,6 +1710,7 @@ const ExamManagement = () => {
         <MarksheetModal
           data={selectedGroupData}
           onClose={() => setShowMarksheetModal(false)}
+          template={{ id: selectedGroupData.templateId || (selectedGroupData.marks && selectedGroupData.marks.length > 0 ? selectedGroupData.marks[0].template : 'rg_modern') }}
         />
       )}
 
@@ -1621,7 +1810,7 @@ const ExamManagement = () => {
             <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
               <Download size={24} className="text-brand-600" /> Download Pre-filled Template
             </h2>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Center</label>
@@ -1659,7 +1848,7 @@ const ExamManagement = () => {
                   onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, courseId: e.target.value })}
                 >
                   <option value="">Select Course</option>
-                  {(sampleCsvForm.batchId 
+                  {(sampleCsvForm.batchId
                     ? courses.filter(c => batches.find(b => b._id === sampleCsvForm.batchId)?.courses?.some(bc => (bc._id || bc) === c._id))
                     : courses
                   ).map(c => (
@@ -1701,6 +1890,14 @@ const ExamManagement = () => {
         </div>
       )}
 
+      {showBulkUploadPreviewModal && (
+        <BulkUploadPreviewModal
+          data={bulkPreviewData}
+          onClose={() => setShowBulkUploadPreviewModal(false)}
+          onSave={handleBulkUploadConfirm}
+          onPreviewRow={handlePreviewRow}
+        />
+      )}
     </div>
   );
 };

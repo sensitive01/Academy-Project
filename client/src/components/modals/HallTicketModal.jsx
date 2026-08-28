@@ -38,7 +38,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
     `);
     windowPrint.document.close();
     windowPrint.focus();
-    
+
     // Give external stylesheets a moment to load if there are any
     setTimeout(() => {
       windowPrint.print();
@@ -61,10 +61,10 @@ const HallTicketModal = ({ students, exam, onClose }) => {
   const renderTicket = (student, index, isPrint = false) => {
     if (!student) return null;
     const courseTitle = student.enrolledCourses?.[0]?.course?.title || exam?.course?.title || "N/A";
-    
+
     return (
       <div key={student._id || index} className="hall-ticket-container bg-white text-black" style={{ border: '2px solid #000', padding: '20px', minHeight: '270mm' }}>
-        
+
         {/* Header */}
         <div className="flex items-center border-b-2 border-black pb-2 mb-0">
           <div className="w-32 text-center p-2">
@@ -105,7 +105,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
           </div>
           <div className="w-[220px] p-4 flex flex-col items-center justify-center text-center text-[15px] text-[#1e3a8a] font-semibold">
             <div className="h-24 w-20 border-2 border-dashed border-slate-300 mb-4 flex items-center justify-center text-xs text-slate-400">Photo</div>
-            <div>Signature of<br/>Candidate<br/>(In front of<br/>Invigilator)</div>
+            <div>Signature of<br />Candidate<br />(In front of<br />Invigilator)</div>
           </div>
         </div>
 
@@ -114,8 +114,8 @@ const HallTicketModal = ({ students, exam, onClose }) => {
           <thead>
             <tr>
               <th className="border-2 border-black border-t-0 p-3 text-center w-16 text-[#1e3a8a]">S.NO</th>
-              <th className="border-2 border-black border-t-0 p-3 text-center w-32 text-[#1e3a8a]">DATE OF<br/>EXAM</th>
-              <th className="border-2 border-black border-t-0 p-3 text-center w-40 text-[#1e3a8a]">SUBJECT<br/>CODE</th>
+              <th className="border-2 border-black border-t-0 p-3 text-center w-32 text-[#1e3a8a]">DATE OF<br />EXAM</th>
+              <th className="border-2 border-black border-t-0 p-3 text-center w-40 text-[#1e3a8a]">SUBJECT<br />CODE</th>
               <th className="border-2 border-black border-t-0 p-3 text-center text-[#1e3a8a]">TITLE OF THE PAPER</th>
             </tr>
           </thead>
@@ -137,7 +137,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
         {/* Footer Box */}
         <div className="border-2 border-black border-t-0 border-l-0 border-r-0 p-4 flex justify-between items-end font-bold text-[15px] text-[#1e3a8a]">
           <div className="leading-relaxed">
-            
+
           </div>
           <div className="pr-12 pt-16 text-black font-semibold">
             Examiner Signature
@@ -145,7 +145,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
         </div>
 
         {/* Instructions */}
-        <div className="mt-6 px-4">
+        <div className="mt-6 px-4" style={{ pageBreakBefore: 'always' }}>
           <div className="font-bold text-[15px] mb-3 text-[#1e3a8a]">Instructions to the Candidates:</div>
           <ul className="list-disc pl-5 text-[12px] text-justify leading-relaxed text-[#1e3a8a] space-y-1">
             {instructions.map((inst, i) => (
@@ -174,11 +174,11 @@ const HallTicketModal = ({ students, exam, onClose }) => {
             <h2 className="text-xl font-bold text-slate-900">Hall Tickets</h2>
             <p className="text-sm text-slate-500 font-medium">Viewing Student {currentIndex + 1} of {students?.length || 0}</p>
           </div>
-          
+
           {/* Pagination Controls */}
           {students?.length > 1 && (
             <div className="flex items-center gap-4 bg-slate-100 p-1.5 rounded-xl">
-              <button 
+              <button
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
                 className="p-2 rounded-lg bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
@@ -188,7 +188,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
               <span className="font-bold text-slate-700 text-sm w-12 text-center">
                 {currentIndex + 1} / {students.length}
               </span>
-              <button 
+              <button
                 onClick={handleNext}
                 disabled={currentIndex === students.length - 1}
                 className="p-2 rounded-lg bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
@@ -199,7 +199,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
           )}
 
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={handlePrint}
               className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 font-bold"
             >

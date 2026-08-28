@@ -8,6 +8,16 @@ import * as XLSX from 'xlsx';
 import MarksheetModal from "../../components/modals/MarksheetModal";
 import BulkEditMarksModal from "../../components/modals/BulkEditMarksModal";
 import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
+import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
+
+const templates = [
+  { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
+  { id: 'bglrgm', name: 'BGLRGM' },
+  { id: 'rgmtn', name: 'RGMTN' },
+  { id: 'dr_rg_academy', name: 'DR RG ACADEMY' },
+  { id: 'unicarewel', name: 'UNICAREWEL' },
+  { id: 'vocational_council', name: 'VOCATIONAL COUNCIL' }
+];
 
 const ExamsTab = () => {
   const { user } = useAuth();
@@ -31,6 +41,8 @@ const ExamsTab = () => {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedGroupData, setSelectedGroupData] = useState(null);
+  const [showBulkUploadPreviewModal, setShowBulkUploadPreviewModal] = useState(false);
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
@@ -59,7 +71,8 @@ const ExamsTab = () => {
     subject: "",
     theoryMark: 0,
     internalMark: 0,
-    practicalMark: 0
+    practicalMark: 0,
+    template: "rg_modern"
   });
 
   const fileInputRef = React.useRef(null);
@@ -74,8 +87,8 @@ const ExamsTab = () => {
         api.get("/batches"),
         api.get("/subjects"),
         api.get("/marks"),
-        isAdmin ? api.get("/students") : Promise.resolve({ data: [] }),
-        isAdmin ? api.get("/student-fees") : Promise.resolve({ data: [] })
+        api.get("/students"),
+        api.get("/student-fees")
       ]);
       setExams(examsRes.data);
       setCourses(coursesRes.data.filter(c => c.type === "Center Courses"));
@@ -83,8 +96,10 @@ const ExamsTab = () => {
       setBatches(batchesRes.data);
       setSubjects(subjectsRes.data);
       setMarks(marksRes.data);
-      if (isAdmin) setStudents(studentsRes.data.students || []);
-      if (isAdmin) setStudentFees(feesRes.data || []);
+      // Filter out online students (those without a center)
+      const centerStudents = (studentsRes.data.students || []).filter(s => s.center);
+      setStudents(centerStudents);
+      setStudentFees(feesRes.data || []);
     } catch (error) {
       toast.error("Failed to load data");
     } finally {
@@ -227,7 +242,7 @@ const ExamsTab = () => {
       setShowMarkModal(false);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save mark");
+      toast.error(error.response?.data?.message || "Error submitting mark");
     }
   };
 
@@ -249,13 +264,8 @@ const ExamsTab = () => {
           return;
         }
 
-        const res = await api.post('/marks/bulk', { marks: data });
-        toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
-        if (res.data.results.failed > 0) {
-          console.error("Bulk Upload Errors:", res.data.results.errors);
-          toast.error("Some records failed. Check console for details.");
-        }
-        fetchData();
+        setBulkPreviewData(data);
+        setShowBulkUploadPreviewModal(true);
       } catch (err) {
         toast.error("Failed to process Excel file");
       }
@@ -264,10 +274,25 @@ const ExamsTab = () => {
     reader.readAsBinaryString(file);
   };
 
+  const handleBulkUploadConfirm = async (payload) => {
+    try {
+      const res = await api.post("/marks/bulk", { marks: payload.data, template: payload.template });
+      toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
+      if (res.data.results.failed > 0) {
+        console.error("Bulk Upload Errors:", res.data.results.errors);
+        toast.error("Some records failed. Check console for details.");
+      }
+      setShowBulkUploadPreviewModal(false);
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to upload bulk data");
+    }
+  };
+
   const downloadSampleExcel = () => {
     const csvContent = "data:text/csv;charset=utf-8,"
-      + "Student ID,Semester,Course Title,Subject Code,Theory Mark,Internal Mark,Practical Mark\n"
-      + "STU123,1,Class 10,MAT01,40,20,10";
+      + "Student ID,Student Name,Center Code,Semester,Course Title,Subject Code,Theory Mark,Internal Mark,Practical Mark\n"
+      + "STU123,John Doe,CEN-2024-1234,1,Full Stack Web,MAT01,40,20,10";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -500,22 +525,33 @@ const ExamsTab = () => {
     }
 
     // Look up exam config to find pass/fail
-    const examConfig = exams.find(e => {
-      const eSubId = (e.subject && e.subject._id) ? e.subject._id : e.subject;
+    let examConfig = null;
+    
+    if (m.exam && m.exam.subjects) {
       const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
-      const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
-      const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
-      return String(eSubId) === String(mSubId) && String(eCourseId) === String(mCourseId) && e.semester === m.semester;
-    });
-
-    let isPass = false;
-    let totalSecured = (m.theoryMark || 0) + (m.internalMark || 0) + (m.practicalMark || 0);
-
-    if (examConfig) {
-      isPass = totalSecured >= (examConfig.passMark || 0);
-    } else {
-      isPass = totalSecured >= 35; // default fallback
+      examConfig = m.exam.subjects.find(s => String(s.subject?._id || s.subject) === String(mSubId));
     }
+
+    if (!examConfig) {
+      for (const e of exams) {
+        const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
+        const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
+        if (String(eCourseId) === String(mCourseId) && e.semester === m.semester) {
+          if (!e.batch || !m.batch || String(e.batch._id || e.batch) === String(m.batch._id || m.batch)) {
+            const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
+            const subConf = e.subjects?.find(s => String(s.subject?._id || s.subject) === String(mSubId));
+            if (subConf) {
+              examConfig = subConf;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    let totalSecured = (m.subject?.type === "Practical" ? Number(m.practicalMark || 0) : (Number(m.theoryMark || 0) + Number(m.internalMark || 0)));
+    const effectivePassMark = (examConfig && examConfig.passMark !== undefined) ? Number(examConfig.passMark) : (m.passMark !== undefined ? Number(m.passMark) : 40);
+    const isPass = totalSecured >= effectivePassMark;
 
     groupedMarksMap[key].marks.push({ ...m, isPass, examConfig });
     groupedMarksMap[key].totalSubjects += 1;
@@ -911,8 +947,13 @@ const ExamsTab = () => {
                   <input type="number" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.internalMark} onChange={(e) => setMarkFormData({ ...markFormData, internalMark: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Practical Mark</label>
                   <input type="number" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.practicalMark} onChange={(e) => setMarkFormData({ ...markFormData, practicalMark: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Marksheet Template</label>
+                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.template} onChange={(e) => setMarkFormData({ ...markFormData, template: e.target.value })}>
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="flex gap-3 pt-4 border-t border-slate-100">
@@ -930,6 +971,23 @@ const ExamsTab = () => {
         <MarksheetModal
           data={selectedGroupData}
           onClose={() => setShowMarksheetModal(false)}
+          template={{ id: selectedGroupData.marks && selectedGroupData.marks.length > 0 ? selectedGroupData.marks[0].template : 'rg_modern' }}
+        />
+      )}
+
+      {showPaymentModal && selectedGroupData && (
+        <AddStudentFeeModal
+          student={selectedGroupData}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={fetchData}
+        />
+      )}
+
+      {showBulkUploadPreviewModal && (
+        <BulkUploadPreviewModal
+          data={bulkPreviewData}
+          onClose={() => setShowBulkUploadPreviewModal(false)}
+          onSave={handleBulkUploadConfirm}
         />
       )}
 
@@ -944,7 +1002,6 @@ const ExamsTab = () => {
           subjects={subjects}
         />
       )}
-
       {showPaymentModal && (
         <AddStudentFeeModal
           onClose={() => setShowPaymentModal(false)}

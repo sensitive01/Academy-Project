@@ -8,6 +8,15 @@ import * as XLSX from 'xlsx';
 import MarksheetModal from "../../components/modals/MarksheetModal";
 import BulkEditMarksModal from "../../components/modals/BulkEditMarksModal";
 import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
+import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
+const templates = [
+  { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
+  { id: 'bglrgm', name: 'BGLRGM' },
+  { id: 'rgmtn', name: 'RGMTN' },
+  { id: 'dr_rg_academy', name: 'DR RG ACADEMY' },
+  { id: 'unicarewel', name: 'UNICAREWEL' },
+  { id: 'vocational_council', name: 'VOCATIONAL COUNCIL' }
+];
 
 const ResultsTab = () => {
   const { user } = useAuth();
@@ -31,6 +40,8 @@ const ResultsTab = () => {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedGroupData, setSelectedGroupData] = useState(null);
+  const [showBulkUploadPreviewModal, setShowBulkUploadPreviewModal] = useState(false);
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
@@ -56,10 +67,12 @@ const ResultsTab = () => {
     batch: "",
     semester: 1,
     course: "",
+    exam: "",
     subject: "",
     theoryMark: 0,
     internalMark: 0,
-    practicalMark: 0
+    practicalMark: 0,
+    template: "rg_modern"
   });
 
   const fileInputRef = React.useRef(null);
@@ -74,8 +87,8 @@ const ResultsTab = () => {
         api.get("/batches"),
         api.get("/subjects"),
         api.get("/marks"),
-        isAdmin ? api.get("/students") : Promise.resolve({ data: [] }),
-        isAdmin ? api.get("/student-fees") : Promise.resolve({ data: [] })
+        api.get("/students"),
+        api.get("/student-fees")
       ]);
       setExams(examsRes.data);
       setCourses(coursesRes.data.filter(c => c.type === "Center Courses"));
@@ -83,8 +96,10 @@ const ResultsTab = () => {
       setBatches(batchesRes.data);
       setSubjects(subjectsRes.data);
       setMarks(marksRes.data);
-      if (isAdmin) setStudents(studentsRes.data.students || []);
-      if (isAdmin) setStudentFees(feesRes.data || []);
+      // Filter out online students (those without a center)
+      const centerStudents = (studentsRes.data.students || []).filter(s => s.center);
+      setStudents(centerStudents);
+      setStudentFees(feesRes.data || []);
     } catch (error) {
       toast.error("Failed to load data");
     } finally {
@@ -190,6 +205,7 @@ const ResultsTab = () => {
         batch: mark.batch?._id || "",
         semester: mark.semester || 1,
         course: mark.course?._id || "",
+        exam: mark.exam?._id || "",
         subject: mark.subject?._id || "",
         theoryMark: mark.theoryMark,
         internalMark: mark.internalMark,
@@ -203,6 +219,7 @@ const ResultsTab = () => {
         batch: "",
         semester: 1,
         course: "",
+        exam: "",
         subject: "",
         theoryMark: 0,
         internalMark: 0,
@@ -227,7 +244,7 @@ const ResultsTab = () => {
       setShowMarkModal(false);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save mark");
+      toast.error(error.response?.data?.message || "Error submitting mark");
     }
   };
 
@@ -249,13 +266,8 @@ const ResultsTab = () => {
           return;
         }
 
-        const res = await api.post('/marks/bulk', { marks: data });
-        toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
-        if (res.data.results.failed > 0) {
-          console.error("Bulk Upload Errors:", res.data.results.errors);
-          toast.error("Some records failed. Check console for details.");
-        }
-        fetchData();
+        setBulkPreviewData(data);
+        setShowBulkUploadPreviewModal(true);
       } catch (err) {
         toast.error("Failed to process Excel file");
       }
@@ -264,9 +276,55 @@ const ResultsTab = () => {
     reader.readAsBinaryString(file);
   };
 
+  const handleBulkUploadConfirm = async (payload) => {
+    try {
+      const res = await api.post("/marks/bulk", { marks: payload.data, template: payload.template });
+      toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
+      if (res.data.results.failed > 0) {
+        console.error("Bulk Upload Errors:", res.data.results.errors);
+        toast.error("Some records failed. Check console for details.");
+      }
+      setShowBulkUploadPreviewModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to upload bulk data");
+    }
+  };
+
+  const handlePreviewRow = (row) => {
+    const studentData = students.find(s => s.studentId === row["Student ID"]) || { studentNameEnglish: 'Student Name', studentId: row["Student ID"], year: 'I Year' };
+
+    const mockMarks = [];
+    for (let i = 1; i <= 10; i++) {
+      if (row[`Subject ${i} Code`] || row[`Subject ${i} Theory`] !== undefined) {
+        const ext = Number(row[`Subject ${i} Theory`] || 0) + Number(row[`Subject ${i} Practical`] || 0);
+        const int = Number(row[`Subject ${i} Internal`] || 0);
+        mockMarks.push({
+          _id: `mock_${i}`,
+          subject: { name: row[`Subject ${i} Code`] || `Subject ${i}`, type: row[`Subject ${i} Practical`] ? 'Practical' : 'Theory' },
+          theoryMark: Number(row[`Subject ${i} Theory`] || 0),
+          internalMark: int,
+          practicalMark: Number(row[`Subject ${i} Practical`] || 0),
+          isPass: (ext + int) >= 35
+        });
+      }
+    }
+
+    const mockData = {
+      student: studentData,
+      semester: row["Semester"] || 1,
+      course: { title: row["Course Title"] || 'Course' },
+      batch: { name: 'Preview Batch' },
+      marks: mockMarks
+    };
+
+    setSelectedGroupData(mockData);
+    setShowMarksheetModal(true);
+  };
+
   const downloadSampleExcel = () => {
-    let headers = "Student ID,Semester,Course Title";
-    let rowData = "STU123,1,Full Stack Web";
+    let headers = "Student ID,Student Name,Center Code,Semester,Course Title";
+    let rowData = "STU123,John Doe,CEN-2024-1234,1,Full Stack Web";
 
     for (let i = 1; i <= 5; i++) {
       headers += `,Subject ${i} Code,Subject ${i} Theory,Subject ${i} Internal,Subject ${i} Practical`;
@@ -498,6 +556,7 @@ const ResultsTab = () => {
         course: m.course,
         batch: batchObj,
         semester: m.semester,
+        exam: m.exam,
         marks: [],
         totalSubjects: 0,
         passCount: 0,
@@ -506,22 +565,33 @@ const ResultsTab = () => {
     }
 
     // Look up exam config to find pass/fail
-    const examConfig = exams.find(e => {
-      const eSubId = (e.subject && e.subject._id) ? e.subject._id : e.subject;
+    let examConfig = null;
+    
+    if (m.exam && m.exam.subjects) {
       const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
-      const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
-      const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
-      return String(eSubId) === String(mSubId) && String(eCourseId) === String(mCourseId) && e.semester === m.semester;
-    });
-
-    let isPass = false;
-    let totalSecured = (m.theoryMark || 0) + (m.internalMark || 0) + (m.practicalMark || 0);
-
-    if (examConfig) {
-      isPass = totalSecured >= (examConfig.passMark || 0);
-    } else {
-      isPass = totalSecured >= 35; // default fallback
+      examConfig = m.exam.subjects.find(s => String(s.subject?._id || s.subject) === String(mSubId));
     }
+
+    if (!examConfig) {
+      for (const e of exams) {
+        const eCourseId = (e.course && e.course._id) ? e.course._id : e.course;
+        const mCourseId = (m.course && m.course._id) ? m.course._id : m.course;
+        if (String(eCourseId) === String(mCourseId) && e.semester === m.semester) {
+          if (!e.batch || !m.batch || String(e.batch._id || e.batch) === String(m.batch._id || m.batch)) {
+            const mSubId = (m.subject && m.subject._id) ? m.subject._id : m.subject;
+            const subConf = e.subjects?.find(s => String(s.subject?._id || s.subject) === String(mSubId));
+            if (subConf) {
+              examConfig = subConf;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    let totalSecured = (m.subject?.type === "Practical" ? Number(m.practicalMark || 0) : (Number(m.theoryMark || 0) + Number(m.internalMark || 0)));
+    const effectivePassMark = (examConfig && examConfig.passMark !== undefined) ? Number(examConfig.passMark) : (m.passMark !== undefined ? Number(m.passMark) : 40);
+    const isPass = totalSecured >= effectivePassMark;
 
     groupedMarksMap[key].marks.push({ ...m, isPass, examConfig });
     groupedMarksMap[key].totalSubjects += 1;
@@ -662,8 +732,8 @@ const ResultsTab = () => {
         <button
           onClick={() => handleTogglePaymentStatus(row._id)}
           className={`px-3 py-1 text-xs font-bold rounded-full transition-colors border ${row.status === 'paid'
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-              : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
             }`}
         >
           {row.status === 'paid' ? 'PAID' : 'UNPAID'}
@@ -699,7 +769,7 @@ const ResultsTab = () => {
         <div>
           <h2 className="text-xl font-bold text-gray-800">Results</h2>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           {isAdmin && activeTab === "exams" && (
             <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
               <Plus size={20} /> Add Exam
@@ -711,7 +781,7 @@ const ResultsTab = () => {
                 <Download size={20} /> Sample CSV
               </button>
               <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
-                <Upload size={20} /> Bulk Excel
+                <Upload size={20} /> Bulk Upload
               </button>
               <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
               <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
@@ -900,6 +970,19 @@ const ResultsTab = () => {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Exam</label>
+                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.exam} onChange={(e) => setMarkFormData({ ...markFormData, exam: e.target.value })}>
+                    <option value="">Select Exam</option>
+                    {exams.filter(e => {
+                      const eCourse = e.course?._id || e.course;
+                      const mCourse = markFormData.course;
+                      const eBatch = e.batch?._id || e.batch;
+                      const mBatch = markFormData.batch;
+                      return (!mCourse || eCourse === mCourse) && e.semester === markFormData.semester && (!eBatch || !mBatch || eBatch === mBatch);
+                    }).map(ex => <option key={ex._id} value={ex._id}>{ex.name}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Subject</label>
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.subject} onChange={(e) => setMarkFormData({ ...markFormData, subject: e.target.value })}>
                     <option value="">Select Subject</option>
@@ -920,6 +1003,12 @@ const ResultsTab = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Practical Mark</label>
                   <input type="number" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.practicalMark} onChange={(e) => setMarkFormData({ ...markFormData, practicalMark: Number(e.target.value) })} />
                 </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Marksheet Template</label>
+                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.template} onChange={(e) => setMarkFormData({ ...markFormData, template: e.target.value })}>
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setShowMarkModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
@@ -936,6 +1025,7 @@ const ResultsTab = () => {
         <MarksheetModal
           data={selectedGroupData}
           onClose={() => setShowMarksheetModal(false)}
+          template={{ id: selectedGroupData.marks && selectedGroupData.marks.length > 0 ? selectedGroupData.marks[0].template : 'rg_modern' }}
         />
       )}
 
@@ -959,6 +1049,15 @@ const ResultsTab = () => {
           centers={centers}
           courses={courses}
           batches={batches}
+        />
+      )}
+
+      {showBulkUploadPreviewModal && (
+        <BulkUploadPreviewModal
+          data={bulkPreviewData}
+          onClose={() => setShowBulkUploadPreviewModal(false)}
+          onSave={handleBulkUploadConfirm}
+          onPreviewRow={handlePreviewRow}
         />
       )}
     </div>

@@ -252,7 +252,7 @@ router.get("/", protect, async (req, res) => {
       .populate("user", "-password")
       .populate("parent", "name email")
       .populate("enrolledCourses.course", "title price category duration")
-      .populate("center", "name location");
+      .populate("center", "centerId name location");
 
     res.json({
       count: students.length,
@@ -524,6 +524,19 @@ router.delete("/:id", protect, adminOrCenter, async (req, res) => {
     // 4️⃣ Delete all linked student fees
     await StudentFee.deleteMany({ student: req.params.id });
 
+    // 5️⃣ Remove from Batches
+    const Batch = require('../models/Batch');
+    await Batch.updateMany(
+      { students: req.params.id },
+      { $pull: { students: req.params.id } }
+    );
+    // Update numberOfStudents for affected batches
+    const affectedBatches = await Batch.find({ students: req.params.id });
+    for (const b of affectedBatches) {
+      b.numberOfStudents = b.students.length;
+      await b.save();
+    }
+
     res.json({
       message: "Student, linked user and fee records deleted successfully",
     });
@@ -543,6 +556,7 @@ router.post("/bulk-delete", protect, adminOrCenter, async (req, res) => {
       return res.status(400).json({ message: "No student IDs provided" });
     }
 
+    const Batch = require('../models/Batch');
     for (const id of ids) {
       const student = await Student.findById(id);
       if (student) {
@@ -551,7 +565,19 @@ router.post("/bulk-delete", protect, adminOrCenter, async (req, res) => {
         }
         await Student.findByIdAndDelete(id);
         await StudentFee.deleteMany({ student: id });
+        
+        await Batch.updateMany(
+          { students: id },
+          { $pull: { students: id } }
+        );
       }
+    }
+
+    // Update numberOfStudents for all batches that were modified
+    const allBatches = await Batch.find();
+    for (const b of allBatches) {
+      b.numberOfStudents = b.students.length;
+      await b.save();
     }
 
     res.json({

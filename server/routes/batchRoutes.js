@@ -143,16 +143,16 @@ router.post("/:id/assign-students", protect, async (req, res) => {
       if (student) {
         let updated = false;
         student.enrolledCourses = student.enrolledCourses.map(ec => {
-          if (ec.course && ec.course.toString() === batch.course.toString()) {
+          if (ec.course && batch.courses.some(c => c.toString() === ec.course.toString())) {
             ec.batch = batch._id;
             updated = true;
           }
           return ec;
         });
 
-        if (!updated) {
+        if (!updated && batch.courses && batch.courses.length > 0) {
           student.enrolledCourses.push({
-            course: batch.course,
+            course: batch.courses[0],
             batch: batch._id,
             completed: false,
             progress: 0
@@ -162,7 +162,7 @@ router.post("/:id/assign-students", protect, async (req, res) => {
       }
     }
 
-    await batch.populate("course");
+    await batch.populate("courses");
     await batch.populate("centers");
     await batch.populate("semesters.subjects");
     await batch.populate("students", "studentNameEnglish studentId");

@@ -583,6 +583,7 @@ const Students = () => {
   };
 
   const handleBulkDelete = async () => {
+    setConfirmBulkDelete(false);
     const toastId = toast.loading(`Deleting ${selectedStudents.length} students...`);
     try {
       const studentIds = selectedStudents.map(s => s._id);
@@ -590,7 +591,6 @@ const Students = () => {
       toast.success(data.message || "Students deleted successfully!", { id: toastId });
       setSelectedStudents([]);
       setClearSelectedRows(!clearSelectedRows);
-      setConfirmBulkDelete(false);
       fetchStudents();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete students", { id: toastId });
@@ -600,13 +600,14 @@ const Students = () => {
   const confirmDelete = async () => {
     const id = confirmConfig.id;
     if (!id) return;
+    setConfirmConfig({ isOpen: false, id: null });
+    const toastId = toast.loading("Deleting student...");
     try {
       await api.delete(`/students/${id}`);
-      toast.success("Student deleted successfully");
+      toast.success("Student deleted successfully", { id: toastId });
       setStudents((prev) => prev.filter((s) => s._id !== id));
-      setConfirmConfig({ isOpen: false, id: null });
     } catch {
-      toast.error("Failed to delete student");
+      toast.error("Failed to delete student", { id: toastId });
     }
   };
 
