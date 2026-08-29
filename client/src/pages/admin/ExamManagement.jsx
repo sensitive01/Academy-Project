@@ -40,13 +40,14 @@ const ExamManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [showMarkModal, setShowMarkModal] = useState(false);
   const [showSampleCsvModal, setShowSampleCsvModal] = useState(false);
-  const [sampleCsvForm, setSampleCsvForm] = useState({ courseId: "", batchId: "", centerId: "", semester: "" });
+  const [sampleCsvForm, setSampleCsvForm] = useState({ examId: "", centerId: "" });
   const [showMarksheetModal, setShowMarksheetModal] = useState(false);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showHallTicketModal, setShowHallTicketModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showBulkUploadPreviewModal, setShowBulkUploadPreviewModal] = useState(false);
   const [bulkPreviewData, setBulkPreviewData] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({ isUploading: false, current: 0, total: 0 });
 
   // Hall ticket generation states
   const [selectedHallTicketExam, setSelectedHallTicketExam] = useState("");
@@ -80,6 +81,7 @@ const ExamManagement = () => {
     batch: "",
     semester: 1,
     course: "",
+    exam: "",
     subjects: [],
     template: "rg_modern"
   });
@@ -218,20 +220,17 @@ const ExamManagement = () => {
     if (!batchId || !semesterNumber || !courseId) return [];
 
     const batch = batches.find(b => String(b._id) === String(batchId));
-
-    // Default course/semester filtering
-    const defaultFilter = subjects.filter(sub => {
-      const subCourseId = sub.course?._id ? String(sub.course._id) : (sub.course ? String(sub.course) : "");
-      return subCourseId === String(courseId) && Number(sub.semester) === Number(semesterNumber);
-    });
+    
+    // semesterNumber could be "Semester 1", extract the number
+    const semNum = parseInt(String(semesterNumber).replace(/\D/g, ''), 10) || 1;
 
     if (!batch || !batch.semesters || batch.semesters.length === 0) {
-      return defaultFilter;
+      return [];
     }
 
-    const batchSemester = batch.semesters.find(s => Number(s.semesterNumber) === Number(semesterNumber));
+    const batchSemester = batch.semesters.find(s => Number(s.semesterNumber) === semNum);
     if (!batchSemester || !batchSemester.subjects || batchSemester.subjects.length === 0) {
-      return defaultFilter;
+      return [];
     }
 
     const allowedSubjectIds = batchSemester.subjects.map(s => (s._id ? String(s._id) : String(s)));
@@ -326,6 +325,7 @@ const ExamManagement = () => {
         batch: mark.batch?._id || "",
         semester: mark.semester || 1,
         course: mark.course?._id || "",
+        exam: mark.exam?._id || "",
         subjects: [{
           subject: mark.subject?._id || "",
           theoryMark: mark.theoryMark,
@@ -342,6 +342,7 @@ const ExamManagement = () => {
         batch: "",
         semester: 1,
         course: "",
+        exam: "",
         subjects: [],
         template: "rg_modern"
       });
@@ -361,6 +362,7 @@ const ExamManagement = () => {
           batch: markFormData.batch,
           semester: markFormData.semester,
           course: markFormData.course,
+          exam: markFormData.exam,
           subject: markFormData.subjects[0]?.subject,
           theoryMark: markFormData.subjects[0]?.theoryMark,
           internalMark: markFormData.subjects[0]?.internalMark,
@@ -413,19 +415,128 @@ const ExamManagement = () => {
   };
 
   const handleBulkUploadConfirm = async (payload) => {
-    const toastId = toast.loading("Uploading bulk data...");
     try {
-      const res = await api.post('/marks/bulk', { marks: payload.data, template: payload.template });
-      toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`, { id: toastId });
-      if (res.data.results.failed > 0) {
-        console.error("Bulk Upload Errors:", res.data.results.errors);
+      const data = payload.data || [];
+      const total = data.length;
+      if (total === 0) return;
+
+      setUploadProgress({ isUploading: true, current: 0, total });
+      setShowBulkUploadPreviewModal(false);
+
+      let successCount = 0;
+      let failedCount = 0;
+      const chunkSize = 10;
+
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = data.slice(i, i + chunkSize);
+        const res = await api.post("/marks/bulk", { marks: chunk, template: payload.template });
+        successCount += res.data.results.success;
+        failedCount += res.data.results.failed;
+        
+        setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total });
+      }
+
+      toast.success(`Bulk upload completed! Success: ${successCount}, Failed: ${failedCount}`);
+      if (failedCount > 0) {
         toast.error("Some records failed. Check console for details.");
       }
-      setShowBulkUploadPreviewModal(false);
+      
+      setUploadProgress({ isUploading: false, current: 0, total: 0 });
       fetchData();
     } catch (err) {
-      toast.error("Failed to upload bulk data", { id: toastId });
+      toast.error("Failed to upload bulk data");
+      setUploadProgress({ isUploading: false, current: 0, total: 0 });
     }
+  };
+
+  const validateRow = (row) => {
+    let errors = {};
+    let isValid = true;
+
+    // 1. Find Course
+    let extractedCourseId = "";
+    let extractedTitle = row["Course Title"] || 'Course';
+    if (extractedTitle.includes(' - ')) {
+      const parts = extractedTitle.split(' - ');
+      extractedCourseId = parts[0];
+    }
+    const courseObj = courses.find(c => c.courseId === extractedCourseId || c.title === extractedTitle);
+
+    // 2. Find Batch
+    const batchName = row["Batch Name"];
+    const batchObj = batches.find(b => b.name === batchName);
+
+    // 3. Find Semester
+    const semesterStr = String(row["Semester"] || "1").replace(/\D/g, '');
+    const semNum = parseInt(semesterStr, 10) || 1;
+
+    // 4. Find Exam
+    let examObj = null;
+    if (courseObj && batchObj) {
+      examObj = exams.find(e => 
+        (e.course?._id === courseObj._id || e.course === courseObj._id) &&
+        (e.batch?._id === batchObj._id || e.batch === batchObj._id) &&
+        Number(e.semester) === Number(semNum)
+      );
+    }
+
+    // 5. Validate Marks for each subject
+    for (let i = 1; i <= 10; i++) {
+      if (row[`Subject ${i} Code`] !== undefined || row[`Subject ${i} Mark`] !== undefined || row[`Subject ${i} Theory`] !== undefined) {
+        let rawTitle = String(row[`Subject ${i} Code`] || `Subject ${i}`);
+        let subCode = rawTitle.includes(' - ') ? rawTitle.split(' - ')[0] : rawTitle;
+        
+        const subjectObj = subjects.find(s => s.code === subCode || s.name === subCode);
+        
+        // Defaults if no exam found
+        let maxExt = 100;
+        let maxInt = 100;
+
+        if (examObj && subjectObj) {
+          const config = examObj.subjects?.find(s => String(s.subject?._id || s.subject) === String(subjectObj._id));
+          if (config) {
+            maxExt = config.externalMark !== undefined ? config.externalMark : (config.theoryMark || 100);
+            maxInt = config.internalMark !== undefined ? config.internalMark : 100;
+          }
+        }
+
+        const markKey = row[`Subject ${i} Mark`] !== undefined ? `Subject ${i} Mark` : `Subject ${i} Theory`;
+        const intKey = `Subject ${i} Internal`;
+
+        const thVal = String(row[markKey] || "").trim().toUpperCase();
+        const intVal = String(row[intKey] || "").trim().toUpperCase();
+
+        if (thVal !== "" && thVal !== 'AB') {
+          const thNum = Number(thVal);
+          if (isNaN(thNum)) {
+            errors[markKey] = "Must be a number or AB";
+            isValid = false;
+          } else if (thNum > maxExt) {
+            errors[markKey] = `Max allowed is ${maxExt}`;
+            isValid = false;
+          } else if (thNum < 0) {
+            errors[markKey] = `Cannot be negative`;
+            isValid = false;
+          }
+        }
+
+        if (intVal !== "" && intVal !== 'AB') {
+          const intNum = Number(intVal);
+          if (isNaN(intNum)) {
+            errors[intKey] = "Must be a number or AB";
+            isValid = false;
+          } else if (intNum > maxInt) {
+            errors[intKey] = `Max allowed is ${maxInt}`;
+            isValid = false;
+          } else if (intNum < 0) {
+            errors[intKey] = `Cannot be negative`;
+            isValid = false;
+          }
+        }
+      }
+    }
+
+    return { isValid, errors };
   };
 
   const handlePreviewRow = (row, templateId) => {
@@ -446,16 +557,28 @@ const ExamManagement = () => {
           }
         }
 
-        const ext = Number(row[`Subject ${i} Theory`] || 0) + Number(row[`Subject ${i} Practical`] || 0);
-        const int = Number(row[`Subject ${i} Internal`] || 0);
+        const thVal = String(row[`Subject ${i} Mark`] || row[`Subject ${i} Theory`] || "").trim().toUpperCase();
+        const intVal = String(row[`Subject ${i} Internal`] || "").trim().toUpperCase();
+        const pracVal = String(row[`Subject ${i} Practical`] || "").trim().toUpperCase();
+
+        const th = thVal === 'AB' ? 'AB' : Number(thVal || 0);
+        const int = intVal === 'AB' ? 'AB' : Number(intVal || 0);
+        const prac = pracVal === 'AB' ? 'AB' : Number(pracVal || 0);
+
+        const extNum = th === 'AB' ? 0 : th + (prac === 'AB' ? 0 : prac);
+        const intNum = int === 'AB' ? 0 : int;
+
+        const subjectObj = subjects.find(s => s.code === subCode || s.name === subCode);
+        const actualType = subjectObj ? subjectObj.type : 'Theory';
+
         mockMarks.push({
           _id: `mock_${i}`,
-          subject: { code: subCode, name: subName, type: row[`Subject ${i} Practical`] ? 'Practical' : 'Theory' },
-          theoryMark: Number(row[`Subject ${i} Theory`] || 0),
+          subject: { code: subCode, name: subName, type: actualType },
+          theoryMark: th,
           internalMark: int,
-          practicalMark: Number(row[`Subject ${i} Practical`] || 0),
+          practicalMark: prac,
           passMark: 40,
-          isPass: (ext + int) >= 40
+          isPass: (th !== 'AB' && int !== 'AB' && prac !== 'AB') && (extNum + intNum) >= 40
         });
       }
     }
@@ -482,12 +605,19 @@ const ExamManagement = () => {
   };
 
   const handleDownloadDynamicCSV = () => {
-    const { courseId, batchId, centerId, semester } = sampleCsvForm;
+    const { examId, centerId } = sampleCsvForm;
 
-    if (!courseId || !semester) {
-      toast.error("Course and Semester are required!");
+    if (!examId) {
+      toast.error("Please select an Exam!");
       return;
     }
+
+    const exam = exams.find(e => e._id === examId);
+    if (!exam) return;
+
+    const courseId = exam.course?._id || exam.course;
+    const batchId = exam.batch?._id || exam.batch;
+    const semester = exam.semester;
 
     // Filter students
     let filteredStudents = students;
@@ -501,15 +631,18 @@ const ExamManagement = () => {
       filteredStudents = filteredStudents.filter(s => s.center?._id === centerId || s.center === centerId);
     }
 
-    // Filter subjects
-    const filteredSubjects = getFilteredSubjects(batchId, semester, courseId);
+    // Filter subjects directly from exam
+    const filteredSubjects = (exam.subjects || []).map(s => {
+      const subObj = subjects.find(sub => sub._id === (s.subject?._id || s.subject));
+      return subObj || null;
+    }).filter(Boolean);
 
     if (filteredSubjects.length === 0) {
-      toast.error("No subjects found for the selected batch, course, and semester.");
+      toast.error("The selected Exam has no subjects configured.");
       return;
     }
     if (filteredStudents.length === 0) {
-      toast.error("No students found matching the selected criteria.");
+      toast.error("No students found matching the selected Exam criteria.");
       return;
     }
 
@@ -517,7 +650,7 @@ const ExamManagement = () => {
     let headers = ["Student ID", "Student Name", "Center Code", "Batch Name", "Course Title", "Semester"];
     filteredSubjects.forEach((sub, index) => {
       const i = index + 1;
-      headers.push(`Subject ${i} Code`, `Subject ${i} Mark`, `Subject ${i} Internal`);
+      headers.push(`Subject ${i} Code`, `Subject ${i} Mark`, `Subject ${i} Internal`, `Subject ${i} Total`);
     });
 
     let rowsData = [];
@@ -528,7 +661,17 @@ const ExamManagement = () => {
     const batchObj = batches.find(b => b._id === batchId);
     const batchName = batchObj ? batchObj.name : "";
 
-    filteredStudents.forEach(student => {
+    const getExcelColName = (colIndex) => {
+      let colName = '';
+      let index = colIndex;
+      while (index >= 0) {
+        colName = String.fromCharCode(65 + (index % 26)) + colName;
+        index = Math.floor(index / 26) - 1;
+      }
+      return colName;
+    };
+
+    filteredStudents.forEach((student, rowIndex) => {
       let row = [
         student.studentId,
         student.studentNameEnglish || "",
@@ -538,8 +681,21 @@ const ExamManagement = () => {
         semester
       ];
 
+      // Base offset for dynamic columns is 6 (A-F)
+      let currentColIndex = 6; 
+      const excelRowNum = rowIndex + 2; // Data rows start at 2
+      
       filteredSubjects.forEach(sub => {
-        row.push(`${sub.code} - ${sub.name} (${sub.type || "Theory"})`, "", "");
+        const markCol = getExcelColName(currentColIndex + 1); // e.g. H
+        const internalCol = getExcelColName(currentColIndex + 2); // e.g. I
+        
+        row.push(
+          `${sub.code} - ${sub.name} (${sub.type || "Theory"})`,
+          "",
+          "",
+          { f: `IF(AND(${markCol}${excelRowNum}="",${internalCol}${excelRowNum}=""),"",IF(OR(UPPER(${markCol}${excelRowNum})="AB",UPPER(${internalCol}${excelRowNum})="AB"),"AB",SUM(${markCol}${excelRowNum},${internalCol}${excelRowNum})))` }
+        );
+        currentColIndex += 4; // 4 columns per subject: Code, Mark, Internal, Total
       });
       rowsData.push(row);
     });
@@ -601,9 +757,28 @@ const ExamManagement = () => {
     }
   };
 
+  const handleExamChange = (examId) => {
+    if (!examId) {
+      setMarkFormData(prev => ({ ...prev, exam: "" }));
+      return;
+    }
+    const exam = exams.find(e => String(e._id) === String(examId));
+    if (exam) {
+      setMarkFormData(prev => ({
+        ...prev,
+        exam: examId,
+        course: exam.course?._id || exam.course || prev.course,
+        batch: exam.batch?._id || exam.batch || prev.batch,
+        semester: exam.semester || prev.semester
+      }));
+    } else {
+      setMarkFormData(prev => ({ ...prev, exam: examId }));
+    }
+  };
+
   const handleStudentChange = (studentId) => {
     if (!studentId) {
-      setMarkFormData(prev => ({ ...prev, student: "", course: "", batch: "" }));
+      setMarkFormData(prev => ({ ...prev, student: "", course: "", batch: "", exam: "" }));
       return;
     }
     const st = students.find(s => s._id === studentId);
@@ -628,7 +803,7 @@ const ExamManagement = () => {
           courseId = studentBatch.course?._id || studentBatch.course || "";
 
           if (!courseId && studentBatch.courses && studentBatch.courses.length > 0) {
-            courseId = studentBatch.courses[0]._id || studentBatch.courses[0] || "";
+            courseId = studentBatch.courses[0]?._id || studentBatch.courses[0];
           }
         }
       }
@@ -1721,6 +1896,13 @@ const ExamManagement = () => {
             </div>
             <form onSubmit={handleMarkSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Select Exam <span className="text-red-500">*</span></label>
+                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-brand-50/50" value={markFormData.exam} onChange={(e) => handleExamChange(e.target.value)}>
+                    <option value="">Choose Exam</option>
+                    {exams.map(e => <option key={e._id} value={e._id}>{e.name} (Sem {e.semester})</option>)}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Select Student</label>
                   <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.student} onChange={(e) => handleStudentChange(e.target.value)}>
@@ -1929,74 +2111,45 @@ const ExamManagement = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Batch <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Select Exam <span className="text-red-500">*</span></label>
                 <select
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
-                  value={sampleCsvForm.batchId}
-                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, batchId: e.target.value, courseId: "", centerId: "" })}
+                  value={sampleCsvForm.examId}
+                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, examId: e.target.value, centerId: "" })}
                 >
-                  <option value="">Select Batch</option>
-                  {batches.map(b => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
+                  <option value="">Choose Exam...</option>
+                  {exams.map(e => (
+                    <option key={e._id} value={e._id}>{e.name} (Sem {e.semester})</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Course <span className="text-red-500">*</span></label>
-                <select
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
-                  value={sampleCsvForm.courseId}
-                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, courseId: e.target.value, centerId: "" })}
-                  disabled={!sampleCsvForm.batchId}
-                >
-                  <option value="">Select Course</option>
-                  {(sampleCsvForm.batchId
-                    ? courses.filter(c => batches.find(b => b._id === sampleCsvForm.batchId)?.courses?.some(bc => (bc._id || bc) === c._id))
-                    : courses
-                  ).map(c => (
-                    <option key={c._id} value={c._id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Center</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Center (Optional Filter)</label>
                 <select
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   value={sampleCsvForm.centerId}
                   onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, centerId: e.target.value })}
-                  disabled={!sampleCsvForm.batchId || !sampleCsvForm.courseId}
+                  disabled={!sampleCsvForm.examId}
                 >
-                  <option value="">{(!sampleCsvForm.batchId || !sampleCsvForm.courseId) ? "Select Batch and Course first" : "All Available Centers"}</option>
-                  {(sampleCsvForm.batchId && sampleCsvForm.courseId
-                    ? centers.filter(c => 
-                        students.some(s => 
+                  <option value="">{!sampleCsvForm.examId ? "Select Exam first" : "All Available Centers"}</option>
+                  {(sampleCsvForm.examId
+                    ? centers.filter(c => {
+                        const exam = exams.find(e => e._id === sampleCsvForm.examId);
+                        if (!exam) return false;
+                        return students.some(s => 
                           (String(s.center?._id || s.center) === String(c._id)) &&
                           s.enrolledCourses?.some(ec => 
-                            String(ec.batch?._id || ec.batch) === String(sampleCsvForm.batchId) &&
-                            String(ec.course?._id || ec.course) === String(sampleCsvForm.courseId)
+                            String(ec.batch?._id || ec.batch) === String(exam.batch?._id || exam.batch) &&
+                            String(ec.course?._id || ec.course) === String(exam.course?._id || exam.course)
                           )
-                        )
-                      )
+                        );
+                      })
                     : []
                   ).map(c => (
                     <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Semester <span className="text-red-500">*</span></label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
-                  value={sampleCsvForm.semester}
-                  onChange={(e) => setSampleCsvForm({ ...sampleCsvForm, semester: e.target.value })}
-                  placeholder="e.g. 1"
-                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -2025,7 +2178,25 @@ const ExamManagement = () => {
           onClose={() => setShowBulkUploadPreviewModal(false)}
           onSave={handleBulkUploadConfirm}
           onPreviewRow={handlePreviewRow}
+          validateRow={validateRow}
         />
+      )}
+
+      {uploadProgress.isUploading && (
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Uploading Data...</h3>
+            <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden relative">
+              <div 
+                className="bg-brand-600 h-4 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.max(5, (uploadProgress.current / uploadProgress.total) * 100)}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-slate-600 text-center font-medium">
+              Processing {uploadProgress.current} of {uploadProgress.total} records
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

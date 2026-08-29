@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { protect } = require('../middleware/authMiddleware');
 const User = require('../models/User');
+const Subject = require('../models/Subject');
 
 const logFile = path.join(__dirname, '../debug_course.log');
 const log = (msg) => {
@@ -18,7 +19,7 @@ const log = (msg) => {
 // @route   GET /api/courses
 router.get('/', async (req, res) => {
     try {
-        const courses = await Course.find({}).populate('instructor', 'name');
+        const courses = await Course.find({}).populate('instructor', 'name').populate('subjects');
         res.json(courses);
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
@@ -98,7 +99,7 @@ router.get('/available', protect, async (req, res) => {
 // @access  Public
 router.get('/:id', async (req, res) => {
     try {
-        const course = await Course.findById(req.params.id).populate('instructor', 'name');
+        const course = await Course.findById(req.params.id).populate('instructor', 'name').populate('subjects');
         if (course) {
             res.json(course);
         } else {
@@ -193,7 +194,7 @@ router.post('/', (req, res, next) => {
         log(`POST /api/courses started`);
         log(`Body keys: ${Object.keys(req.body).join(', ')}`);
 
-        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, subjects, type } = req.body;
+        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, subjects, type, inlineSubjects } = req.body;
 
         const thumbnail = req.file ? {
             url: req.file.path,
@@ -234,6 +235,43 @@ router.post('/', (req, res, next) => {
         });
 
         const createdCourse = await course.save();
+        
+        let parsedInlineSubjects = [];
+        if (inlineSubjects) {
+            try {
+                parsedInlineSubjects = typeof inlineSubjects === 'string' ? JSON.parse(inlineSubjects) : inlineSubjects;
+                
+                if (Array.isArray(parsedInlineSubjects) && parsedInlineSubjects.length > 0) {
+                    const newSubjectIds = [];
+                    for (const sub of parsedInlineSubjects) {
+                        if (sub.name && sub.code) { // Basic validation
+                            let existingSub = await Subject.findOne({ $or: [{ code: sub.code }, { name: sub.name }] });
+                            if (existingSub) {
+                                newSubjectIds.push(existingSub._id);
+                            } else {
+                                const newSub = new Subject({
+                                    name: sub.name,
+                                    code: sub.code,
+                                    semester: sub.semester || 1,
+                                    type: sub.type || 'Theory',
+                                    course: createdCourse._id
+                                });
+                                await newSub.save();
+                                newSubjectIds.push(newSub._id);
+                            }
+                        }
+                    }
+                    if (newSubjectIds.length > 0) {
+                        createdCourse.subjects = [...createdCourse.subjects, ...newSubjectIds];
+                        await createdCourse.save();
+                    }
+                }
+            } catch (e) {
+                log(`inlineSubjects parse error: ${e.message}`);
+                console.error("inlineSubjects parse error:", e);
+            }
+        }
+
         log(`Course created: ${createdCourse._id}`);
         res.status(201).json(createdCourse);
     } catch (error) {
@@ -250,7 +288,7 @@ router.put('/:id', upload.single('thumbnail'), async (req, res) => {
         const course = await Course.findById(req.params.id);
         if (!course) return res.status(404).json({ message: 'Course not found' });
 
-        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, lessons, subjects, type } = req.body;
+        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, lessons, subjects, type, inlineSubjects } = req.body;
         
         if (lessons) {
             course.lessons = lessons;
@@ -287,6 +325,51 @@ router.put('/:id', upload.single('thumbnail'), async (req, res) => {
         }
 
         const updatedCourse = await course.save();
+
+        let parsedInlineSubjects = [];
+        if (inlineSubjects) {
+            try {
+                parsedInlineSubjects = typeof inlineSubjects === 'string' ? JSON.parse(inlineSubjects) : inlineSubjects;
+                
+                if (Array.isArray(parsedInlineSubjects)) {
+                    const newSubjectIds = [];
+                    for (const sub of parsedInlineSubjects) {
+                        if (sub._id) {
+                            // Update existing subject
+                            await Subject.findByIdAndUpdate(sub._id, {
+                                name: sub.name,
+                                code: sub.code,
+                                semester: sub.semester || 1,
+                                type: sub.type || 'Theory'
+                            });
+                            newSubjectIds.push(sub._id);
+                        } else if (sub.name && sub.code) {
+                            // Create new subject or use existing
+                            let existingSub = await Subject.findOne({ $or: [{ code: sub.code }, { name: sub.name }] });
+                            if (existingSub) {
+                                newSubjectIds.push(existingSub._id);
+                            } else {
+                                const newSub = new Subject({
+                                    name: sub.name,
+                                    code: sub.code,
+                                    semester: sub.semester || 1,
+                                    type: sub.type || 'Theory',
+                                    course: updatedCourse._id
+                                });
+                                await newSub.save();
+                                newSubjectIds.push(newSub._id);
+                            }
+                        }
+                    }
+                    // Only overwrite if inlineSubjects was explicitly sent (which it is for center courses)
+                    updatedCourse.subjects = newSubjectIds;
+                    await updatedCourse.save();
+                }
+            } catch (e) {
+                console.error("inlineSubjects parse error in PUT:", e);
+            }
+        }
+
         res.json(updatedCourse);
     } catch (error) {
         res.status(400).json({ message: error.message });

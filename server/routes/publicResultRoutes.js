@@ -60,7 +60,8 @@ router.post('/results', async (req, res) => {
     }
 
     const student = await Student.findOne({ studentId })
-      .populate('enrolledCourses.course', 'title');
+      .populate('enrolledCourses.course', 'title')
+      .populate('center');
       
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
@@ -83,6 +84,7 @@ router.post('/results', async (req, res) => {
     // Fetch marks
     const marks = await Mark.find({ student: student._id })
       .populate('course', 'title')
+      .populate('batch', 'name')
       .populate('subject', 'name code type')
       .sort({ semester: 1 });
 
@@ -98,6 +100,7 @@ router.post('/results', async (req, res) => {
         studentId: student.studentId,
         courseName: courseName
       },
+      studentFull: student,
       marks
     });
   } catch (error) {

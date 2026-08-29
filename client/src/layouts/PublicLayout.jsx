@@ -507,6 +507,15 @@ const PublicLayout = () => {
 
               <div className="hidden md:flex items-center gap-3">
                 <Link
+                  to="/results"
+                  className="relative group flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2 rounded font-bold hover:from-red-600 hover:to-red-700 transition-all shadow-md overflow-visible"
+                >
+                  <span className="absolute -top-2.5 -right-2.5 bg-amber-400 text-slate-900 text-[10px] uppercase font-black px-2 py-0.5 rounded-full shadow border border-amber-300 animate-bounce">
+                    New
+                  </span>
+                  <span className="text-sm">Exam Results Published Here</span>
+                </Link>
+                <Link
                   to="/login"
                   className="text-brand-700 font-bold hover:bg-brand-50 px-4 py-2 rounded transition-colors text-sm"
                 >

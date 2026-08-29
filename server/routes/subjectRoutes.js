@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Subject = require("../models/Subject");
+const Course = require("../models/Course");
 const { protect } = require("../middleware/authMiddleware");
 
 //////////////////////////////////////////////////////
@@ -16,6 +17,10 @@ router.post("/", protect, async (req, res) => {
     }
 
     const subject = await Subject.create({ name, code, type, semester, course });
+
+    if (course) {
+      await Course.findByIdAndUpdate(course, { $addToSet: { subjects: subject._id } });
+    }
 
     await subject.populate("course");
 
@@ -50,13 +55,24 @@ router.put("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Subject not found" });
     }
 
+    const oldCourseId = subject.course;
+
     if (name) subject.name = name;
     if (code) subject.code = code;
     if (type) subject.type = type;
     if (semester) subject.semester = semester;
-    if (course) subject.course = course;
+    if (course !== undefined) subject.course = course;
 
     await subject.save();
+
+    if (course !== undefined && String(course) !== String(oldCourseId)) {
+      if (oldCourseId) {
+        await Course.findByIdAndUpdate(oldCourseId, { $pull: { subjects: subject._id } });
+      }
+      if (course) {
+        await Course.findByIdAndUpdate(course, { $addToSet: { subjects: subject._id } });
+      }
+    }
     
     await subject.populate("course");
 
@@ -75,6 +91,10 @@ router.delete("/:id", protect, async (req, res) => {
 
     if (!subject) {
       return res.status(404).json({ message: "Subject not found" });
+    }
+
+    if (subject.course) {
+      await Course.findByIdAndUpdate(subject.course, { $pull: { subjects: subject._id } });
     }
 
     await subject.deleteOne();

@@ -165,7 +165,11 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
             )}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Amount (₹)</label>
-              <input type="number" required min="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
+              <input type="text" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.amount !== '' && formData.amount !== null && formData.amount !== undefined ? Number(formData.amount).toLocaleString('en-IN') : ''} onChange={e => {
+                const val = e.target.value.replace(/,/g, '');
+                if (val === '') setFormData({...formData, amount: ''});
+                else if (!isNaN(val)) setFormData({...formData, amount: Number(val)});
+              }} />
             </div>
           </div>
           
@@ -178,7 +182,11 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
                </div>
                <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Penalty Amount (₹)</label>
-                  <input type="number" min="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.penaltyAmount} onChange={e => setFormData({...formData, penaltyAmount: Number(e.target.value)})} />
+                  <input type="text" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.penaltyAmount !== '' && formData.penaltyAmount !== null && formData.penaltyAmount !== undefined ? Number(formData.penaltyAmount).toLocaleString('en-IN') : ''} onChange={e => {
+                    const val = e.target.value.replace(/,/g, '');
+                    if (val === '') setFormData({...formData, penaltyAmount: ''});
+                    else if (!isNaN(val)) setFormData({...formData, penaltyAmount: Number(val)});
+                  }} />
                </div>
                <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Final Due Date</label>
@@ -186,7 +194,11 @@ const AddStudentFeeModal = ({ onClose, onSave, students, centers, courses, batch
                </div>
                <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Final Penalty Amount (₹)</label>
-                  <input type="number" min="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.finalPenaltyAmount} onChange={e => setFormData({...formData, finalPenaltyAmount: Number(e.target.value)})} />
+                  <input type="text" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white" value={formData.finalPenaltyAmount !== '' && formData.finalPenaltyAmount !== null && formData.finalPenaltyAmount !== undefined ? Number(formData.finalPenaltyAmount).toLocaleString('en-IN') : ''} onChange={e => {
+                    const val = e.target.value.replace(/,/g, '');
+                    if (val === '') setFormData({...formData, finalPenaltyAmount: ''});
+                    else if (!isNaN(val)) setFormData({...formData, finalPenaltyAmount: Number(val)});
+                  }} />
                </div>
              </div>
           </div>

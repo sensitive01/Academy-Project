@@ -29,15 +29,15 @@ const markSchema = new mongoose.Schema({
     ref: 'Exam',
   },
   theoryMark: {
-    type: Number,
+    type: mongoose.Schema.Types.Mixed,
     default: 0,
   },
   internalMark: {
-    type: Number,
+    type: mongoose.Schema.Types.Mixed,
     default: 0,
   },
   practicalMark: {
-    type: Number,
+    type: mongoose.Schema.Types.Mixed,
     default: 0,
   },
   marksheetUrl: {

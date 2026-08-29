@@ -300,6 +300,18 @@ const Students = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [attendanceRefresh, setAttendanceRefresh] = useState(0);
+  
+  // Preview Pagination & Search
+  const [previewSearch, setPreviewSearch] = useState("");
+  const [previewPage, setPreviewPage] = useState(1);
+  const previewItemsPerPage = 10;
+
+  const formatDOB = (dateStr) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
+  };
   // New Filter States
   const [filterType, setFilterType] = useState([]);
   const [filterCenter, setFilterCenter] = useState([]);
@@ -345,6 +357,7 @@ const Students = () => {
     selectedDuplicates: []
   });
   const [activePreviewTab, setActivePreviewTab] = useState('valid');
+  const [uploadProgress, setUploadProgress] = useState({ isUploading: false, current: 0, total: 0 });
 
   useEffect(() => {
     sessionStorage.setItem("studentsActiveTab", activeTab);
@@ -440,7 +453,7 @@ const Students = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    setPreviewModal(prev => ({ ...prev, isOpen: true, isLoading: true }));
+    const toastId = toast.loading("Analyzing records...");
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -452,12 +465,12 @@ const Students = () => {
         const data = XLSX.utils.sheet_to_json(ws);
 
         if (data.length === 0) {
-            toast.error("File is empty.");
-            setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+            toast.error("File is empty.", { id: toastId });
             return;
         }
 
         const res = await api.post("/students/bulk-upload-preview", { students: data });
+        toast.dismiss(toastId);
         setPreviewModal(prev => ({ 
           ...prev, 
           isOpen: true, 
@@ -469,8 +482,7 @@ const Students = () => {
         }));
         setActivePreviewTab('valid');
       } catch (error) {
-        toast.error(error.response?.data?.message || "Error processing file.");
-        setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        toast.error(error.response?.data?.message || "Error processing file.", { id: toastId });
       }
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
@@ -479,10 +491,7 @@ const Students = () => {
 
   const handleCommitUpload = async () => {
     const recordsToProcess = [
-      ...previewModal.validRecords,
-      ...previewModal.duplicateRecords
-        .filter(d => previewModal.selectedDuplicates.includes(d.id))
-        .map(d => ({ ...d, isUpdate: true }))
+      ...previewModal.validRecords
     ];
 
     if (recordsToProcess.length === 0) {
@@ -490,15 +499,34 @@ const Students = () => {
       return;
     }
 
-    setPreviewModal(prev => ({ ...prev, isLoading: true }));
+    setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+    const total = recordsToProcess.length;
+    setUploadProgress({ isUploading: true, current: 0, total, statusText: "Uploading Data..." });
+
     try {
-      const res = await api.post("/students/bulk-upload", { recordsToProcess });
+      let finalResult = { totalProcessed: 0, successes: 0, errors: [] };
+      const chunkSize = 10;
+      
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = recordsToProcess.slice(i, i + chunkSize);
+        const res = await api.post("/students/bulk-upload", { recordsToProcess: chunk });
+        
+        if (res.data) {
+          finalResult.totalProcessed += res.data.totalProcessed || 0;
+          finalResult.successes += res.data.successes || 0;
+          if (res.data.errors) finalResult.errors.push(...res.data.errors);
+        }
+        
+        setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total, statusText: "Uploading Data..." });
+      }
+
       setPreviewModal({ isOpen: false, validRecords: [], duplicateRecords: [], invalidRecords: [], isLoading: false, selectedDuplicates: [] });
-      setBulkUploadResult({ isOpen: true, result: res.data, isLoading: false });
+      setUploadProgress({ isUploading: false, current: 0, total: 0, statusText: "" });
+      setBulkUploadResult({ isOpen: true, result: finalResult, isLoading: false });
       fetchStudents();
     } catch (error) {
       toast.error(error.response?.data?.message || "Error uploading records.");
-      setPreviewModal(prev => ({ ...prev, isLoading: false }));
+      setUploadProgress({ isUploading: false, current: 0, total: 0, statusText: "" });
     }
   };
 
@@ -722,6 +750,370 @@ const Students = () => {
           onBack={() => setSelectedStudent(null)}
           onUpdate={handleUpdate}
         />
+      </div>
+    );
+  }
+
+  if (previewModal.isOpen) {
+    const activePreviewRecords = activePreviewTab === 'valid' ? previewModal.validRecords : 
+                                 activePreviewTab === 'duplicates' ? previewModal.duplicateRecords : 
+                                 previewModal.invalidRecords;
+                                 
+    const filteredPreviewRecords = activePreviewRecords.filter(r => {
+      if (!previewSearch) return true;
+      const s = previewSearch.toLowerCase();
+      return (
+        r["Name"]?.toLowerCase().includes(s) || 
+        r["Student ID"]?.toLowerCase().includes(s) || 
+        r["Email"]?.toLowerCase().includes(s) || 
+        r["Center ID"]?.toLowerCase().includes(s) ||
+        r["Course ID"]?.toLowerCase().includes(s) ||
+        r["Batch ID"]?.toLowerCase().includes(s)
+      );
+    });
+    
+    const totalPreviewPages = Math.max(1, Math.ceil(filteredPreviewRecords.length / previewItemsPerPage));
+    const currentPreviewRecords = filteredPreviewRecords.slice((previewPage - 1) * previewItemsPerPage, previewPage * previewItemsPerPage);
+
+    return (
+      <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-500 max-w-full h-full flex flex-col bg-slate-50">
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col flex-1 overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Preview Upload</h3>
+                <p className="text-sm text-slate-500">Review your data before finalizing</p>
+              </div>
+              <button onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }))} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 border-b border-slate-200 mb-4 justify-between sm:items-center">
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => { setActivePreviewTab('valid'); setPreviewPage(1); }}
+                  className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'valid' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Ready ({previewModal.validRecords.length})
+                  {activePreviewTab === 'valid' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full"></div>}
+                </button>
+                <button 
+                  onClick={() => { setActivePreviewTab('duplicates'); setPreviewPage(1); }}
+                  className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'duplicates' ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Duplicates ({previewModal.duplicateRecords.length})
+                  {activePreviewTab === 'duplicates' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-orange-600 rounded-t-full"></div>}
+                </button>
+                <button 
+                  onClick={() => { setActivePreviewTab('invalid'); setPreviewPage(1); }}
+                  className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'invalid' ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Invalid ({previewModal.invalidRecords.length})
+                  {activePreviewTab === 'invalid' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-600 rounded-t-full"></div>}
+                </button>
+              </div>
+              <div className="relative mb-2 sm:mb-0">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search records..."
+                  value={previewSearch}
+                  onChange={(e) => { setPreviewSearch(e.target.value); setPreviewPage(1); }}
+                  className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100">
+              {activePreviewTab === 'valid' && (
+                <div className="w-full">
+                  {previewModal.validRecords.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">No valid records to upload.</div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-700">
+                            <th className="p-3 font-bold border-b border-slate-200 w-12">S.No</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Name</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Student ID</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Email</th>
+                            <th className="p-3 font-bold border-b border-slate-200">DOB</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Center</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Course</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentPreviewRecords.map((r, i) => (
+                            <tr key={r.id} className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                              <td className="p-3 text-slate-500 font-mono text-xs">{(previewPage - 1) * previewItemsPerPage + i + 1}</td>
+                              <td className="p-3 font-semibold text-slate-800">{r["Name"]}</td>
+                              <td className="p-3 text-slate-600 font-mono text-xs">{r["Student ID"]}</td>
+                              <td className="p-3 text-slate-600">{r["Email"]}</td>
+                              <td className="p-3 text-slate-600">{formatDOB(r["DOB"])}</td>
+                              <td className="p-3 text-slate-600">{r["Center ID"]}</td>
+                              <td className="p-3 text-slate-600">{r["Course ID"]}</td>
+                              <td className="p-3 text-slate-600">{r["Batch ID"]}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activePreviewTab === 'duplicates' && (
+                <div>
+                  <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs flex gap-2 items-start">
+                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                    <p>These records already exist. You can edit the Student ID below and move them to the Ready section to insert them as new records.</p>
+                  </div>
+                  <div className="w-full">
+                    {previewModal.duplicateRecords.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500">No duplicates found.</div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700">
+                              <th className="p-3 font-bold border-b border-slate-200 w-12">S.No</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Name</th>
+                              <th className="p-3 font-bold border-b border-slate-200 w-32">Student ID</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Email</th>
+                              <th className="p-3 font-bold border-b border-slate-200">DOB</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Center</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Course</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Reason</th>
+                              <th className="p-3 font-bold border-b border-slate-200 text-right w-32">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentPreviewRecords.map((r, i) => {
+                              return (
+                                <tr 
+                                  key={r.id} 
+                                  className="border-b border-slate-100 transition-colors bg-white hover:bg-slate-50"
+                                >
+                                  <td className="p-3 text-slate-500 font-mono text-xs">{(previewPage - 1) * previewItemsPerPage + i + 1}</td>
+                                  <td className="p-3 font-semibold text-slate-800">{r["Name"]}</td>
+                                  <td className="p-3">
+                                    <input 
+                                      type="text"
+                                      value={r["Student ID"] || ""}
+                                      onChange={(e) => {
+                                        setPreviewModal(prev => ({
+                                          ...prev,
+                                          duplicateRecords: prev.duplicateRecords.map(dup => dup.id === r.id ? { ...dup, "Student ID": e.target.value } : dup)
+                                        }));
+                                      }}
+                                      className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
+                                    />
+                                  </td>
+                                  <td className="p-3 text-slate-600">{r["Email"]}</td>
+                                  <td className="p-3 text-slate-600">{formatDOB(r["DOB"])}</td>
+                                  <td className="p-3 text-slate-600">{r["Center ID"]}</td>
+                                  <td className="p-3 text-slate-600">{r["Course ID"]}</td>
+                                  <td className="p-3 text-slate-600">{r["Batch ID"]}</td>
+                                  <td className="p-3">
+                                    <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold inline-block truncate max-w-[120px]" title={r.reason}>{r.reason}</span>
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <button 
+                                      onClick={() => {
+                                        try {
+                                          const editedId = r["Student ID"] ? String(r["Student ID"]).trim() : "";
+                                          if (!editedId) {
+                                            toast.error("Student ID cannot be empty.");
+                                            return;
+                                          }
+
+                                          const existsInDB = students.some(s => s.studentId && String(s.studentId).toLowerCase() === editedId.toLowerCase());
+                                          if (existsInDB) {
+                                            toast.error(`Student ID "${editedId}" already exists in the database.`);
+                                            return;
+                                          }
+
+                                          const existsInValid = previewModal.validRecords.some(v => v["Student ID"] && String(v["Student ID"]).toLowerCase() === editedId.toLowerCase());
+                                          if (existsInValid) {
+                                            toast.error(`Student ID "${editedId}" already exists in the Ready section.`);
+                                            return;
+                                          }
+
+                                          setPreviewModal(prev => {
+                                            const recordToMove = prev.duplicateRecords.find(dup => dup.id === r.id);
+                                            if (!recordToMove) return prev;
+                                            const newValid = [...prev.validRecords, { ...recordToMove, reason: undefined }];
+                                            const newDups = prev.duplicateRecords.filter(dup => dup.id !== r.id);
+                                            return {
+                                              ...prev,
+                                              validRecords: newValid,
+                                              duplicateRecords: newDups
+                                            };
+                                          });
+                                        } catch (err) {
+                                          console.error("Error moving record:", err);
+                                          toast.error("Something went wrong. Please try again.");
+                                        }
+                                      }}
+                                      className="px-3 py-1.5 bg-brand-50 border border-brand-100 text-brand-700 hover:bg-brand-100 rounded-lg text-xs font-bold transition-colors whitespace-nowrap flex items-center gap-1 ml-auto"
+                                    >
+                                      <CheckCircle size={14} /> Move to Ready
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activePreviewTab === 'invalid' && (
+                <div>
+                  <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex gap-2 items-start">
+                    <XCircle size={16} className="mt-0.5 shrink-0" />
+                    <p>These records cannot be uploaded due to missing data or invalid references. Please fix them in your spreadsheet and re-upload.</p>
+                  </div>
+                  <div className="w-full">
+                    {previewModal.invalidRecords.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500">No invalid records found.</div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700">
+                              <th className="p-3 font-bold border-b border-slate-200 w-12">S.No</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Row ID</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Name</th>
+                              <th className="p-3 font-bold border-b border-slate-200">DOB</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Center</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Course</th>
+                              <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                              <th className="p-3 font-bold border-b border-slate-200 text-right">Reason</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentPreviewRecords.map((r, i) => (
+                              <tr key={r.id} className="bg-white border-b border-slate-100 hover:bg-red-50/50 transition-colors">
+                                <td className="p-3 text-slate-500 font-mono text-xs">{(previewPage - 1) * previewItemsPerPage + i + 1}</td>
+                                <td className="p-3 text-slate-500 font-mono text-xs">{r.id}</td>
+                                <td className="p-3 font-semibold text-slate-800">{r["Name"] || "-"}</td>
+                                <td className="p-3 text-slate-600">{formatDOB(r["DOB"])}</td>
+                                <td className="p-3 text-slate-600">{r["Center ID"] || "-"}</td>
+                                <td className="p-3 text-slate-600">{r["Course ID"] || "-"}</td>
+                                <td className="p-3 text-slate-600">{r["Batch ID"] || "-"}</td>
+                                <td className="p-3 text-right">
+                                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold inline-block">{r.reason}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {totalPreviewPages > 1 && (
+              <div className="flex justify-between items-center py-3 px-1 border-t border-slate-100">
+                <span className="text-sm text-slate-500">
+                  Showing {(previewPage - 1) * previewItemsPerPage + 1} to {Math.min(previewPage * previewItemsPerPage, filteredPreviewRecords.length)} of {filteredPreviewRecords.length} entries
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={previewPage === 1}
+                    onClick={() => setPreviewPage(p => p - 1)}
+                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={previewPage === totalPreviewPages}
+                    onClick={() => setPreviewPage(p => p + 1)}
+                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center shrink-0">
+              <div className="text-sm font-semibold text-slate-600">
+                Will upload: <span className="text-brand-600 font-bold">{previewModal.validRecords.length}</span> records
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }))} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Cancel</button>
+                <button onClick={handleCommitUpload} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/20 transition-all">Confirm & Upload</button>
+              </div>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (bulkUploadResult.isOpen) {
+    return (
+      <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-500 max-w-full h-full flex flex-col bg-slate-50">
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col max-w-2xl mx-auto w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-slate-900">Bulk Upload Results</h3>
+              <button onClick={() => setBulkUploadResult({ isOpen: false, result: null, isLoading: false })} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            {bulkUploadResult.isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
+                <p className="text-slate-500 font-medium">Processing records, please wait...</p>
+              </div>
+            ) : bulkUploadResult.result ? (
+              <div className="flex-1 overflow-y-auto pr-2">
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-green-50 border border-green-100 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center"><CheckCircle size={24} /></div>
+                    <div>
+                      <p className="text-sm text-green-800 font-semibold mb-1">Successfully Uploaded</p>
+                      <p className="text-2xl font-black text-green-700">{bulkUploadResult.result.successCount}</p>
+                    </div>
+                  </div>
+                  <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center"><AlertCircle size={24} /></div>
+                    <div>
+                      <p className="text-sm text-red-800 font-semibold mb-1">Skipped Records</p>
+                      <p className="text-2xl font-black text-red-700">{bulkUploadResult.result.skippedRecords?.length || 0}</p>
+                    </div>
+                  </div>
+                </div>
+                {bulkUploadResult.result.skippedRecords?.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><AlertCircle size={16} className="text-red-500" /> Skipped Records Details</h4>
+                    <div className="space-y-3">
+                      {bulkUploadResult.result.skippedRecords.map((skip, idx) => (
+                        <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center justify-between">
+                          <div className="font-medium text-slate-700 text-sm">{skip.name || "Unknown row"} {skip.studentId ? `(${skip.studentId})` : ""}</div>
+                          <div className="text-xs font-bold px-3 py-1 bg-red-100 text-red-700 rounded-full">{skip.reason}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500">Something went wrong.</div>
+            )}
+            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end shrink-0">
+              <button onClick={() => setBulkUploadResult({ isOpen: false, result: null, isLoading: false })} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Close</button>
+            </div>
+        </div>
       </div>
     );
   }
@@ -955,7 +1347,7 @@ const Students = () => {
                       <button className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer">
                         <Briefcase size={18} /> Promote Selected <ChevronDown size={16} />
                       </button>
-                      <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                      <div className="absolute top-full right-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <button
                           onClick={() => {
                             setPromoteForm({ vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false });
@@ -1314,7 +1706,6 @@ const Students = () => {
                     toast.success(data.message || "Students promoted successfully!");
                     setSelectedStudents([]);
                     setClearSelectedRows(!clearSelectedRows);
-                    setIsAcademicBulkMode(false);
                     fetchStudents();
                     setAcademicPromoteConfig({ isOpen: false });
                   } catch (err) {
@@ -1388,205 +1779,21 @@ const Students = () => {
         document.body
       )}
 
-      {/* Bulk Upload Result Modal */}
-      {bulkUploadResult.isOpen && ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Bulk Upload Results</h3>
-              <button onClick={() => setBulkUploadResult({ isOpen: false, result: null, isLoading: false })} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <XCircle size={24} />
-              </button>
+      {uploadProgress.isUploading && (
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">{uploadProgress.statusText || "Uploading Data..."}</h3>
+            <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden relative">
+              <div 
+                className="bg-brand-600 h-4 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.max(5, (uploadProgress.current / uploadProgress.total) * 100)}%` }}
+              ></div>
             </div>
-            {bulkUploadResult.isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
-                <p className="text-slate-500 font-medium">Processing records, please wait...</p>
-              </div>
-            ) : bulkUploadResult.result ? (
-              <div className="flex-1 overflow-y-auto pr-2">
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-green-50 border border-green-100 rounded-2xl p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center"><CheckCircle size={24} /></div>
-                    <div>
-                      <p className="text-sm text-green-800 font-semibold mb-1">Successfully Uploaded</p>
-                      <p className="text-2xl font-black text-green-700">{bulkUploadResult.result.successCount}</p>
-                    </div>
-                  </div>
-                  <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center"><AlertCircle size={24} /></div>
-                    <div>
-                      <p className="text-sm text-red-800 font-semibold mb-1">Skipped Records</p>
-                      <p className="text-2xl font-black text-red-700">{bulkUploadResult.result.skippedRecords?.length || 0}</p>
-                    </div>
-                  </div>
-                </div>
-                {bulkUploadResult.result.skippedRecords?.length > 0 && (
-                  <div>
-                    <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><AlertCircle size={16} className="text-red-500" /> Skipped Records Details</h4>
-                    <div className="space-y-3">
-                      {bulkUploadResult.result.skippedRecords.map((skip, idx) => (
-                        <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center justify-between">
-                          <div className="font-medium text-slate-700 text-sm">{skip.name || "Unknown row"} {skip.studentId ? `(${skip.studentId})` : ""}</div>
-                          <div className="text-xs font-bold px-3 py-1 bg-red-100 text-red-700 rounded-full">{skip.reason}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-500">Something went wrong.</div>
-            )}
-            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-              <button onClick={() => setBulkUploadResult({ isOpen: false, result: null, isLoading: false })} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Close</button>
-            </div>
+            <p className="text-sm text-slate-600 text-center font-medium">
+              Processing {uploadProgress.current} of {uploadProgress.total} records
+            </p>
           </div>
-        </div>,
-        document.body
-      )}
-      {/* Preview Modal */}
-      {previewModal.isOpen && ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-4xl w-full shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">Preview Upload</h3>
-                <p className="text-sm text-slate-500">Review your data before finalizing</p>
-              </div>
-              <button onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }))} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <XCircle size={24} />
-              </button>
-            </div>
-            
-            {previewModal.isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 flex-1">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600 mb-4"></div>
-                <p className="text-slate-500 font-medium">Analyzing records...</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-4 border-b border-slate-200 mb-4">
-                  <button 
-                    onClick={() => setActivePreviewTab('valid')}
-                    className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'valid' ? 'text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Ready ({previewModal.validRecords.length})
-                    {activePreviewTab === 'valid' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-600 rounded-t-full"></div>}
-                  </button>
-                  <button 
-                    onClick={() => setActivePreviewTab('duplicates')}
-                    className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'duplicates' ? 'text-orange-600' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Duplicates ({previewModal.duplicateRecords.length})
-                    {activePreviewTab === 'duplicates' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-orange-600 rounded-t-full"></div>}
-                  </button>
-                  <button 
-                    onClick={() => setActivePreviewTab('invalid')}
-                    className={`pb-3 font-semibold text-sm px-2 transition-colors relative ${activePreviewTab === 'invalid' ? 'text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Invalid ({previewModal.invalidRecords.length})
-                    {activePreviewTab === 'invalid' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-red-600 rounded-t-full"></div>}
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                  {activePreviewTab === 'valid' && (
-                    <div className="space-y-3">
-                      {previewModal.validRecords.length === 0 ? (
-                        <div className="text-center py-8 text-slate-500">No valid records found.</div>
-                      ) : (
-                        previewModal.validRecords.map(r => (
-                          <div key={r.id} className="bg-white border border-slate-200 p-3 rounded-xl flex justify-between items-center shadow-sm">
-                            <div>
-                              <p className="font-bold text-slate-800 text-sm">{r["Name"]}</p>
-                              <p className="text-xs text-slate-500">{r["Email"] || "No Email"} | {r["Student ID"] || "New ID will be generated"}</p>
-                            </div>
-                            <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center gap-1"><CheckCircle size={14}/> Ready</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-
-                  {activePreviewTab === 'duplicates' && (
-                    <div>
-                      <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs flex gap-2 items-start">
-                        <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                        <p>These records conflict with existing students. <strong>Check the box</strong> to overwrite their existing data, or leave unchecked to safely skip them.</p>
-                      </div>
-                      <div className="space-y-3">
-                        {previewModal.duplicateRecords.length === 0 ? (
-                          <div className="text-center py-8 text-slate-500">No duplicates found.</div>
-                        ) : (
-                          previewModal.duplicateRecords.map(r => {
-                            const isSelected = previewModal.selectedDuplicates.includes(r.id);
-                            return (
-                              <label key={r.id} className={`flex items-center gap-3 bg-white border p-3 rounded-xl cursor-pointer transition-all ${isSelected ? 'border-orange-400 ring-1 ring-orange-400 shadow-md' : 'border-slate-200 hover:border-orange-300'}`}>
-                                <input 
-                                  type="checkbox" 
-                                  className="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500"
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setPreviewModal(prev => ({ ...prev, selectedDuplicates: [...prev.selectedDuplicates, r.id] }));
-                                    } else {
-                                      setPreviewModal(prev => ({ ...prev, selectedDuplicates: prev.selectedDuplicates.filter(id => id !== r.id) }));
-                                    }
-                                  }}
-                                />
-                                <div className="flex-1">
-                                  <p className="font-bold text-slate-800 text-sm">{r["Name"]}</p>
-                                  <p className="text-xs text-slate-500">{r["Email"]} | {r["Student ID"]}</p>
-                                </div>
-                                <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold text-right max-w-[200px] truncate">{r.reason}</div>
-                              </label>
-                            )
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activePreviewTab === 'invalid' && (
-                    <div>
-                      <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex gap-2 items-start">
-                        <XCircle size={16} className="mt-0.5 shrink-0" />
-                        <p>These records cannot be uploaded due to missing data or invalid references. Please fix them in your spreadsheet and re-upload.</p>
-                      </div>
-                      <div className="space-y-3">
-                        {previewModal.invalidRecords.length === 0 ? (
-                          <div className="text-center py-8 text-slate-500">No invalid records found.</div>
-                        ) : (
-                          previewModal.invalidRecords.map(r => (
-                            <div key={r.id} className="bg-white border border-red-100 p-3 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm">
-                              <div>
-                                <p className="font-bold text-slate-800 text-sm">{r["Name"] || "Unknown"}</p>
-                                <p className="text-xs text-slate-500">Row ID: {r.id}</p>
-                              </div>
-                              <div className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold text-right">{r.reason}</div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
-                  <div className="text-sm font-semibold text-slate-600">
-                    Will upload: <span className="text-brand-600 font-bold">{previewModal.validRecords.length + previewModal.selectedDuplicates.length}</span> records
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false, isLoading: false }))} className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">Cancel</button>
-                    <button onClick={handleCommitUpload} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg shadow-brand-600/20 transition-all">Confirm & Upload</button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );

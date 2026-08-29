@@ -42,6 +42,7 @@ const ResultsTab = () => {
   const [selectedGroupData, setSelectedGroupData] = useState(null);
   const [showBulkUploadPreviewModal, setShowBulkUploadPreviewModal] = useState(false);
   const [bulkPreviewData, setBulkPreviewData] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({ isUploading: false, current: 0, total: 0 });
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
@@ -278,16 +279,36 @@ const ResultsTab = () => {
 
   const handleBulkUploadConfirm = async (payload) => {
     try {
-      const res = await api.post("/marks/bulk", { marks: payload.data, template: payload.template });
-      toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
-      if (res.data.results.failed > 0) {
-        console.error("Bulk Upload Errors:", res.data.results.errors);
+      const data = payload.data || [];
+      const total = data.length;
+      if (total === 0) return;
+
+      setUploadProgress({ isUploading: true, current: 0, total });
+      setShowBulkUploadPreviewModal(false);
+
+      let successCount = 0;
+      let failedCount = 0;
+      const chunkSize = 10;
+
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = data.slice(i, i + chunkSize);
+        const res = await api.post("/marks/bulk", { marks: chunk, template: payload.template });
+        successCount += res.data.results.success;
+        failedCount += res.data.results.failed;
+        
+        setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total });
+      }
+
+      toast.success(`Bulk upload completed! Success: ${successCount}, Failed: ${failedCount}`);
+      if (failedCount > 0) {
         toast.error("Some records failed. Check console for details.");
       }
-      setShowBulkUploadPreviewModal(false);
+      
+      setUploadProgress({ isUploading: false, current: 0, total: 0 });
       fetchData();
     } catch (err) {
       toast.error("Failed to upload bulk data");
+      setUploadProgress({ isUploading: false, current: 0, total: 0 });
     }
   };
 
@@ -297,15 +318,27 @@ const ResultsTab = () => {
     const mockMarks = [];
     for (let i = 1; i <= 10; i++) {
       if (row[`Subject ${i} Code`] || row[`Subject ${i} Theory`] !== undefined) {
-        const ext = Number(row[`Subject ${i} Theory`] || 0) + Number(row[`Subject ${i} Practical`] || 0);
-        const int = Number(row[`Subject ${i} Internal`] || 0);
+        const thVal = String(row[`Subject ${i} Theory`]).trim().toUpperCase();
+        const intVal = String(row[`Subject ${i} Internal`]).trim().toUpperCase();
+        const pracVal = String(row[`Subject ${i} Practical`]).trim().toUpperCase();
+        
+        const th = thVal === 'AB' ? 'AB' : Number(thVal || 0);
+        const int = intVal === 'AB' ? 'AB' : Number(intVal || 0);
+        const prac = pracVal === 'AB' ? 'AB' : Number(pracVal || 0);
+
+        const extNum = th === 'AB' ? 0 : th + (prac === 'AB' ? 0 : prac);
+        const intNum = int === 'AB' ? 0 : int;
+        
+        const subjectObj = subjects.find(s => s.code === subCode || s.name === subCode);
+        const actualType = subjectObj ? subjectObj.type : 'Theory';
+
         mockMarks.push({
           _id: `mock_${i}`,
-          subject: { name: row[`Subject ${i} Code`] || `Subject ${i}`, type: row[`Subject ${i} Practical`] ? 'Practical' : 'Theory' },
-          theoryMark: Number(row[`Subject ${i} Theory`] || 0),
+          subject: { code: subCode, name: subName, type: actualType },
+          theoryMark: th,
           internalMark: int,
-          practicalMark: Number(row[`Subject ${i} Practical`] || 0),
-          isPass: (ext + int) >= 35
+          practicalMark: prac,
+          isPass: (th !== 'AB' && int !== 'AB' && prac !== 'AB') && (extNum + intNum) >= 35
         });
       }
     }
@@ -323,22 +356,45 @@ const ResultsTab = () => {
   };
 
   const downloadSampleExcel = () => {
-    let headers = "Student ID,Student Name,Center Code,Semester,Course Title";
-    let rowData = "STU123,John Doe,CEN-2024-1234,1,Full Stack Web";
-
+    // We create a 2D array of data so we can export a real Excel file with formulas
+    const headers = [
+      "Student ID", "Student Name", "Center Code", "Semester", "Course Title"
+    ];
+    
+    // Add 5 subjects columns
     for (let i = 1; i <= 5; i++) {
-      headers += `,Subject ${i} Code,Subject ${i} Theory,Subject ${i} Internal,Subject ${i} Practical`;
-      rowData += `,SUB0${i},40,20,10`;
+      headers.push(`Subject ${i} Code`, `Subject ${i} Theory`, `Subject ${i} Internal`, `Subject ${i} Practical`, `Subject ${i} Total`);
     }
-
-    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rowData;
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "sample_marks.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    const rowData = [
+      "STU123", "John Doe", "CEN-2024-1234", "1", "Full Stack Web"
+    ];
+    
+    // Determine the Excel column letters for the subjects.
+    // Base columns: A-E. Subject 1 starts at F.
+    // Subj 1: F(Code), G(Theory), H(Internal), I(Practical), J(Total)
+    // Subj 2: K(Code), L(Theory), M(Internal), N(Practical), O(Total)
+    // We will just dynamically push values and formula objects.
+    let currentColIndex = 5; // 0-indexed, so F is 5
+    for (let i = 1; i <= 5; i++) {
+      const theoryCol = String.fromCharCode(65 + currentColIndex + 1); // e.g. G
+      const internalCol = String.fromCharCode(65 + currentColIndex + 2); // e.g. H
+      const rowNum = 2; // Data row starts at 2
+      
+      rowData.push(
+        `SUB0${i}`, // Code
+        40, // Theory
+        20, // Internal
+        10, // Practical
+        { f: `IF(AND(${theoryCol}${rowNum}="",${internalCol}${rowNum}=""),"",IF(OR(UPPER(${theoryCol}${rowNum})="AB",UPPER(${internalCol}${rowNum})="AB"),"AB",SUM(${theoryCol}${rowNum},${internalCol}${rowNum})))` } // Total Formula
+      );
+      currentColIndex += 5;
+    }
+    
+    const ws = XLSX.utils.aoa_to_sheet([headers, rowData]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sample Result");
+    XLSX.writeFile(wb, "sample_marks.xlsx");
   };
 
   const handleMarkDelete = async (id) => {
@@ -1059,6 +1115,23 @@ const ResultsTab = () => {
           onSave={handleBulkUploadConfirm}
           onPreviewRow={handlePreviewRow}
         />
+      )}
+
+      {uploadProgress.isUploading && (
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Uploading Data...</h3>
+            <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden relative">
+              <div 
+                className="bg-brand-600 h-4 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.max(5, (uploadProgress.current / uploadProgress.total) * 100)}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-slate-600 text-center font-medium">
+              Processing {uploadProgress.current} of {uploadProgress.total} records
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

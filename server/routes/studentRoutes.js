@@ -846,19 +846,21 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
     const validRecords = [];
     const duplicateRecords = [];
     const invalidRecords = [];
+    const seenStudentIds = new Set();
+    const seenEmails = new Set();
 
     for (let i = 0; i < students.length; i++) {
       const record = students[i];
-      const name = record["Name"];
-      const studentId = record["Student ID"];
-      const dob = record["DOB"];
-      const courseIdStr = record["Course ID"];
-      const batchIdStr = record["Batch ID"];
-      const centerIdStr = record["Center ID"];
-      const year = record["Year"];
-      const email = record["Email"];
+      const recordId = record.id || `row-${i}`;
       
-      const recordId = `row-${i}`;
+      let name = record["Name"];
+      let studentId = record["Student ID"];
+      let dob = record["DOB"];
+      let year = record["Year"];
+      let centerIdStr = record["Center ID"];
+      let batchIdStr = record["Batch ID"];
+      let courseIdStr = record["Course ID"];
+      let email = record["Email"];
 
       // 1. Mandatory Check
       if (!name || !dob || !courseIdStr || !batchIdStr || !centerIdStr || !year) {
@@ -870,7 +872,6 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
         continue;
       }
 
-      // 2. Resolve References
       const center = await Center.findOne({ centerId: centerIdStr });
       if (!center) {
         invalidRecords.push({ id: recordId, ...record, reason: `Center ID not found: ${centerIdStr}` });
@@ -892,21 +893,45 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
       let isDuplicate = false;
       let duplicateReason = "";
 
+      // Auto-generate missing student ID for preview
+      if (!studentId) {
+        const d = new Date();
+        studentId = `STU-${d.getFullYear()}-${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 100)}`;
+        record["Student ID"] = studentId; // update record for frontend
+      } else {
+        studentId = String(studentId).trim();
+      }
+
+      // Auto-generate missing email for preview
+      if (!email || !email.trim()) {
+        email = `${studentId}@drrgacademy.in`;
+        record["Email"] = email; // update record for frontend
+      }
+
       // 3. Duplicate Check
       if (studentId) {
         const existingStudent = await Student.findOne({ studentId });
         if (existingStudent) {
           isDuplicate = true;
           duplicateReason = "Student ID already exists";
+        } else if (seenStudentIds.has(studentId)) {
+          isDuplicate = true;
+          duplicateReason = "Student ID duplicated in this file";
         }
+        seenStudentIds.add(studentId);
       }
       
-      if (!isDuplicate && email && email.trim()) {
-        const existingUser = await User.findOne({ email: email.trim() });
+      if (!isDuplicate && email) {
+        const emailTrimmed = email.trim();
+        const existingUser = await User.findOne({ email: emailTrimmed });
         if (existingUser) {
           isDuplicate = true;
-          duplicateReason = `Email already exists: ${email}`;
+          duplicateReason = `Email already exists: ${emailTrimmed}`;
+        } else if (seenEmails.has(emailTrimmed)) {
+          isDuplicate = true;
+          duplicateReason = "Email duplicated in this file";
         }
+        seenEmails.add(emailTrimmed);
       }
 
       const enrichedRecord = {
@@ -965,11 +990,16 @@ router.post("/bulk-upload", protect, async (req, res) => {
           parsedDob = new Date();
         }
 
-        const finalEmail = (email && email.trim()) ? email.trim() : `student_${Date.now()}_${Math.floor(Math.random()*1000)}@dracademy.internal`;
+        if (!isUpdate && !studentId) {
+          const d = new Date();
+          studentId = `STU-${d.getFullYear()}-${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 100)}`;
+        }
 
-        if (isUpdate && studentId) {
+        const finalEmail = (email && email.trim()) ? email.trim() : `${String(studentId).trim()}@drrgacademy.in`;
+
+        if (isUpdate) {
           // Overwrite existing student
-          const existingStudent = await Student.findOne({ studentId }).populate("user");
+          const existingStudent = await Student.findOne({ studentId: String(studentId).trim() }).populate("user");
           if (!existingStudent) {
             skippedRecords.push({ name, studentId, reason: "Attempted to update but student not found" });
             continue;
@@ -1015,11 +1045,6 @@ router.post("/bulk-upload", protect, async (req, res) => {
           successCount++;
         } else {
           // Create new student
-          if (!studentId) {
-            const d = new Date();
-            studentId = `STU-${d.getFullYear()}-${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 100)}`;
-          }
-
           const user = await User.create({
             name,
             email: finalEmail,

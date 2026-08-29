@@ -146,12 +146,6 @@ const Home = () => {
                 >
                   <Clock size={20} /> Mark Attendance
                 </a>
-                <Link
-                  to="/results"
-                  className="px-8 py-4 bg-brand-500 text-white rounded font-bold text-lg hover:bg-brand-600 transition-colors shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
-                >
-                  <FileText size={20} /> Exam Results
-                </Link>
               </div>
             </div>
 

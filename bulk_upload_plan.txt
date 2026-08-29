@@ -1,0 +1,37 @@
+# Goal Description
+
+Enhance the Student Bulk Upload preview and upload flow by:
+1. Allowing users to edit the "Student ID" of duplicate records directly in the preview modal.
+2. Implementing progressive loading during the final upload, showing how many records have been processed and how many are remaining.
+
+## Open Questions
+
+1. When you edit the Student ID for a duplicate record, should that record be treated as a **New Student** instead of overwriting the existing one? (Assuming yes, since the ID was changed).
+2. For progressive loading, I plan to upload the students in small batches (e.g., 5-10 at a time) so the UI can update the progress count. Does this approach work for you?
+
+## Proposed Changes
+
+### client/src/pages/students/Students.jsx
+
+#### [MODIFY] `Students.jsx`
+- **State Additions**: Add an `uploadProgress` state to track `{ current: 0, total: 0 }`.
+- **Edit Duplicate ID**: Update the `activePreviewTab === 'duplicates'` render block. Add an inline `<input type="text" />` for the `Student ID`.
+- **Handle ID Change**: Add a handler function to update the `Student ID` inside `previewModal.duplicateRecords` when the user types.
+- **Progressive Upload Logic**: Rewrite `handleCommitUpload` to process `recordsToProcess` in batches (e.g. chunks of 5).
+  - Loop through chunks, `await api.post("/students/bulk-upload", { recordsToProcess: chunk })`.
+  - Update `uploadProgress.current` after each chunk.
+  - Combine the success counts and skipped records from all chunks for the final result modal.
+- **Loading UI**: Update the "Uploading..." overlay in the preview modal to display `uploadProgress.current` out of `uploadProgress.total` records loaded.
+
+### server/routes/studentRoutes.js
+
+#### [MODIFY] `studentRoutes.js`
+- Ensure `POST /bulk-upload` returns a structured response that includes the number of successfully processed records, skipped records, and any errors, so the frontend can properly aggregate them across multiple chunked requests. (Currently it does return this, but we will make sure it handles chunks efficiently without failing the whole request if one record fails).
+
+## Verification Plan
+
+### Manual Verification
+1. I will attempt a bulk upload using a mock dataset with duplicate student IDs.
+2. I will verify that the duplicates tab displays editable inputs for the Student IDs.
+3. I will test editing a duplicate ID and confirming the upload.
+4. I will observe the UI to ensure the progressive loading bar/text accurately reflects the uploaded count vs total count.

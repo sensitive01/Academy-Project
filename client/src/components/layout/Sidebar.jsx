@@ -154,7 +154,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     },
     { icon: <FileText size={22} />, label: "Examination", path: "/dashboard/exams" },
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
-    { icon: <Building2 size={22} />, label: "Center Management", path: "/dashboard/admin/centers" },
     { icon: <Briefcase size={22} />, label: "Vendor Mgmt", path: "/dashboard/admin/vendors" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
     { icon: <MessageSquare size={22} />, label: "Discussion Forum", path: "/dashboard/forum" },

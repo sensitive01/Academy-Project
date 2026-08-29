@@ -4,6 +4,7 @@ import CoursesTab from "../../components/course-management/CoursesTab";
 import BatchesTab from "../../components/course-management/BatchesTab";
 import SubjectsTab from "../../components/course-management/SubjectsTab";
 import CourseDashboardTab from "../../components/course-management/CourseDashboardTab";
+import CenterManagement from "./CenterManagement";
 
 const CourseManagement = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -14,6 +15,7 @@ const CourseManagement = () => {
     { id: "center_courses", label: "Center Courses", icon: <MapPin size={18} /> },
     { id: "batch", label: "Batches", icon: <Layers size={18} /> },
     { id: "subject", label: "Subjects", icon: <BookType size={18} /> },
+    { id: "centers", label: "Centers", icon: <MapPin size={18} /> },
   ];
 
   return (
@@ -51,6 +53,11 @@ const CourseManagement = () => {
         {activeTab === "center_courses" && <CoursesTab courseType="Center Courses" />}
         {activeTab === "batch" && <BatchesTab />}
         {activeTab === "subject" && <SubjectsTab />}
+        {activeTab === "centers" && (
+          <div className="-mt-6">
+            <CenterManagement isTab={true} />
+          </div>
+        )}
       </div>
     </div>
   );

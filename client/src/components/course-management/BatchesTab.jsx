@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Trash2,
@@ -13,9 +14,9 @@ import {
   DollarSign,
   Users,
   X,
-  RotateCcw,
   Save,
   Download,
+  MoreVertical,
 } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -27,6 +28,114 @@ import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
+
+const ActionsDropdown = ({
+  row,
+  activeTab,
+  openLoginModal,
+  openAssignModal,
+  openModal,
+  handleDelete
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const [coords, setCoords] = React.useState({ x: 0, y: 0 });
+  const buttonRef = React.useRef(null);
+  const menuRef = React.useRef(null);
+
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        x: rect.right,
+        y: rect.bottom + window.scrollY
+      });
+    }
+    setOpen(!open);
+  };
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        menuRef.current && !menuRef.current.contains(event.target) &&
+        buttonRef.current && !buttonRef.current.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    };
+    
+    const handleScroll = () => {
+      setOpen(false);
+    };
+
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("scroll", handleScroll, true);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open]);
+
+  const dropdownMenu = open ? createPortal(
+    <div 
+      ref={menuRef}
+      style={{
+        position: 'absolute',
+        top: `${coords.y + 4}px`,
+        left: `${coords.x - 192}px`,
+        zIndex: 9999
+      }}
+      className="w-48 bg-white rounded-xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.15)] border border-slate-100 py-1.5 overflow-hidden text-left animate-in fade-in zoom-in-95 duration-100"
+    >
+      {activeTab === "centers" && (
+        <button 
+          onClick={() => { setOpen(false); openLoginModal(row); }} 
+          className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+        >
+          <Key size={16} className="text-blue-600"/> Center Credentials
+        </button>
+      )}
+      {activeTab === "batches" && (
+        <button 
+          onClick={() => { setOpen(false); openAssignModal(row); }} 
+          className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+        >
+          <UserCheck size={16} className="text-indigo-600"/> Assign Students
+        </button>
+      )}
+      <button 
+        onClick={() => { setOpen(false); openModal(row); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+      >
+        <Edit size={16} className="text-brand-600"/> Edit Details
+      </button>
+      <div className="h-px bg-slate-100 my-1 mx-2"></div>
+      <button 
+        onClick={() => { setOpen(false); handleDelete(row._id); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-red-50 transition-colors text-red-600"
+      >
+        <Trash2 size={16} /> Delete
+      </button>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      <button 
+        ref={buttonRef}
+        onClick={handleOpen} 
+        className={`p-1.5 rounded-lg transition-colors relative z-10 ${open ? 'bg-brand-50 text-brand-600' : 'text-slate-400 hover:text-brand-600 hover:bg-slate-50'}`}
+        title="More Actions"
+      >
+        <MoreVertical size={18} />
+      </button>
+      {dropdownMenu}
+    </>
+  );
+};
 
 const toTitleCase = (str) => {
   return str
@@ -598,11 +707,11 @@ const BatchesTab = () => {
       sortable: true,
       omit: activeTab === "examFees",
       cell: r => (
-        <div className="flex items-center">
-          <div className="h-10 w-10 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center">
+        <div className="flex items-center cursor-pointer group" onClick={() => openModal(r)}>
+          <div className="h-10 w-10 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center group-hover:ring-2 ring-brand-500 transition-all">
             {config[activeTab].icon}
           </div>
-          <div className="ml-3 font-medium text-gray-900">{r.name}</div>
+          <div className="ml-3 font-medium text-gray-900 group-hover:text-brand-600 transition-colors">{r.name}</div>
         </div>
       )
     },
@@ -735,24 +844,14 @@ const BatchesTab = () => {
       center: true,
       width: "140px",
       cell: r => (
-        <div className="flex justify-center gap-2">
-          {activeTab === "centers" && (
-            <button onClick={() => openLoginModal(r)} className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50">
-              <Key size={18} />
-            </button>
-          )}
-          {activeTab === "batches" && (
-            <button onClick={() => openAssignModal(r)} className="text-indigo-600 hover:text-indigo-900 p-2 rounded-lg hover:bg-indigo-50" title="Assign Students & Semester">
-              <UserCheck size={18} />
-            </button>
-          )}
-          <button onClick={() => openModal(r)} className="text-brand-600 hover:text-brand-900 p-2 rounded-lg hover:bg-brand-50">
-            <Edit size={18} />
-          </button>
-          <button onClick={() => handleDelete(r._id)} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50">
-            <Trash2 size={18} />
-          </button>
-        </div>
+        <ActionsDropdown
+          row={r}
+          activeTab={activeTab}
+          openLoginModal={openLoginModal}
+          openAssignModal={openAssignModal}
+          openModal={openModal}
+          handleDelete={handleDelete}
+        />
       )
     }
   ];

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Trash2,
@@ -16,6 +17,7 @@ import {
   Users as UsersIcon,
   Play,
   Video,
+  MoreVertical,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
@@ -24,6 +26,120 @@ import CustomDataTable from "../../components/common/DataTable";
 import LessonManagementModal from "../../components/modals/LessonManagementModal";
 import Loading from "../../components/common/Loading";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
+
+const ActionsDropdown = ({ 
+  row, 
+  handleToggleStatus, 
+  handleView, 
+  handleShowStudents, 
+  handleManageLessons, 
+  handleDelete,
+  courseType
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const [coords, setCoords] = React.useState({ x: 0, y: 0 });
+  const buttonRef = React.useRef(null);
+  const menuRef = React.useRef(null);
+
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        x: rect.right, 
+        y: rect.bottom + window.scrollY
+      });
+    }
+    setOpen(!open);
+  };
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        menuRef.current && !menuRef.current.contains(event.target) &&
+        buttonRef.current && !buttonRef.current.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    };
+    
+    const handleScroll = () => {
+      setOpen(false);
+    };
+
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("scroll", handleScroll, true);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open]);
+
+  const dropdownMenu = open ? createPortal(
+    <div 
+      ref={menuRef}
+      style={{
+        position: 'absolute',
+        top: `${coords.y + 4}px`,
+        left: `${coords.x - 192}px`, // 192px is w-48
+        zIndex: 9999
+      }}
+      className="w-48 bg-white rounded-xl shadow-[0_4px_24px_-4px_rgba(0,0,0,0.15)] border border-slate-100 py-1.5 overflow-hidden text-left animate-in fade-in zoom-in-95 duration-100"
+    >
+      <button 
+        onClick={() => { setOpen(false); handleToggleStatus(row._id); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+      >
+        {row.isActive ? <ToggleRight size={16} className="text-green-600"/> : <ToggleLeft size={16} className="text-slate-400"/>}
+        {row.isActive ? "Deactivate" : "Activate"}
+      </button>
+      <button 
+        onClick={() => { setOpen(false); handleView(row); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+      >
+        <Eye size={16} className="text-brand-600"/> View Details
+      </button>
+      <button 
+        onClick={() => { setOpen(false); handleShowStudents(row); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+      >
+        <UsersIcon size={16} className="text-purple-600"/> Enrolled Students
+      </button>
+      {courseType !== "Center Courses" && (
+        <button 
+          onClick={() => { setOpen(false); handleManageLessons(row); }} 
+          className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+        >
+          <Play size={16} className="text-orange-600"/> Manage Lessons
+        </button>
+      )}
+      <div className="h-px bg-slate-100 my-1 mx-2"></div>
+      <button 
+        onClick={() => { setOpen(false); handleDelete(row._id); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-red-50 transition-colors text-red-600"
+      >
+        <Trash2 size={16} /> Delete Course
+      </button>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      <button 
+        ref={buttonRef}
+        onClick={handleOpen} 
+        className={`p-1.5 rounded-lg transition-colors relative z-10 ${open ? 'bg-brand-50 text-brand-600' : 'text-slate-400 hover:text-brand-600 hover:bg-slate-50'}`}
+        title="More Actions"
+      >
+        <MoreVertical size={18} />
+      </button>
+      {dropdownMenu}
+    </>
+  );
+};
 
 const CoursesTab = ({ courseType }) => {
   const [courses, setCourses] = useState([]);
@@ -58,6 +174,7 @@ const CoursesTab = ({ courseType }) => {
     subjects: [],
     thumbnail: null,
     syllabus: [{ week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" }],
+    inlineSubjects: [{ name: "", code: "", semester: 1, type: "Theory" }],
   });
   const [preview, setPreview] = useState(null);
 
@@ -128,6 +245,16 @@ const CoursesTab = ({ courseType }) => {
         course.syllabus && course.syllabus.length > 0
           ? course.syllabus
           : [{ week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" }],
+      inlineSubjects:
+        course.subjects && course.subjects.length > 0
+          ? course.subjects.map(s => ({
+              _id: s._id,
+              name: s.name || "",
+              code: s.code || "",
+              semester: s.semester || 1,
+              type: s.type || "Theory"
+            }))
+          : [{ name: "", code: "", semester: 1, type: "Theory" }],
     });
     setPreview(course.thumbnail?.url || null);
     setShowModal(true);
@@ -152,6 +279,16 @@ const CoursesTab = ({ courseType }) => {
         course.syllabus && course.syllabus.length > 0
           ? course.syllabus
           : [{ week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" }],
+      inlineSubjects:
+        course.subjects && course.subjects.length > 0
+          ? course.subjects.map(s => ({
+              _id: s._id,
+              name: s.name || "",
+              code: s.code || "",
+              semester: s.semester || 1,
+              type: s.type || "Theory"
+            }))
+          : [{ name: "", code: "", semester: 1, type: "Theory" }],
     });
     setPreview(course.thumbnail?.url || null);
     setShowModal(true);
@@ -278,6 +415,27 @@ const CoursesTab = ({ courseType }) => {
     setFormData({ ...formData, syllabus: newSyllabus });
   };
 
+  const updateInlineSubject = (index, field, value) => {
+    const newSubjects = [...formData.inlineSubjects];
+    newSubjects[index][field] = value;
+    setFormData({ ...formData, inlineSubjects: newSubjects });
+  };
+
+  const addInlineSubjectRow = () => {
+    setFormData((prev) => ({
+      ...prev,
+      inlineSubjects: [
+        ...prev.inlineSubjects,
+        { name: "", code: "", semester: 1, type: "Theory" },
+      ],
+    }));
+  };
+
+  const removeInlineSubjectRow = (index) => {
+    const newSubjects = formData.inlineSubjects.filter((_, i) => i !== index);
+    setFormData({ ...formData, inlineSubjects: newSubjects });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
 
@@ -294,7 +452,11 @@ const CoursesTab = ({ courseType }) => {
       data.append("durationUnit", formData.durationUnit);
       data.append("instructor", formData.instructor || user?._id);
       data.append("subjects", JSON.stringify(formData.subjects));
-      data.append("syllabus", JSON.stringify(formData.syllabus));
+      if (courseType === "Center Courses") {
+        data.append("inlineSubjects", JSON.stringify(formData.inlineSubjects));
+      } else {
+        data.append("syllabus", JSON.stringify(formData.syllabus));
+      }
 
       if (formData.thumbnail) {
         data.append("thumbnail", formData.thumbnail);
@@ -340,6 +502,7 @@ const CoursesTab = ({ courseType }) => {
       syllabus: [
         { week: courseType === "Center Courses" ? "Year 1" : "Week 1", topic: "", description: "", projectName: "" },
       ],
+      inlineSubjects: [{ name: "", code: "", semester: 1, type: "Theory" }],
     });
     setPreview(null);
     setIsViewOnly(false);
@@ -350,16 +513,21 @@ const CoursesTab = ({ courseType }) => {
   const columns = [
     { name: 'S.No', selector: (row, index) => index + 1, width: '100px', sortable: true, center: true },
     { name: 'Course', grow: 3, minWidth: '300px', sortable: true, selector: row => row.title, cell: row => (
-        <div className="flex items-center">
-          <div className="flex-shrink-0 h-10 w-16 bg-gray-100 rounded overflow-hidden">
-            {row.thumbnail?.url ? (
-              <img className="h-10 w-16 object-cover" src={row.thumbnail.url} alt="" />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-400">No Image</div>
-            )}
-          </div>
-          <div className="ml-4">
-            <div className="text-sm font-bold text-gray-900">{row.title}</div>
+        <div 
+          className="flex items-center cursor-pointer group" 
+          onClick={() => handleView(row)}
+        >
+          {courseType !== "Center Courses" && (
+            <div className="flex-shrink-0 h-10 w-16 bg-gray-100 rounded overflow-hidden group-hover:ring-2 ring-brand-500 transition-all">
+              {row.thumbnail?.url ? (
+                <img className="h-10 w-16 object-cover" src={row.thumbnail.url} alt="" />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-400">No Image</div>
+              )}
+            </div>
+          )}
+          <div className={courseType !== "Center Courses" ? "ml-4" : ""}>
+            <div className="text-sm font-bold text-gray-900 group-hover:text-brand-600 transition-colors">{row.title}</div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mt-0.5">{row.courseId || "NO-ID"}</div>
             <div className="text-xs font-semibold text-slate-500 mt-1">
               {row.duration ? `${row.duration} ${row.durationUnit || (courseType === 'Center Courses' ? 'year' : 'week')}s` : ''}
@@ -382,24 +550,16 @@ const CoursesTab = ({ courseType }) => {
         {row.isActive ? "Published" : "Draft"}
       </span>
     )},
-    { name: 'Actions', center: true, width: '180px', cell: row => (
-        <div className="flex items-center gap-x-3">
-          <button onClick={() => handleToggleStatus(row._id)} className={`transition-colors ${row.isActive ? "text-green-600 hover:text-green-800" : "text-slate-400 hover:text-slate-600"}`} title={row.isActive ? "Deactivate" : "Activate"}>
-            {row.isActive ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-          </button>
-          <button onClick={() => handleView(row)} className="text-brand-600 hover:text-brand-900 transition-colors" title="View Details">
-            <Eye size={18} />
-          </button>
-          <button onClick={() => handleShowStudents(row)} className="text-purple-600 hover:text-purple-900 transition-colors" title="Enrolled Students">
-            <UsersIcon size={18} />
-          </button>
-          <button onClick={() => handleManageLessons(row)} className="text-orange-600 hover:text-orange-900 transition-colors" title="Manage Lessons">
-            <Play size={18} />
-          </button>
-          <button onClick={() => handleDelete(row._id)} className="text-red-600 hover:text-red-900 transition-colors" title="Delete">
-            <Trash2 size={18} />
-          </button>
-        </div>
+    { name: 'Actions', center: true, width: '100px', cell: row => (
+        <ActionsDropdown 
+          row={row} 
+          handleToggleStatus={handleToggleStatus}
+          handleView={handleView}
+          handleShowStudents={handleShowStudents}
+          handleManageLessons={handleManageLessons}
+          handleDelete={handleDelete}
+          courseType={courseType}
+        />
       )
     }
   ];
@@ -531,36 +691,161 @@ const CoursesTab = ({ courseType }) => {
             {isViewOnly ? (
               <div className="flex-1 overflow-y-auto">
                 {/* Hero Section */}
-                <div className="relative h-64 bg-slate-900">
-                  {preview ? (
-                    <img
-                      src={preview}
-                      alt=""
-                      className="w-full h-full object-cover opacity-60"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-500">
-                      No Industrial Image
+                {courseType !== "Center Courses" ? (
+                  <div className="relative h-64 bg-slate-900">
+                    {preview ? (
+                      <img
+                        src={preview}
+                        alt=""
+                        className="w-full h-full object-cover opacity-60"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-500">
+                        No Industrial Image
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
+                    <div className="absolute bottom-6 left-8 right-8 text-white">
+                      <span className="px-3 py-1 bg-brand-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-full mb-3 inline-block">
+                        {formData.category}
+                      </span>
+                      <h3 className="text-3xl font-black">{formData.title}</h3>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
-                  <div className="absolute bottom-6 left-8 right-8 text-white">
-                    <span className="px-3 py-1 bg-brand-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-full mb-3 inline-block">
-                      {formData.category}
-                    </span>
-                    <h3 className="text-3xl font-black">{formData.title}</h3>
+                    <button
+                      onClick={handleSwitchToEdit}
+                      className="absolute top-6 right-8 bg-white/20 hover:bg-white/40 backdrop-blur-md text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm transition-all border border-white/20"
+                    >
+                      <Edit size={16} /> Edit Course
+                    </button>
                   </div>
-                  <button
-                    onClick={handleSwitchToEdit}
-                    className="absolute top-6 right-8 bg-white/20 hover:bg-white/40 backdrop-blur-md text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm transition-all border border-white/20"
-                  >
-                    <Edit size={16} /> Edit Course
-                  </button>
-                </div>
+                ) : (
+                  <div className="relative h-56 bg-gradient-to-br from-brand-900 via-slate-800 to-slate-900 overflow-hidden">
+                    <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }}></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
+                    
+                    <div className="absolute bottom-0 left-0 right-0 p-8 flex justify-between items-end gap-8 z-10">
+                      <div className="text-white flex-1 min-w-0">
+                        <span className="px-3 py-1 bg-brand-500/20 backdrop-blur-md text-brand-100 border border-brand-500/30 text-[10px] font-black uppercase tracking-widest rounded-md mb-4 inline-block">
+                          {formData.category}
+                        </span>
+                        <h3 className="text-3xl lg:text-4xl font-black tracking-tight leading-tight">{formData.title}</h3>
+                      </div>
+                      <button
+                        onClick={handleSwitchToEdit}
+                        className="bg-white text-slate-900 hover:bg-slate-50 px-6 py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-all shadow-xl hover:shadow-2xl whitespace-nowrap flex-shrink-0"
+                      >
+                        <Edit size={16} className="text-brand-600" /> Edit Course
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-                <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 text-slate-900">
-                  {/* Left Column: Details */}
-                  <div className="lg:col-span-2 space-y-8">
+                {courseType !== "Center Courses" ? (
+                  <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 text-slate-900">
+                    <div className="lg:col-span-2 space-y-8">
+                      <section>
+                        <h4 className="text-sm font-bold text-brand-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <BookOpen size={16} /> Course Overview
+                        </h4>
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm">
+                          {formData.description}
+                        </p>
+                      </section>
+                      <section>
+                        <h4 className="text-sm font-bold text-brand-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <CheckCircle2 size={16} /> Curriculum & Syllabus
+                        </h4>
+                        <div className="space-y-4">
+                          {formData.syllabus.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-slate-50 border border-slate-100 rounded-2xl p-5 hover:border-brand-200 transition-colors"
+                            >
+                              <div className="flex justify-between items-start mb-3">
+                                <span className="text-[10px] font-black text-brand-600 uppercase bg-brand-50 px-2 py-0.5 rounded">
+                                  {item.week}
+                                </span>
+                                {item.projectName && (
+                                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded italic">
+                                    Project: {item.projectName}
+                                  </span>
+                                )}
+                              </div>
+                              <h5 className="font-bold text-slate-800 mb-2">
+                                {item.topic || "Untitled Topic"}
+                              </h5>
+                              <p className="text-xs text-slate-500 line-clamp-2">
+                                {item.description}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-brand-600">
+                          <IndianRupee size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Investment
+                          </p>
+                          <p className="text-xl font-black text-slate-900">
+                            {formData.price === "0"
+                              ? "Free"
+                              : `₹${formData.price}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-orange-600">
+                          <Clock size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Duration
+                          </p>
+                          <p className="text-xl font-black text-slate-900">
+                            {formData.duration} {formData.durationUnit}s
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600">
+                          <BarChart size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Level
+                          </p>
+                          <p className="text-xl font-black text-slate-900">
+                            {formData.level}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-purple-600">
+                          <UserIcon size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Instructor
+                          </p>
+                          <p className="text-sm font-bold text-slate-900">
+                            {instructors.find((i) => i.id === formData.instructor)
+                              ?.name || "Not Assigned"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 flex flex-col gap-8 text-slate-900">
                     <section>
                       <h4 className="text-sm font-bold text-brand-600 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <BookOpen size={16} /> Course Overview
@@ -570,100 +855,96 @@ const CoursesTab = ({ courseType }) => {
                       </p>
                     </section>
 
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-brand-600">
+                          <BookOpen size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Total Subjects
+                          </p>
+                          <p className="text-xl font-black text-slate-900">
+                            {formData.inlineSubjects.length}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-orange-600">
+                          <Clock size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Duration
+                          </p>
+                          <p className="text-xl font-black text-slate-900">
+                            {formData.duration} {formData.durationUnit}s
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-purple-600">
+                          <UserIcon size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Instructor
+                          </p>
+                          <p className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
+                            {instructors.find((i) => i.id === formData.instructor)
+                              ?.name || "Not Assigned"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     <section>
                       <h4 className="text-sm font-bold text-brand-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <CheckCircle2 size={16} /> Curriculum & Syllabus
+                        <BookOpen size={16} /> Subjects Curriculum
                       </h4>
-                      <div className="space-y-4">
-                        {formData.syllabus.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-slate-50 border border-slate-100 rounded-2xl p-5 hover:border-brand-200 transition-colors"
-                          >
-                            <div className="flex justify-between items-start mb-3">
-                              <span className="text-[10px] font-black text-brand-600 uppercase bg-brand-50 px-2 py-0.5 rounded">
-                                {item.week}
-                              </span>
-                              {item.projectName && (
-                                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded italic">
-                                  Project: {item.projectName}
-                                </span>
-                              )}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                        {(() => {
+                          const bySemester = formData.inlineSubjects.reduce((acc, curr) => {
+                            const sem = curr.semester || 1;
+                            if (!acc[sem]) acc[sem] = [];
+                            acc[sem].push(curr);
+                            return acc;
+                          }, {});
+                          return Object.keys(bySemester).sort((a,b) => a-b).map(sem => (
+                            <div key={sem} className="mb-8 last:mb-0">
+                              <h5 className="font-bold text-slate-800 text-sm mb-4 pb-3 border-b border-slate-100 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-xs font-black shadow-inner border border-brand-100/50">
+                                  {sem}
+                                </div>
+                                Semester {sem}
+                              </h5>
+                              <div className="space-y-3">
+                                {bySemester[sem].map((item, idx) => (
+                                  <div key={idx} className="flex items-center justify-between p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:border-brand-200 hover:bg-brand-50/30 transition-all group">
+                                     <div className="flex items-center gap-4">
+                                       <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-brand-400 transition-colors"></div>
+                                       <div>
+                                         <h6 className="font-bold text-slate-900 text-sm">{item.name || "Untitled Subject"}</h6>
+                                         <p className="text-[11px] text-slate-500 mt-0.5 font-medium uppercase tracking-wider">{item.type}</p>
+                                       </div>
+                                     </div>
+                                     <div className="text-right">
+                                       <span className="text-[10px] font-black text-slate-600 uppercase bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-lg group-hover:text-brand-600 group-hover:border-brand-200 transition-colors">
+                                         {item.code || "NO CODE"}
+                                       </span>
+                                     </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            <h5 className="font-bold text-slate-800 mb-2">
-                              {item.topic || "Untitled Topic"}
-                            </h5>
-                            <p className="text-xs text-slate-500 line-clamp-2">
-                              {item.description}
-                            </p>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
                     </section>
                   </div>
-
-                  {/* Right Column: Meta Info Cards */}
-                  <div className="space-y-4">
-                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
-                      <div className="p-3 bg-white rounded-xl shadow-sm text-brand-600">
-                        <IndianRupee size={24} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Investment
-                        </p>
-                        <p className="text-xl font-black text-slate-900">
-                          {formData.price === "0"
-                            ? "Free"
-                            : `₹${formData.price}`}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
-                      <div className="p-3 bg-white rounded-xl shadow-sm text-orange-600">
-                        <Clock size={24} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Duration
-                        </p>
-                        <p className="text-xl font-black text-slate-900">
-                          {formData.duration} {formData.durationUnit}s
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
-                      <div className="p-3 bg-white rounded-xl shadow-sm text-blue-600">
-                        <BarChart size={24} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Level
-                        </p>
-                        <p className="text-xl font-black text-slate-900">
-                          {formData.level}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
-                      <div className="p-3 bg-white rounded-xl shadow-sm text-purple-600">
-                        <UserIcon size={24} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">
-                          Instructor
-                        </p>
-                        <p className="text-sm font-bold text-slate-900">
-                          {instructors.find((i) => i.id === formData.instructor)
-                            ?.name || "Not Assigned"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             ) : (
               <form
@@ -892,11 +1173,12 @@ const CoursesTab = ({ courseType }) => {
                 </div>
 
                 {/* Curriculum Section */}
-                <div className="pt-6 border-t border-gray-100 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
-                      Course Curriculum / Syllabus
-                    </h3>
+                {courseType !== "Center Courses" && (
+                  <div className="pt-6 border-t border-gray-100 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
+                        Course Curriculum / Syllabus
+                      </h3>
                     <button
                       type="button"
                       onClick={addSyllabusRow}
@@ -992,6 +1274,106 @@ const CoursesTab = ({ courseType }) => {
                     ))}
                   </div>
                 </div>
+                )}
+
+                {/* Subjects Section for Center Courses */}
+                {courseType === "Center Courses" && (
+                  <div className="pt-6 border-t border-gray-100 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
+                        Course Subjects
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={addInlineSubjectRow}
+                        className="text-xs bg-brand-50 text-brand-600 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 hover:bg-brand-100 transition-colors"
+                      >
+                        <Plus size={14} /> Add Subject
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {formData.inlineSubjects.map((subject, index) => (
+                        <div
+                          key={index}
+                          className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4 relative group"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="md:col-span-2">
+                              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                Subject Name
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full bg-white rounded-lg border-gray-200 border p-2 text-xs font-bold"
+                                placeholder="e.g. Mathematics"
+                                value={subject.name}
+                                onChange={(e) =>
+                                  updateInlineSubject(index, "name", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                Subject Code
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full bg-white rounded-lg border-gray-200 border p-2 text-xs"
+                                placeholder="e.g. MAT101"
+                                value={subject.code}
+                                onChange={(e) =>
+                                  updateInlineSubject(index, "code", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                Semester
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="8"
+                                className="w-full bg-white rounded-lg border-gray-200 border p-2 text-xs"
+                                value={subject.semester}
+                                onChange={(e) =>
+                                  updateInlineSubject(index, "semester", parseInt(e.target.value) || 1)
+                                }
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                Type
+                              </label>
+                              <select
+                                className="w-full bg-white rounded-lg border-gray-200 border p-2 text-xs"
+                                value={subject.type}
+                                onChange={(e) =>
+                                  updateInlineSubject(index, "type", e.target.value)
+                                }
+                              >
+                                <option value="Theory">Theory</option>
+                                <option value="Practical">Practical</option>
+                                <option value="Both">Both</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          {formData.inlineSubjects.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeInlineSubjectRow(index)}
+                              className="absolute -top-2 -right-2 bg-red-100 text-red-600 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 hover:text-white"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Modal Actions */}
                 <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 sticky bottom-0 bg-white z-10 py-4">

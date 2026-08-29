@@ -128,7 +128,7 @@ router.get('/student/:studentId', protect, async (req, res) => {
 // POST create marks for a student's entire semester (Admin only)
 router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
   try {
-    const { student, batch, course, semester, subjects, template } = req.body;
+    const { student, batch, course, semester, subjects, template, exam } = req.body;
     
     if (!student || !course || !semester || !Array.isArray(subjects)) {
       return res.status(400).json({ message: 'Missing required fields or invalid format' });
@@ -150,6 +150,7 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
         existing.internalMark = Number(sub.internalMark || 0);
         existing.practicalMark = Number(sub.practicalMark || 0);
         if (template) existing.template = template;
+        if (exam) existing.exam = exam;
         await existing.save();
         createdMarks.push(existing);
       } else {
@@ -163,7 +164,8 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
           theoryMark: Number(sub.theoryMark || 0),
           internalMark: Number(sub.internalMark || 0),
           practicalMark: Number(sub.practicalMark || 0),
-          template: template || 'rg_modern'
+          template: template || 'rg_modern',
+          exam: exam || null
         });
         createdMarks.push(newMark);
       }
@@ -197,15 +199,13 @@ router.post('/', protect, isAdmin, async (req, res) => {
       semester: Number(semester),
       batch,
       course,
-      exam,
+      exam: exam || null,
       subject,
       theoryMark: Number(theoryMark || 0),
       internalMark: Number(internalMark || 0),
       practicalMark: Number(practicalMark || 0),
       template: template || 'rg_modern'
     };
-
-
 
     const mark = await Mark.create(markData);
     
@@ -289,7 +289,7 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
 // POST bulk upload marks via JSON array (Admin only)
 router.post('/bulk', protect, isAdmin, async (req, res) => {
   try {
-    const { marks, template } = req.body; // Array of objects and template
+    const { marks, template, examId } = req.body; // Array of objects, template, and optional examId
     if (!marks || !Array.isArray(marks)) {
       return res.status(400).json({ message: 'Invalid data format' });
     }
@@ -300,22 +300,43 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
       errors: []
     };
 
+    let examDoc = null;
+    if (examId) {
+      examDoc = await Exam.findById(examId);
+      if (!examDoc) {
+        return res.status(400).json({ message: 'Selected Exam not found in database.' });
+      }
+    }
+
     for (let i = 0; i < marks.length; i++) {
       const row = marks[i];
       try {
         const studentDoc = await Student.findOne({ studentId: row['Student ID'] });
-        let actualCourseTitle = row['Course Title'];
-        if (actualCourseTitle && String(actualCourseTitle).includes(' - ')) {
-          // Extracts everything after the first ' - ' in case of "CRS-123 - Course Name"
-          const parts = String(actualCourseTitle).split(' - ');
-          actualCourseTitle = parts.slice(1).join(' - ').trim();
-        }
-        const courseDoc = await Course.findOne({ title: actualCourseTitle });
+        
+        let courseDoc = null;
         let batchDoc = null;
-        if (row['Batch Name']) {
-          batchDoc = await Batch.findOne({ name: row['Batch Name'] });
+        let semester;
+
+        if (examDoc) {
+          // Strictly use Exam definitions
+          courseDoc = await Course.findById(examDoc.course);
+          if (examDoc.batch) {
+            batchDoc = await Batch.findById(examDoc.batch);
+          }
+          semester = examDoc.semester;
+        } else {
+          // Legacy string matching fallback
+          let actualCourseTitle = row['Course Title'];
+          if (actualCourseTitle && String(actualCourseTitle).includes(' - ')) {
+            const parts = String(actualCourseTitle).split(' - ');
+            actualCourseTitle = parts.slice(1).join(' - ').trim();
+          }
+          courseDoc = await Course.findOne({ title: actualCourseTitle });
+          if (row['Batch Name']) {
+            batchDoc = await Batch.findOne({ name: row['Batch Name'] });
+          }
+          semester = Number(row['Semester']);
         }
-        const semester = Number(row['Semester']);
 
         if (!studentDoc || !courseDoc || isNaN(semester)) {
           throw new Error(`Missing student, course, or invalid semester`);
@@ -359,10 +380,11 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
             existing.practicalMark = practicalMark;
             if (template) existing.template = template;
             if (batchDoc) existing.batch = batchDoc._id;
+            if (examDoc) existing.exam = examDoc._id;
             await existing.save();
             results.success += 1;
           } else {
-            await Mark.create({
+            const newMarkData = {
               student: studentDoc._id,
               batch: batchDoc ? batchDoc._id : undefined,
               semester,
@@ -372,7 +394,9 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
               internalMark,
               practicalMark,
               template: template || 'rg_modern'
-            });
+            };
+            if (examDoc) newMarkData.exam = examDoc._id;
+            await Mark.create(newMarkData);
             results.success += 1;
           }
           return true;
