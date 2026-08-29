@@ -11,6 +11,7 @@ import HallTicketModal from "../../components/modals/HallTicketModal";
 import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
 import StudentFeesList from "../../components/payments/StudentFeesList";
 import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
+import Select from "react-select";
 
 const templates = [
   { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
@@ -1905,10 +1906,23 @@ const ExamManagement = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Select Student</label>
-                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.student} onChange={(e) => handleStudentChange(e.target.value)}>
-                    <option value="">Choose Student</option>
-                    {students.map(s => <option key={s._id} value={s._id}>{s.studentNameEnglish} ({s.studentId})</option>)}
-                  </select>
+                  <Select 
+                    options={students.map(s => ({ value: s._id, label: `${s.studentNameEnglish} (${s.studentId})` }))}
+                    value={markFormData.student ? { value: markFormData.student, label: students.find(s => s._id === markFormData.student) ? `${students.find(s => s._id === markFormData.student).studentNameEnglish} (${students.find(s => s._id === markFormData.student).studentId})` : 'Choose Student' } : null}
+                    onChange={(selectedOption) => handleStudentChange(selectedOption ? selectedOption.value : '')}
+                    placeholder="Choose Student"
+                    isClearable
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderRadius: '0.75rem',
+                        borderColor: '#e2e8f0',
+                        padding: '2px',
+                        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                        backgroundColor: '#f8fafc',
+                      })
+                    }}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Batch</label>

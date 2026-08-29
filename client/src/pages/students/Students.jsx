@@ -763,12 +763,12 @@ const Students = () => {
       if (!previewSearch) return true;
       const s = previewSearch.toLowerCase();
       return (
-        r["Name"]?.toLowerCase().includes(s) || 
-        r["Student ID"]?.toLowerCase().includes(s) || 
-        r["Email"]?.toLowerCase().includes(s) || 
-        r["Center ID"]?.toLowerCase().includes(s) ||
-        r["Course ID"]?.toLowerCase().includes(s) ||
-        r["Batch ID"]?.toLowerCase().includes(s)
+        String(r["Name"] || "").toLowerCase().includes(s) || 
+        String(r["Student ID"] || "").toLowerCase().includes(s) || 
+        String(r["Email"] || "").toLowerCase().includes(s) || 
+        String(r["Center ID"] || "").toLowerCase().includes(s) ||
+        String(r["Course ID"] || "").toLowerCase().includes(s) ||
+        String(r["Batch ID"] || "").toLowerCase().includes(s)
       );
     });
     
