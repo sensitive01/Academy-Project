@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -129,4 +129,30 @@ body {
 
 .animate-marquee:hover {
     animation-play-state: paused;
+}
+
+
+@media print {
+  body {
+    visibility: hidden;
+  }
+  .print-marksheet, .print-marksheet * {
+    visibility: visible;
+  }
+  .print-marksheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: hidden !important;
+    page-break-after: always;
+    page-break-inside: avoid;
+    transform-origin: top left !important;
+  }
 }

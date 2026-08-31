@@ -11,29 +11,42 @@ const templates = [
   { id: 'vocational_council', name: 'Council for Vocational Education' }
 ];
 
-const BulkUploadPreviewModal = ({ data, exams = [], onClose, onSave, onPreviewRow, validateRow }) => {
+const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], onClose, onSave, onPreviewRow, validateRow }) => {
   const [previewData, setPreviewData] = useState(data);
   const [selectedTemplate, setSelectedTemplate] = useState('rg_modern');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'invalid'
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'invalid', 'missing'
 
   const processedData = React.useMemo(() => {
-    if (!validateRow) return { all: previewData.map((r, i) => ({ ...r, _originalIndex: i, _errors: {} })), invalid: [] };
+    if (!validateRow) return { all: previewData.map((r, i) => ({ ...r, _originalIndex: i, _errors: {} })), invalid: [], missingMarks: [] };
     
     const all = [];
     const invalid = [];
+    const missingMarks = [];
     
     previewData.forEach((row, idx) => {
       const { isValid, errors } = validateRow(row);
       const rowWithMeta = { ...row, _originalIndex: idx, _errors: errors };
       all.push(rowWithMeta);
       if (!isValid) invalid.push(rowWithMeta);
+
+      const hasMissingMark = Object.keys(row).some(key => {
+        if (key.match(/Subject \d+ (Mark|Internal|Theory|Practical)/i)) {
+          const val = row[key];
+          return val === undefined || val === null || String(val).trim() === '';
+        }
+        return false;
+      });
+
+      if (hasMissingMark) {
+        missingMarks.push(rowWithMeta);
+      }
     });
     
-    return { all, invalid };
+    return { all, invalid, missingMarks };
   }, [previewData, validateRow]);
 
-  const currentDisplayData = activeTab === 'all' ? processedData.all : processedData.invalid;
+  const currentDisplayData = activeTab === 'all' ? processedData.all : activeTab === 'invalid' ? processedData.invalid : activeTab === 'missingMarks' ? processedData.missingMarks : processedData.all;
 
   const headers = data.length > 0 ? Object.keys(data[0]).filter(k => k !== '_originalIndex' && k !== '_errors') : [];
 
@@ -81,8 +94,13 @@ const BulkUploadPreviewModal = ({ data, exams = [], onClose, onSave, onPreviewRo
     
     setIsSubmitting(true);
     try {
+      // Filter out records that have missing marks
+      const dataToUpload = processedData.all.filter(row => 
+        !processedData.missingMarks.some(m => m._originalIndex === row._originalIndex)
+      );
+
       // Clean up metadata before saving
-      const cleanData = previewData.map(row => {
+      const cleanData = dataToUpload.map(row => {
         const cleanRow = { ...row };
         delete cleanRow._originalIndex;
         delete cleanRow._errors;
@@ -145,6 +163,30 @@ const BulkUploadPreviewModal = ({ data, exams = [], onClose, onSave, onPreviewRo
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
             </button>
           )}
+          {processedData.missingMarks.length > 0 && (
+            <button
+              onClick={() => setActiveTab('missingMarks')}
+              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
+                activeTab === 'missingMarks'
+                  ? 'border-yellow-500 text-yellow-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Missing Marks ({processedData.missingMarks.length})
+            </button>
+          )}
+          {missingStudentsData.length > 0 && (
+            <button
+              onClick={() => setActiveTab('missing')}
+              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
+                activeTab === 'missing'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Missing in Sheet ({missingStudentsData.length})
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto bg-slate-50 rounded-xl border border-slate-200 relative">
@@ -157,6 +199,35 @@ const BulkUploadPreviewModal = ({ data, exams = [], onClose, onSave, onPreviewRo
               </div>
             </div>
           )}
+          
+          {activeTab === 'missing' ? (
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-30 shadow-sm">
+                <tr>
+                  <th className="px-4 py-3 whitespace-nowrap">S.No</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Register Number</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Name</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Center Code</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Course</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {missingStudentsData.map((student, idx) => (
+                  <tr key={student._id || idx} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-500">{idx + 1}</td>
+                    <td className="px-4 py-3 font-bold text-slate-900">{student.studentId}</td>
+                    <td className="px-4 py-3 text-slate-700 uppercase">{student.studentNameEnglish}</td>
+                    <td className="px-4 py-3 text-slate-700">{student.center?.centerId || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {student.enrolledCourses && student.enrolledCourses.length > 0
+                        ? student.enrolledCourses[0].course?.courseCode || '-'
+                        : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-30 shadow-sm">
               <tr>
@@ -208,6 +279,7 @@ const BulkUploadPreviewModal = ({ data, exams = [], onClose, onSave, onPreviewRo
               )}
             </tbody>
           </table>
+          )}
         </div>
 
         <div className="flex gap-3 pt-4 mt-4 border-t border-slate-100 shrink-0">
@@ -216,13 +288,13 @@ const BulkUploadPreviewModal = ({ data, exams = [], onClose, onSave, onPreviewRo
           </button>
           <button 
             onClick={handleSubmit} 
-            disabled={previewData.length === 0 || isSubmitting || processedData.invalid.length > 0}
+            disabled={previewData.length === 0 || isSubmitting || processedData.invalid.length > 0 || (processedData.all.length - processedData.missingMarks.length) === 0}
             className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <><Loader2 size={18} className="animate-spin" /> Uploading...</>
             ) : (
-              <><Save size={18} /> Confirm Upload ({processedData.all.length} Records)</>
+              <><Save size={18} /> Confirm Upload ({processedData.all.length - processedData.missingMarks.length} Records)</>
             )}
           </button>
         </div>

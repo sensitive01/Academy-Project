@@ -854,7 +854,7 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
       const recordId = record.id || `row-${i}`;
       
       let name = record["Name"];
-      let studentId = record["Student ID"];
+      let studentId = record["Student ID"] ? String(record["Student ID"]).trim() : undefined;
       let dob = record["DOB"];
       let year = record["Year"];
       let centerIdStr = record["Center ID"];
@@ -975,7 +975,7 @@ router.post("/bulk-upload", protect, async (req, res) => {
     for (const record of recordsToProcess) {
       try {
         const name = record["Name"];
-        let studentId = record["Student ID"];
+        let studentId = record["Student ID"] ? String(record["Student ID"]).trim() : undefined;
         const dob = record["DOB"];
         const year = record["Year"];
         const email = record["Email"];

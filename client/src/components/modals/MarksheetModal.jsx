@@ -103,7 +103,7 @@ const DynamicSeal = ({ template }) => {
   const points = getStarPoints(45, 50, 46, 50);
 
   return (
-    <div className="relative w-[130px] h-[130px] flex justify-center items-center">
+    <div className="relative w-[100px] h-[100px] flex justify-center items-center">
       <svg className="absolute inset-0 w-full h-full drop-shadow-md" viewBox="0 0 100 100">
         {/* Spiky Red Outer Background */}
         <polygon points={points} fill="#dc2626" />
@@ -135,7 +135,7 @@ const DynamicSeal = ({ template }) => {
   );
 };
 
-const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
+const MarksheetModal = ({ data, onClose, template, inline = false, title, onConfirm }) => {
   const printRef = useRef();
 
   const handleDownloadPDF = async () => {
@@ -148,7 +148,8 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        scrollY: -window.scrollY
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -159,9 +160,21 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      let width = pdfWidth;
+      let height = pdfHeight;
+      let xOffset = 0;
+
+      // If the image is taller than the A4 page, scale it down to fit on one page
+      if (pdfHeight > pageHeight) {
+        height = pageHeight;
+        width = (canvas.width * pageHeight) / canvas.height;
+        xOffset = (pdfWidth - width) / 2; // Center horizontally
+      }
+
+      pdf.addImage(imgData, 'PNG', xOffset, 0, width, height);
       pdf.save(`${student?.studentId || 'Student'}_Semester_${semester}_Marksheet.pdf`);
 
       toast.success('PDF downloaded successfully!', { id: loadingToast });
@@ -204,14 +217,33 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
             
             @media print {
               @page { size: A4 portrait; margin: 0; }
+              html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+              }
               body { 
                 background: #ffffff !important; 
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact;
-                margin: 0;
-                padding: 0;
+                display: block;
+              }
+              .print-wrapper {
+                width: 100%;
+                height: 100%;
                 display: flex;
                 justify-content: center;
+              }
+              .print-marksheet {
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                margin: 0 auto !important;
+                padding: 12mm !important;
+                box-sizing: border-box !important;
               }
               button { display: none; }
               th, td { border: 1px solid #000; }
@@ -219,7 +251,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
           </style>
         </head>
         <body>
-          <div style="zoom: 0.88; transform-origin: top center; width: 100%; display: flex; justify-content: center;">
+          <div class="print-wrapper">
             ${printContent.outerHTML}
           </div>
         </body>
@@ -248,12 +280,17 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
         <div className="flex justify-between items-center p-4 border-b border-slate-100 shrink-0 bg-slate-50 rounded-t-2xl">
           <h2 className="text-lg font-bold text-slate-800">Student Marksheet</h2>
           <div className="flex gap-2">
+            {onConfirm && (
+              <button onClick={onConfirm} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm">
+                Confirm & Upload
+              </button>
+            )}
             <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors font-semibold text-sm">
               <Download size={16} /> Save PDF
             </button>
-            <button onClick={handleBrowserPrint} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-sm">
+            {/* <button onClick={handleBrowserPrint} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-sm">
               <Printer size={16} /> Print
-            </button>
+            </button> */}
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
               <X size={20} />
             </button>
@@ -272,23 +309,23 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
             </button>
           </div>
         )}
-        <div ref={printRef} className="mx-auto text-black bg-white flex flex-col" style={{ width: '210mm', minHeight: '297mm', padding: '10mm', boxSizing: 'border-box' }}>
+        <div ref={printRef} className="print-marksheet mx-auto text-black bg-white flex flex-col" style={{ width: '210mm', minHeight: '297mm', padding: '12mm', boxSizing: 'border-box' }}>
 
           {/* Outer gold frame */}
-          <div className="flex-1 flex flex-col" style={{ background: 'linear-gradient(135deg, #b8860b 0%, #ffd700 30%, #daa520 50%, #ffd700 70%, #b8860b 100%)', padding: '8px' }}>
+          <div className="flex-1 flex flex-col" style={{ background: 'linear-gradient(135deg, #b8860b 0%, #ffd700 30%, #daa520 50%, #ffd700 70%, #b8860b 100%)', padding: '4px' }}>
             {/* Thin white gap */}
-            <div className="flex-1 flex flex-col" style={{ background: '#fff', padding: '3px' }}>
+            <div className="flex-1 flex flex-col" style={{ background: '#fff', padding: '2px' }}>
               {/* Thin gold inner liner */}
-              <div className="flex-1 flex flex-col" style={{ border: '2px solid #b8860b', padding: '3px' }}>
+              <div className="flex-1 flex flex-col" style={{ border: '1px solid #b8860b', padding: '2px' }}>
                 {/* Red content border */}
-                <div className="flex-1 flex flex-col relative" style={{ border: '3px solid #b91c1c', padding: '6px 28px 12px 28px', background: '#fff' }}>
+                <div className="flex-1 flex flex-col relative" style={{ border: '2px solid #b91c1c', padding: '2px 16px 4px 16px', background: '#fff' }}>
 
                   {/* Dynamic Header Block */}
                   {template?.id === 'vocational_council' ? (
-                    <div className="flex mb-2 pb-2 min-h-[88px] items-center justify-between w-full mt-4">
+                    <div className="flex mb-1 pb-1 min-h-[75px] items-center justify-between w-full mt-2">
                       {/* Left Logo */}
-                      <div className="w-[130px] shrink-0 flex justify-start items-start -ml-4">
-                        <img src={getTemplateLogo(template?.id)} alt="CVESW Logo" className="w-32 h-32 object-contain" />
+                      <div className="w-[120px] shrink-0 flex justify-start items-start -ml-4">
+                        <img src={getTemplateLogo(template?.id)} alt="CVESW Logo" className="w-28 h-28 object-contain" />
                       </div>
                       {/* Center Text */}
                       <div className="flex-1 text-center flex flex-col justify-center items-center text-[#1a365d]">
@@ -309,10 +346,10 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
                       <div className="w-[130px] shrink-0 -mr-4"></div>
                     </div>
                   ) : (
-                    <div className="flex pb-0 min-h-[85px] items-center justify-between w-full mt-1 ">
+                    <div className="flex pb-0 min-h-[65px] items-center justify-between w-full mt-1 ">
                       {/* Left Logo */}
-                      <div className={`shrink-0 flex justify-start items-center ${template?.id === 'dr_rg_academy' ? 'w-[140px] -ml-2' : 'w-[120px]'}`}>
-                        <img src={getTemplateLogo(template?.id)} alt="Institution Logo" className={`${template?.id === 'dr_rg_academy' ? 'w-[140px] h-[140px]' : 'w-28 h-28'} object-contain`} />
+                      <div className={`shrink-0 flex justify-start items-center ${template?.id === 'dr_rg_academy' ? 'w-[100px] -ml-2' : 'w-[90px]'}`}>
+                        <img src={getTemplateLogo(template?.id)} alt="Institution Logo" className={`${template?.id === 'dr_rg_academy' ? 'w-[100px] h-[100px]' : 'w-20 h-20'} object-contain`} />
                       </div>
 
                       {/* Center Text */}
@@ -355,7 +392,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
                     </div>
                   )}
 
-                  <div className={`text-center text-[19px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mb-2 -mt-3' : template?.id === 'dr_rg_academy' ? 'mb-2 mt-2' : 'mb-2 -mt-1'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
+                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mb-1 -mt-2' : template?.id === 'dr_rg_academy' ? 'mb-1 mt-1' : 'mb-1 -mt-1'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
                     {(() => {
                       const map = {
                         1: 'FIRST', 2: 'SECOND', 3: 'THIRD', 4: 'FOURTH',
@@ -378,9 +415,9 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
 
                       {/* Row 2: Student Values */}
                       <tr>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal" colSpan="2">{student.studentId}</td>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal capitalize" colSpan="2">{student.studentNameEnglish}</td>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal" colSpan="2">{course?.title}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="2">{student.studentId}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal capitalize" colSpan="2">{student.studentNameEnglish}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="2">{course?.title}</td>
                       </tr>
 
                       {/* Row 3: Marks Headers */}
@@ -428,7 +465,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
                             obtained = 'AB';
                             isPass = false;
                           } else {
-                            obtained = m.subject?.type === "Practical" ? pracVal : (thVal + intVal);
+                            obtained = thVal + intVal + pracVal;
                             isPass = obtained >= passMark;
                           }
 
@@ -441,12 +478,12 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
 
                           return (
                             <tr key={m._id}>
-                              <td className="border border-black py-4 px-2 text-center text-[12.5px] font-normal">{toRoman(idx + 1)}</td>
-                              <td className="border border-black py-4 px-2 text-center text-[12.5px] font-normal uppercase">{m.subject?.code || '-'}</td>
-                              <td className="border border-black py-4 px-2 text-left pl-4 text-[12.5px] font-normal">{m.subject?.name}</td>
-                              <td className="border border-black py-4 px-2 text-center text-[12.5px] font-normal">{maxMark}</td>
-                              <td className="border border-black py-4 px-2 text-center text-[12.5px] font-normal">{obtained}</td>
-                              <td className="border border-black py-4 px-2 text-center text-[12.5px] font-normal uppercase">{isPass ? 'PASS' : 'FAIL'}</td>
+                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal">{toRoman(idx + 1)}</td>
+                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{m.subject?.code || '-'}</td>
+                              <td className="border border-black py-2 px-2 text-left pl-4 text-[12.5px] font-normal">{m.subject?.name}</td>
+                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal">{maxMark}</td>
+                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal">{obtained}</td>
+                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{isPass ? 'PASS' : 'FAIL'}</td>
                             </tr>
                           );
                         });
@@ -454,13 +491,13 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
 
                       {/* Row: DOB and Total */}
                       <tr>
-                        <th className="border border-black p-3 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>DATE OF<br />BIRTH</th>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal">
+                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>DATE OF<br />BIRTH</th>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">
                           {student.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '-'}
                         </td>
-                        <th className="border border-black p-3 text-right pr-4 text-[11px] font-bold" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TOTAL MARKS SECURED</th>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal">{grandTotal}</td>
-                        <td className="border border-black p-3 text-center"></td>
+                        <th className="border border-black p-2 text-right pr-4 text-[11px] font-bold" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TOTAL MARKS SECURED</th>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandTotal}</td>
+                        <td className="border border-black p-2 text-center"></td>
                       </tr>
 
                       {/* Row: Centre Headers */}
@@ -473,25 +510,25 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
 
                       {/* Row: Centre Values */}
                       <tr>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal uppercase" colSpan="1">{student.center?.centerId || 'N/A'}</td>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal uppercase" colSpan="3">
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal uppercase" colSpan="1">{student.center?.centerId || 'N/A'}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal uppercase" colSpan="3">
                           {(() => {
                             const shortName = student.center?.name;
                             if (!shortName) return 'N/A';
                             return shortName;
                           })()}
                         </td>
-                        <td className="border border-black p-3 text-center text-[12.5px] font-normal">{grandMax > 0 ? ((grandTotal / grandMax) * 100).toFixed(1) : '0.0'} %</td>
-                        <td className="border border-black p-3 text-center font-bold text-lg">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandMax > 0 ? ((grandTotal / grandMax) * 100).toFixed(1) : '0.0'} %</td>
+                        <td className="border border-black p-2 text-center font-bold text-lg">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
                       </tr>
 
                       {/* Row: Grade Classification & Abbreviations */}
                       <tr>
-                        <td className="border border-black p-4" colSpan="6" style={{ fontFamily: 'Times New Roman, serif' }}>
-                          <div className="flex flex-col gap-6">
+                        <td className="border border-black p-2" colSpan="6" style={{ fontFamily: 'Times New Roman, serif' }}>
+                          <div className="flex flex-col gap-2">
                             <div>
-                              <div className="font-bold text-[12px] mb-2 uppercase">GRADE CLASSIFICATION :</div>
-                              <div className="grid grid-cols-2 gap-x-12 gap-y-1.5 text-[11.5px] max-w-[600px]">
+                              <div className="font-bold text-[12px] mb-1 uppercase">GRADE CLASSIFICATION :</div>
+                              <div className="grid grid-cols-2 gap-x-12 gap-y-0.5 text-[11.5px] max-w-[600px]">
                                 <div className="flex"><span className="font-bold w-32">O : Outstanding</span><span>(90% & above)</span></div>
                                 <div className="flex"><span className="font-bold w-32">C : Fair</span><span>(45% to 59.9%)</span></div>
 
@@ -519,7 +556,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title }) => {
                   </table>
 
                   {/* Footer Signatures */}
-                  <div className="mt-auto relative flex items-center justify-between pt-4 mb-2 px-8 min-h-[160px]">
+                  <div className="mt-8 relative flex items-center justify-between pt-4 mb-4 px-8 min-h-[90px]">
                     {/* Left */}
                     <div className={`flex-1 flex justify-start ${template?.id === 'vocational_council' ? 'pl-4' : 'pl-12'}`}>
                       <p className="text-[12px] font-bold text-black m-0 uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>

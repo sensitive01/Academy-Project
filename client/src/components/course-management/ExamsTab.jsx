@@ -549,7 +549,7 @@ const ExamsTab = () => {
       }
     }
 
-    let totalSecured = (m.subject?.type === "Practical" ? Number(m.practicalMark || 0) : (Number(m.theoryMark || 0) + Number(m.internalMark || 0)));
+    let totalSecured = Number(m.theoryMark || 0) + Number(m.internalMark || 0) + Number(m.practicalMark || 0);
     const effectivePassMark = (examConfig && examConfig.passMark !== undefined) ? Number(examConfig.passMark) : (m.passMark !== undefined ? Number(m.passMark) : 40);
     const isPass = totalSecured >= effectivePassMark;
 

@@ -286,6 +286,67 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
   }
 });
 
+// POST get missing students for bulk upload
+router.post('/bulk-missing-students', protect, isAdmin, async (req, res) => {
+  try {
+    const { studentIds } = req.body;
+    if (!studentIds || !Array.isArray(studentIds)) {
+      return res.status(400).json({ message: 'Invalid data format' });
+    }
+
+    // 1. Find the students that ARE in the Excel sheet
+    const uploadedStudents = await Student.find({ studentId: { $in: studentIds } }).populate('center');
+    
+    // 2. Extract unique (center, course, batch) combinations
+    const cohorts = new Set();
+    uploadedStudents.forEach(student => {
+      const centerId = student.center?._id || student.center;
+      if (student.enrolledCourses && student.enrolledCourses.length > 0) {
+        student.enrolledCourses.forEach(ec => {
+          const courseId = ec.course?._id || ec.course;
+          const batchId = ec.batch?._id || ec.batch;
+          if (centerId && courseId) {
+            cohorts.add(JSON.stringify({ center: centerId, course: courseId, batch: batchId }));
+          }
+        });
+      }
+    });
+
+    if (cohorts.size === 0) {
+      return res.json({ missingStudents: [] });
+    }
+
+    // 3. Construct OR queries for all unique cohorts
+    const orQueries = Array.from(cohorts).map(cohortStr => {
+      const cohort = JSON.parse(cohortStr);
+      const query = {
+        center: cohort.center,
+        'enrolledCourses.course': cohort.course
+      };
+      if (cohort.batch) {
+        query['enrolledCourses.batch'] = cohort.batch;
+      }
+      return query;
+    });
+
+    // 4. Find all students matching these cohorts who are NOT in the uploaded list
+    const missingStudents = await Student.find({
+      $and: [
+        { $or: orQueries },
+        { studentId: { $nin: studentIds } }
+      ]
+    })
+    .populate('center', 'name centerId')
+    .populate('enrolledCourses.course', 'title courseCode')
+    .lean();
+
+    res.json({ missingStudents });
+  } catch (error) {
+    console.error("Error finding missing students:", error);
+    res.status(500).json({ message: 'Server error finding missing students' });
+  }
+});
+
 // POST bulk upload marks via JSON array (Admin only)
 router.post('/bulk', protect, isAdmin, async (req, res) => {
   try {
@@ -311,7 +372,9 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
     for (let i = 0; i < marks.length; i++) {
       const row = marks[i];
       try {
-        const studentDoc = await Student.findOne({ studentId: row['Student ID'] });
+        const rawStudentId = row['Student ID'];
+        const studentIdStr = rawStudentId ? String(rawStudentId).trim() : "";
+        const studentDoc = await Student.findOne({ studentId: studentIdStr });
         
         let courseDoc = null;
         let batchDoc = null;

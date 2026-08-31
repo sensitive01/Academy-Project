@@ -21,6 +21,7 @@ const PublicResults = () => {
   const [dob, setDob] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedSemester, setSelectedSemester] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -41,6 +42,13 @@ const PublicResults = () => {
     try {
       const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/public-results/results`, { studentId, dob: formattedDob });
       setResults(data);
+      
+      // Auto-select the most recent semester
+      if (data.marks && data.marks.length > 0) {
+        const semesters = [...new Set(data.marks.map(m => m.semester))].sort((a, b) => b - a);
+        setSelectedSemester(semesters[0].toString());
+      }
+      
       setStep(2);
       toast.success('Results fetched successfully');
     } catch (error) {
@@ -143,7 +151,15 @@ const PublicResults = () => {
 
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-8">
               <div className="p-6 sm:p-8 border-b border-slate-200">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">{results.student.name}</h2>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                  <h2 className="text-2xl font-bold text-slate-900">{results.student.name}</h2>
+                  <button 
+                    onClick={() => { setStep(1); setResults(null); setSelectedSemester(''); setStudentId(''); setDob(''); }}
+                    className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-4 py-2 rounded-lg"
+                  >
+                    <ArrowLeft size={16} /> Check Another Student
+                  </button>
+                </div>
 
                 <div className="flex flex-wrap gap-x-8 gap-y-4 text-sm text-slate-700">
                   <div>
@@ -162,34 +178,54 @@ const PublicResults = () => {
               <div className="p-6 sm:p-8 bg-slate-50 rounded-b-lg">
                 {results.marks && results.marks.length > 0 ? (
                   <div className="space-y-8">
-                    {Object.keys(groupedMarks).sort().map((sem) => {
-                      const semMarks = groupedMarks[sem];
-                      const templateId = semMarks[0]?.template || 'rg_modern';
-                      const templateObj = templates.find(t => t.id === templateId);
+                    <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-6">
+                      <div className="mb-4 sm:mb-0">
+                        <h3 className="font-bold text-slate-800 text-lg">Select Semester</h3>
+                        <p className="text-sm text-slate-500">Choose a semester to view its results</p>
+                      </div>
+                      <div className="w-full sm:w-64">
+                        <select 
+                          className="w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 text-base font-semibold bg-blue-50 text-blue-900 cursor-pointer"
+                          value={selectedSemester}
+                          onChange={(e) => setSelectedSemester(e.target.value)}
+                        >
+                          {Object.keys(groupedMarks).sort((a,b) => b-a).map(sem => (
+                            <option key={sem} value={sem}>Semester {sem}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
-                      const semData = {
-                        student: results.studentFull,
-                        semester: sem,
-                        course: semMarks[0]?.course,
-                        batch: semMarks[0]?.batch,
-                        marks: semMarks,
-                        templateId: templateId
-                      };
+                    {selectedSemester && groupedMarks[selectedSemester] && (
+                      (() => {
+                        const semMarks = groupedMarks[selectedSemester];
+                        const templateId = semMarks[0]?.template || 'rg_modern';
+                        const templateObj = templates.find(t => t.id === templateId);
 
-                      return (
-                        <div key={sem} className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm">
-                          <div className="overflow-x-auto">
-                            <MarksheetModal
-                              inline={true}
-                              title={`Semester ${sem}`}
-                              data={semData}
-                              template={templateObj}
-                              onClose={() => { }}
-                            />
+                        const semData = {
+                          student: results.studentFull,
+                          semester: selectedSemester,
+                          course: semMarks[0]?.course,
+                          batch: semMarks[0]?.batch,
+                          marks: semMarks,
+                          templateId: templateId
+                        };
+
+                        return (
+                          <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm">
+                            <div className="overflow-x-auto">
+                              <MarksheetModal
+                                inline={true}
+                                title={`Semester ${selectedSemester} Result`}
+                                data={semData}
+                                template={templateObj}
+                                onClose={() => { }}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })()
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-12">

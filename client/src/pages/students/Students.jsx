@@ -125,6 +125,18 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
       width: "200px"
     },
     {
+      name: "DOB",
+      selector: row => row.dob,
+      sortable: true,
+      cell: row => (
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+          <Calendar size={13} className="text-slate-400 shrink-0" />
+          <span className="whitespace-nowrap">{row.dob ? new Date(row.dob).toLocaleDateString('en-GB').replace(/\//g, '-') : "N/A"}</span>
+        </div>
+      ),
+      width: "120px"
+    },
+    {
       name: "Type",
       selector: row => row.internships?.length > 0 ? "Intern" : (row.center ? "Center Student" : "Online Student"),
       sortable: true,
@@ -462,7 +474,28 @@ const Students = () => {
         const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const rawData = XLSX.utils.sheet_to_json(ws);
+        
+        const data = rawData.map(row => {
+          const dobKey = Object.keys(row).find(k => k.toUpperCase() === 'DOB');
+          if (dobKey) {
+            const dobVal = row[dobKey];
+            if (dobVal instanceof Date) {
+              // Add 12 hours to safely bypass any midnight timezone or floating point precision bugs
+              const safeDate = new Date(dobVal.getTime() + 12 * 60 * 60 * 1000);
+              const y = safeDate.getFullYear();
+              const m = String(safeDate.getMonth() + 1).padStart(2, '0');
+              const d = String(safeDate.getDate()).padStart(2, '0');
+              row[dobKey] = `${y}-${m}-${d}`;
+            } else if (typeof dobVal === 'string') {
+              if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(dobVal)) {
+                 const parts = dobVal.split(/[\/\-]/);
+                 row[dobKey] = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              }
+            }
+          }
+          return row;
+        });
 
         if (data.length === 0) {
             toast.error("File is empty.", { id: toastId });
@@ -512,9 +545,9 @@ const Students = () => {
         const res = await api.post("/students/bulk-upload", { recordsToProcess: chunk });
         
         if (res.data) {
-          finalResult.totalProcessed += res.data.totalProcessed || 0;
-          finalResult.successes += res.data.successes || 0;
-          if (res.data.errors) finalResult.errors.push(...res.data.errors);
+          finalResult.totalProcessed += chunk.length;
+          finalResult.successes += res.data.successCount || 0;
+          if (res.data.skippedRecords) finalResult.errors.push(...res.data.skippedRecords);
         }
         
         setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total, statusText: "Uploading Data..." });
@@ -904,9 +937,21 @@ const Students = () => {
                                       type="text"
                                       value={r["Student ID"] || ""}
                                       onChange={(e) => {
+                                        const newId = e.target.value;
                                         setPreviewModal(prev => ({
                                           ...prev,
-                                          duplicateRecords: prev.duplicateRecords.map(dup => dup.id === r.id ? { ...dup, "Student ID": e.target.value } : dup)
+                                          duplicateRecords: prev.duplicateRecords.map(dup => {
+                                            if (dup.id === r.id) {
+                                              const updated = { ...dup, "Student ID": newId };
+                                              const oldId = String(dup["Student ID"] || "");
+                                              const oldEmail = String(dup["Email"] || "");
+                                              if (oldEmail.toLowerCase() === `${oldId.toLowerCase()}@drrgacademy.in`) {
+                                                updated["Email"] = `${newId}@drrgacademy.in`;
+                                              }
+                                              return updated;
+                                            }
+                                            return dup;
+                                          })
                                         }));
                                       }}
                                       className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
