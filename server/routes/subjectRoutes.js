@@ -11,9 +11,14 @@ router.post("/", protect, async (req, res) => {
   try {
     const { name, code, type, semester, course } = req.body;
 
-    const exists = await Subject.findOne({ $or: [{ name }, { code }] });
+    const exists = await Subject.findOne({ 
+      course, 
+      semester, 
+      $or: [{ name }, { code }] 
+    });
+    
     if (exists) {
-      return res.status(400).json({ message: "Subject with this name or code already exists" });
+      return res.status(400).json({ message: "Subject with this name or code already exists in this course and semester" });
     }
 
     const subject = await Subject.create({ name, code, type, semester, course });
@@ -56,6 +61,22 @@ router.put("/:id", protect, async (req, res) => {
     }
 
     const oldCourseId = subject.course;
+    
+    const checkCourse = course !== undefined ? course : subject.course;
+    const checkSemester = semester !== undefined ? semester : subject.semester;
+    const checkName = name || subject.name;
+    const checkCode = code || subject.code;
+    
+    const exists = await Subject.findOne({
+      _id: { $ne: subject._id },
+      course: checkCourse,
+      semester: checkSemester,
+      $or: [{ name: checkName }, { code: checkCode }]
+    });
+
+    if (exists) {
+      return res.status(400).json({ message: "Subject with this name or code already exists in this course and semester" });
+    }
 
     if (name) subject.name = name;
     if (code) subject.code = code;

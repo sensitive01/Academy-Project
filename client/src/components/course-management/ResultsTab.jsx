@@ -680,6 +680,29 @@ const ResultsTab = () => {
       )
     },
     {
+      name: "Exam",
+      selector: row => {
+        if (row.exam?.name) return row.exam.name;
+        const inferredExam = exams.find(e => 
+          (e.course?._id || e.course) === (row.course?._id || row.course) && 
+          e.semester === row.semester
+        );
+        return inferredExam?.name;
+      },
+      sortable: true,
+      cell: row => {
+        let examName = row.exam?.name;
+        if (!examName) {
+          const inferredExam = exams.find(e => 
+            (e.course?._id || e.course) === (row.course?._id || row.course) && 
+            e.semester === row.semester
+          );
+          examName = inferredExam?.name;
+        }
+        return <span className="font-semibold text-slate-700">{examName || "N/A"}</span>;
+      }
+    },
+    {
       name: "Course",
       selector: row => row.course?.title,
       sortable: true,

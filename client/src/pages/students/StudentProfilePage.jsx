@@ -595,16 +595,37 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                       })()}
                     />
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                        Enrolled Course
-                      </label>
-                      <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 min-h-[46px] flex items-center cursor-not-allowed">
-                        {formData.course 
-                          ? (courses.find(c => c._id === formData.course)?.title || formData.course)
-                          : "Select a batch to auto-assign course"}
-                      </div>
-                    </div>
+                    <SelectBox
+                      label="Enrolled Course"
+                      name="course"
+                      value={formData.course}
+                      onChange={handleChange}
+                      isObjectOptions
+                      options={(() => {
+                        if (!formData.batch) return [{ value: "", label: "Select a batch first" }];
+                        const selectedBatch = batches.find(b => b._id === formData.batch);
+                        if (!selectedBatch) return [{ value: "", label: "Batch not found" }];
+                        
+                        const batchCourseIds = [];
+                        if (selectedBatch.courses) {
+                          selectedBatch.courses.forEach(c => batchCourseIds.push((c._id || c).toString()));
+                        }
+                        if (selectedBatch.course) {
+                          batchCourseIds.push((selectedBatch.course._id || selectedBatch.course).toString());
+                        }
+                        
+                        const uniqueCourseIds = [...new Set(batchCourseIds)];
+                        const availableCourses = courses.filter(c => uniqueCourseIds.includes(c._id.toString()));
+                        
+                        if (availableCourses.length === 0) return [{ value: "", label: "No courses assigned to batch" }];
+                        
+                        const opts = availableCourses.map(c => ({ value: c._id, label: c.title }));
+                        if (opts.length > 1 && !formData.course) {
+                          opts.unshift({ value: "", label: "Select a course..." });
+                        }
+                        return opts;
+                      })()}
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

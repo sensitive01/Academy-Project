@@ -276,8 +276,13 @@ const ExamsTab = () => {
 
   const handleBulkUploadConfirm = async (payload) => {
     try {
+      if (!payload.data || payload.data.length === 0) {
+        toast.error("No valid data to upload. Records might have been filtered out due to missing marks.");
+        setShowBulkUploadPreviewModal(false);
+        return;
+      }
       const res = await api.post("/marks/bulk", { marks: payload.data, template: payload.template });
-      toast.success(`Bulk upload completed! Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
+      toast.success(`Bulk upload completed! Total Processed: ${payload.data.length}, Success: ${res.data.results.success}, Failed: ${res.data.results.failed}`);
       if (res.data.results.failed > 0) {
         console.error("Bulk Upload Errors:", res.data.results.errors);
         toast.error("Some records failed. Check console for details.");

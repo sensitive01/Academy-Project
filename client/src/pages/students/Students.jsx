@@ -284,7 +284,7 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
   ];
 
   return (
-    <div className="w-full overflow-x-auto scrollbar-hide">
+    <div className="w-full overflow-visible">
       <CustomDataTable
         columns={columns}
         data={students}
@@ -537,7 +537,7 @@ const Students = () => {
     setUploadProgress({ isUploading: true, current: 0, total, statusText: "Uploading Data..." });
 
     try {
-      let finalResult = { totalProcessed: 0, successes: 0, errors: [] };
+      let finalResult = { totalProcessed: 0, successCount: 0, skippedRecords: [] };
       const chunkSize = 10;
       
       for (let i = 0; i < total; i += chunkSize) {
@@ -546,8 +546,8 @@ const Students = () => {
         
         if (res.data) {
           finalResult.totalProcessed += chunk.length;
-          finalResult.successes += res.data.successCount || 0;
-          if (res.data.skippedRecords) finalResult.errors.push(...res.data.skippedRecords);
+          finalResult.successCount += res.data.successCount || 0;
+          if (res.data.skippedRecords) finalResult.skippedRecords.push(...res.data.skippedRecords);
         }
         
         setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total, statusText: "Uploading Data..." });
@@ -1293,12 +1293,11 @@ const Students = () => {
       ) : ["online_students", "center_students"].includes(activeTab) ? (
         <>
           {/* Stats Section */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { label: "Total Displayed", value: filtered.length, icon: Users, color: "blue" },
               { label: "Active Records", value: filtered.filter(s => s.status === "active").length, icon: CheckCircle, color: "emerald" },
               { label: "Interns", value: filtered.filter(s => s.internships?.length > 0).length, icon: Briefcase, color: "amber" },
-              { label: "Departments", value: [...new Set(filtered.map(s => s.department))].length, icon: GraduationCap, color: "indigo" },
             ].map((stat, i) => (
               <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-brand-200 transition-all">
                 <div className="min-w-0">
@@ -1339,7 +1338,7 @@ const Students = () => {
           )}
 
           {/* Table Section */}
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
             <StudentList
               students={filtered}
               loading={loading}

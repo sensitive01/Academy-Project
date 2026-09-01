@@ -103,7 +103,7 @@ const CustomDataTable = ({
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible flex flex-col w-full h-full">
       {/* Header section with search and export built-in if provided */}
       {(setSearch || exportButton || additionalHeaderContent) && (
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white relative z-20">
           {setSearch && (
             <div className="relative w-full sm:w-72 group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
@@ -127,7 +127,7 @@ const CustomDataTable = ({
         </div>
       )}
       
-      <div className="flex-1 w-full relative overflow-x-auto">
+      <div className="flex-1 w-full relative overflow-x-auto z-10">
         <DataTable
           columns={columns}
           data={data}

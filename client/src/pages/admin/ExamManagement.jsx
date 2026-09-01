@@ -14,6 +14,7 @@ import StudentFeesList from "../../components/payments/StudentFeesList";
 import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
 import Select from "react-select";
 import BatchProgressTab from "../../components/course-management/BatchProgressTab";
+import TemplateSelector from "../../components/course-management/TemplateSelector";
 
 const templates = [
   { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
@@ -43,6 +44,7 @@ const ExamManagement = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showMarkModal, setShowMarkModal] = useState(false);
+  const [templateSelectionTarget, setTemplateSelectionTarget] = useState(null);
   const [showSampleCsvModal, setShowSampleCsvModal] = useState(false);
   const [sampleCsvForm, setSampleCsvForm] = useState({ examId: "", centerId: "" });
   const [showMarksheetModal, setShowMarksheetModal] = useState(false);
@@ -386,63 +388,12 @@ const ExamManagement = () => {
 
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
-    try {
-      setIsSaving(true);
-      if (isEditing) {
-        // Editing a single mark
-        const payload = {
-          student: markFormData.student,
-          batch: markFormData.batch,
-          semester: markFormData.semester,
-          course: markFormData.course,
-          exam: markFormData.exam,
-          subject: markFormData.subjects[0]?.subject,
-          theoryMark: markFormData.subjects[0]?.theoryMark,
-          internalMark: markFormData.subjects[0]?.internalMark,
-          practicalMark: markFormData.subjects[0]?.practicalMark,
-          template: markFormData.template
-        };
-        await api.put(`/marks/${currentId}`, payload);
-        toast.success("Mark updated successfully");
-
-        await new Promise(resolve => setTimeout(resolve, 800));
-        await fetchData();
-
-        setShowMarkModal(false);
-      } else {
-        const student = students.find(s => s._id === markFormData.student) || {};
-        const course = courses.find(c => c._id === markFormData.course) || {};
-        const batch = batches.find(b => b._id === markFormData.batch) || {};
-
-        const marksForPreview = markFormData.subjects.map(subConf => {
-          const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject)) || {};
-          return {
-            subject: subjectDetails,
-            theoryMark: subConf.theoryMark,
-            internalMark: subConf.internalMark,
-            practicalMark: subConf.practicalMark || 0,
-            passMark: 40,
-            template: markFormData.template
-          };
-        });
-
-        setPreviewSingleData({
-          student,
-          semester: markFormData.semester,
-          course,
-          batch,
-          marks: marksForPreview,
-          templateId: markFormData.template
-        });
-
-        setShowMarkModal(false);
-        setShowSinglePreview(true);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to save results");
-    } finally {
-      setIsSaving(false);
-    }
+    setTemplateSelectionTarget({
+      type: isEditing ? 'edit' : 'single',
+      data: { ...markFormData },
+      currentId: isEditing ? currentId : null
+    });
+    setShowMarkModal(false);
   };
 
   const handleConfirmSingleUpload = async () => {
@@ -497,9 +448,17 @@ const ExamManagement = () => {
     reader.readAsBinaryString(file);
   };
 
-  const handleBulkUploadConfirm = async (payload) => {
+  const handleBulkUploadConfirm = (result) => {
+    setShowBulkUploadPreviewModal(false);
+    setTemplateSelectionTarget({
+      type: 'bulk',
+      data: result.data
+    });
+  };
+
+  const processBulkUpload = async (data, templateId) => {
     try {
-      const data = payload.data || [];
+      
       const total = data.length;
       if (total === 0) return;
 
@@ -512,7 +471,7 @@ const ExamManagement = () => {
 
       for (let i = 0; i < total; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
-        const res = await api.post("/marks/bulk", { marks: chunk, template: payload.template });
+        const res = await api.post("/marks/bulk", { marks: chunk, template: templateId });
         successCount += res.data.results.success;
         failedCount += res.data.results.failed;
         if (res.data.results.errors && res.data.results.errors.length > 0) {
@@ -522,7 +481,7 @@ const ExamManagement = () => {
         setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total });
       }
 
-      toast.success(`Bulk upload completed! Success: ${successCount}, Failed: ${failedCount}`);
+      toast.success(`Bulk upload completed! Total Processed: ${total}, Success: ${successCount}, Failed: ${failedCount}`);
       if (failedCount > 0) {
         toast.error("Some records failed. Check console for details.");
       }
@@ -584,9 +543,13 @@ const ExamManagement = () => {
     for (let i = 1; i <= 10; i++) {
       if (row[`Subject ${i} Code`] !== undefined || row[`Subject ${i} Mark`] !== undefined || row[`Subject ${i} Theory`] !== undefined) {
         let rawTitle = String(row[`Subject ${i} Code`] || `Subject ${i}`);
-        let subCode = rawTitle.includes(' - ') ? rawTitle.split(' - ')[0] : rawTitle;
+        let subCode = rawTitle.includes(' - ') ? rawTitle.split(' - ')[0].trim() : rawTitle.trim();
 
-        const subjectObj = subjects.find(s => s.code === subCode || s.name === subCode);
+        const subjectObj = subjects.find(s => 
+          (s.code?.trim().toLowerCase() === subCode.toLowerCase() || s.name?.trim().toLowerCase() === subCode.toLowerCase()) &&
+          (courseObj ? String(s.course?._id || s.course) === String(courseObj._id) : true) &&
+          Number(s.semester) === Number(semNum)
+        );
 
         if (!subjectObj) {
           errors[`Subject ${i} Code`] = "Subject not found";
@@ -649,6 +612,17 @@ const ExamManagement = () => {
     const studentData = students.find(s => String(s.studentId).trim() === sId) || { studentNameEnglish: 'Student Name', studentId: row["Student ID"], year: 'I Year' };
 
     const mockMarks = [];
+    
+    let extractedCourseId = "";
+    let extractedTitle = row["Course Title"] || 'Course';
+    if (extractedTitle.includes(' - ')) {
+      const parts = extractedTitle.split(' - ');
+      extractedCourseId = parts[0];
+      extractedTitle = parts.slice(1).join(' - ');
+    }
+    const courseObj = courses.find(c => c.courseId === extractedCourseId || c.title === extractedTitle);
+    const semNum = Number(String(row["Semester"] || "1").replace(/\D/g, '')) || 1;
+
     for (let i = 1; i <= 10; i++) {
       if (row[`Subject ${i} Code`] || row[`Subject ${i} Theory`] !== undefined) {
         let rawTitle = String(row[`Subject ${i} Code`] || `Subject ${i}`);
@@ -674,7 +648,11 @@ const ExamManagement = () => {
         const extNum = th === 'AB' ? 0 : th + (prac === 'AB' ? 0 : prac);
         const intNum = int === 'AB' ? 0 : int;
 
-        const subjectObj = subjects.find(s => s.code === subCode || s.name === subCode);
+        const subjectObj = subjects.find(s => 
+          (s.code === subCode || s.name === subCode) &&
+          (courseObj ? String(s.course?._id || s.course) === String(courseObj._id) : true) &&
+          Number(s.semester) === Number(semNum)
+        );
         const actualType = subjectObj ? subjectObj.type : 'Theory';
 
         mockMarks.push({
@@ -687,14 +665,6 @@ const ExamManagement = () => {
           isPass: (th !== 'AB' && int !== 'AB' && prac !== 'AB') && (extNum + intNum) >= 40
         });
       }
-    }
-
-    let extractedCourseId = "";
-    let extractedTitle = row["Course Title"] || 'Course';
-    if (extractedTitle.includes(' - ')) {
-      const parts = extractedTitle.split(' - ');
-      extractedCourseId = parts[0];
-      extractedTitle = parts.slice(1).join(' - ');
     }
 
     const mockData = {
@@ -728,13 +698,13 @@ const ExamManagement = () => {
     // Filter students
     let filteredStudents = students;
     if (courseId) {
-      filteredStudents = filteredStudents.filter(s => s.enrolledCourses?.some(c => c.course?._id === courseId || c.course === courseId));
+      filteredStudents = filteredStudents.filter(s => s.enrolledCourses?.some(c => String(c.course?._id || c.course) === String(courseId)));
     }
     if (batchId) {
-      filteredStudents = filteredStudents.filter(s => s.enrolledCourses?.some(c => c.batch?._id === batchId || c.batch === batchId));
+      filteredStudents = filteredStudents.filter(s => s.enrolledCourses?.some(c => String(c.batch?._id || c.batch) === String(batchId)));
     }
     if (centerId) {
-      filteredStudents = filteredStudents.filter(s => s.center?._id === centerId || s.center === centerId);
+      filteredStudents = filteredStudents.filter(s => String(s.center?._id || s.center) === String(centerId));
     }
 
     // Filter subjects directly from exam
@@ -841,36 +811,15 @@ const ExamManagement = () => {
     }
   };
 
-  const handleBulkEditSave = async (updatedMarks, groupDetails) => {
-    try {
-      setIsSaving(true);
-      await Promise.all(updatedMarks.map(m => {
-        return api.put(`/marks/${m._id}`, {
-          student: groupDetails.student,
-          batch: groupDetails.batch,
-          course: groupDetails.course,
-          semester: groupDetails.semester,
-          subject: m.subject,
-          theoryMark: m.theoryMark,
-          internalMark: m.internalMark,
-          practicalMark: m.practicalMark,
-          template: groupDetails.template
-        });
-      }));
-      toast.success("Semester marks updated successfully");
-
-      // Wait for database read-after-write replication to settle before fetching
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Fetch fresh data from the server while the modal is still open and loading.
-      await fetchData();
-
-      setShowBulkEditModal(false);
-    } catch (error) {
-      toast.error("Failed to update marks");
-    } finally {
-      setIsSaving(false);
-    }
+  const handleBulkEditSave = (updatedMarks, groupDetails) => {
+    setShowBulkEditModal(false);
+    setTemplateSelectionTarget({
+      type: 'bulk-edit',
+      data: {
+        updatedMarks,
+        groupDetails
+      }
+    });
   };
 
   const handleExamChange = (examId) => {
@@ -1127,6 +1076,7 @@ const ExamManagement = () => {
         batch: m.batch,
         course: m.course,
         semester,
+        exam: m.exam,
         students: [],
         totalPass: 0,
         totalFail: 0
@@ -1147,7 +1097,7 @@ const ExamManagement = () => {
   const markBatchColumns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     {
-      name: "Batch / Exam",
+      name: "Batch",
       selector: row => row.batch?.name,
       sortable: true,
       cell: row => (
@@ -1155,6 +1105,29 @@ const ExamManagement = () => {
           {row.batch?.name || "N/A"}
         </button>
       )
+    },
+    {
+      name: "Exam",
+      selector: row => {
+        if (row.exam?.name) return row.exam.name;
+        const inferredExam = exams.find(e => 
+          (e.course?._id || e.course) === (row.course?._id || row.course) && 
+          e.semester === row.semester
+        );
+        return inferredExam?.name;
+      },
+      sortable: true,
+      cell: row => {
+        let examName = row.exam?.name;
+        if (!examName) {
+          const inferredExam = exams.find(e => 
+            (e.course?._id || e.course) === (row.course?._id || row.course) && 
+            e.semester === row.semester
+          );
+          examName = inferredExam?.name;
+        }
+        return <span className="font-semibold text-slate-700">{examName || "N/A"}</span>;
+      }
     },
     {
       name: "Course",
@@ -1344,6 +1317,29 @@ const ExamManagement = () => {
       )
     },
     {
+      name: "Exam",
+      selector: row => {
+        if (row.exam?.name) return row.exam.name;
+        const inferredExam = exams.find(e => 
+          (e.course?._id || e.course) === (row.course?._id || row.course) && 
+          e.semester === row.semester
+        );
+        return inferredExam?.name;
+      },
+      sortable: true,
+      cell: row => {
+        let examName = row.exam?.name;
+        if (!examName) {
+          const inferredExam = exams.find(e => 
+            (e.course?._id || e.course) === (row.course?._id || row.course) && 
+            e.semester === row.semester
+          );
+          examName = inferredExam?.name;
+        }
+        return <span className="font-semibold text-slate-700">{examName || "N/A"}</span>;
+      }
+    },
+    {
       name: "Course",
       selector: row => row.course?.title,
       sortable: true,
@@ -1495,8 +1491,208 @@ const ExamManagement = () => {
     ? batchMarksArray.find(b => b.key === viewingMarkBatch.key) 
     : null;
 
+
+  const handleTemplateConfirm = async (templateId) => {
+    if (!templateSelectionTarget) return;
+    
+    try {
+      setIsSaving(true);
+      if (templateSelectionTarget.type === 'bulk') {
+          const bulkData = templateSelectionTarget.data;
+          setTemplateSelectionTarget(null);
+          await processBulkUpload(bulkData, templateId);
+          return;
+        } else if (templateSelectionTarget.type === 'bulk-edit') {
+          const { updatedMarks, groupDetails } = templateSelectionTarget.data;
+          await Promise.all(updatedMarks.map(m => {
+            return api.put(`/marks/${m._id}`, {
+              student: groupDetails.student,
+              batch: groupDetails.batch,
+              course: groupDetails.course,
+              semester: groupDetails.semester,
+              subject: m.subject,
+              theoryMark: m.theoryMark,
+              internalMark: m.internalMark,
+              practicalMark: m.practicalMark,
+              template: templateId
+            });
+          }));
+          toast.success("Semester marks updated successfully");
+        }
+      
+      if (templateSelectionTarget.type === 'edit') {
+        const payload = { ...templateSelectionTarget.data, template: templateId };
+        if (payload.subjects && payload.subjects.length > 0) {
+           payload.subject = payload.subjects[0].subject;
+           payload.theoryMark = payload.subjects[0].theoryMark;
+           payload.internalMark = payload.subjects[0].internalMark;
+           payload.practicalMark = payload.subjects[0].practicalMark;
+        }
+        await api.put(`/marks/${templateSelectionTarget.currentId}`, payload);
+        toast.success("Mark updated successfully");
+      } else if (templateSelectionTarget.type === 'single') {
+        const payload = { ...templateSelectionTarget.data, template: templateId };
+        const student = students.find(s => s._id === payload.student) || {};
+        const course = courses.find(c => c._id === payload.course) || {};
+        const batch = batches.find(b => b._id === payload.batch) || {};
+        
+        const marksForPreview = payload.subjects.map(subConf => {
+          const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject)) || {};
+          return {
+            subject: subjectDetails,
+            theoryMark: subConf.theoryMark,
+            internalMark: subConf.internalMark,
+            practicalMark: subConf.practicalMark || 0,
+            passMark: 40,
+            template: templateId
+          };
+        });
+
+        const previewData = {
+          student,
+          semester: payload.semester,
+          course,
+          exam: exams.find(e => e._id === payload.exam) || {},
+          batch,
+          marks: marksForPreview,
+          templateId: templateId
+        };
+        
+        const finalPayload = {
+          student: previewData.student._id,
+          batch: previewData.batch._id,
+          semester: previewData.semester,
+          course: previewData.course._id,
+          exam: previewData.exam._id,
+          template: templateId,
+          subjects: previewData.marks.map(m => ({
+            subject: m.subject._id,
+            theoryMark: m.theoryMark,
+            internalMark: m.internalMark,
+            practicalMark: m.practicalMark
+          }))
+        };
+
+        await api.post("/marks/bulk-student-semester", finalPayload);
+        toast.success("Result uploaded successfully");
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 800));
+      await fetchData();
+      setTemplateSelectionTarget(null);
+
+    } catch (error) {
+      console.error("Submit error:", error);
+      toast.error(error.response?.data?.message || "Failed to upload result");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTemplatePreview = (templateId) => {
+      if (templateSelectionTarget?.type === 'bulk') {
+        const firstRow = templateSelectionTarget.data[0];
+        if (firstRow) handlePreviewRow(firstRow, templateId);
+      } else if (templateSelectionTarget?.type === 'bulk-edit') {
+        const { updatedMarks, groupDetails } = templateSelectionTarget.data;
+        const student = students.find(s => s._id === groupDetails.student) || {};
+        const course = courses.find(c => c._id === groupDetails.course) || {};
+        const batch = batches.find(b => b._id === groupDetails.batch) || {};
+        
+        const marksForPreview = updatedMarks.map(m => {
+          const subjectDetails = subjects.find(s => s._id === m.subject) || {};
+          return {
+            subject: subjectDetails,
+            theoryMark: m.theoryMark,
+            internalMark: m.internalMark,
+            practicalMark: m.practicalMark || 0,
+            passMark: 40,
+            template: templateId
+          };
+        });
+
+        setPreviewSingleData({
+          student,
+          semester: groupDetails.semester,
+          course,
+          exam: exams.find(e => e.course === groupDetails.course && e.semester === groupDetails.semester) || {},
+          batch,
+          marks: marksForPreview,
+          templateId: templateId
+        });
+        setShowSinglePreview(true);
+      } else {
+        const payload = templateSelectionTarget.data;
+        const student = students.find(s => s._id === payload.student) || {};
+        const course = courses.find(c => c._id === payload.course) || {};
+        const batch = batches.find(b => b._id === payload.batch) || {};
+        
+        const marksForPreview = payload.subjects.map(subConf => {
+          const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject)) || {};
+          return {
+            subject: subjectDetails,
+            theoryMark: subConf.theoryMark,
+            internalMark: subConf.internalMark,
+            practicalMark: subConf.practicalMark || 0,
+            passMark: 40,
+            template: templateId
+          };
+        });
+
+        setPreviewSingleData({
+          student,
+          semester: payload.semester,
+          course,
+          exam: exams.find(e => e._id === payload.exam) || {},
+          batch,
+          marks: marksForPreview,
+          templateId: templateId
+        });
+        setShowSinglePreview(true);
+     }
+  };
+
+  if (templateSelectionTarget) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <TemplateSelector 
+          templates={templates}
+          selectedTemplate={templateSelectionTarget.selectedTemplateId || templateSelectionTarget.data.template || "rg_modern"}
+          onSelect={(id) => setTemplateSelectionTarget({...templateSelectionTarget, selectedTemplateId: id})}
+          onPreview={handleTemplatePreview}
+          onSubmit={() => handleTemplateConfirm(templateSelectionTarget.selectedTemplateId || templateSelectionTarget.data.template || "rg_modern")}
+          onBack={() => {
+            if (templateSelectionTarget.type === 'bulk') setShowBulkUploadPreviewModal(true);
+            else if (templateSelectionTarget.type === 'bulk-edit') setShowBulkEditModal(true);
+            else setShowMarkModal(true);
+            setTemplateSelectionTarget(null);
+          }}
+          isSaving={isSaving}
+        />
+        
+        {showMarksheetModal && selectedGroupData && (
+          <MarksheetModal
+            data={selectedGroupData}
+            onClose={() => setShowMarksheetModal(false)}
+            template={{ id: selectedGroupData.templateId || 'rg_modern' }}
+          />
+        )}
+        
+        {showSinglePreview && previewSingleData && (
+          <MarksheetModal
+            data={previewSingleData}
+            onClose={() => setShowSinglePreview(false)}
+            template={{ id: previewSingleData.templateId || 'rg_modern' }}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+
+      {!showMarkModal && !showBulkUploadPreviewModal && (<>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Examination Management</h1>
@@ -1785,7 +1981,7 @@ const ExamManagement = () => {
       {/* Exam Modal */}
       {showModal && isAdmin && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
@@ -2038,9 +2234,10 @@ const ExamManagement = () => {
       )}
 
       {/* Mark Modal */}
+      </>)}
       {showMarkModal && isAdmin && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-100 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="w-full p-8">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
@@ -2207,17 +2404,10 @@ const ExamManagement = () => {
                 </div>
               )}
 
-              <div className="mt-4">
-                <label className="block text-sm font-bold text-slate-700 mb-1">Marksheet Template</label>
-                <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={markFormData.template} onChange={(e) => setMarkFormData({ ...markFormData, template: e.target.value })}>
-                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-
               <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setShowMarkModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
                 <button type="submit" disabled={isSaving || !markFormData.subjects || markFormData.subjects.length === 0} className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
-                  {isEditing ? "Update Mark" : "Upload Result"}
+                  Next: Choose Template
                 </button>
               </div>
             </form>

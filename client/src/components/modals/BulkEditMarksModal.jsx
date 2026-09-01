@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { X, Save, CheckSquare } from 'lucide-react';
 
-const BulkEditMarksModal = ({ data, onClose, onSave, students, batches, courses, subjects, templates, isSaving }) => {
+const BulkEditMarksModal = ({ data, onClose, onSave, students, batches, courses, subjects, isSaving }) => {
   const [groupDetails, setGroupDetails] = useState({
     student: data.student?._id || data.student,
     batch: data.batch?._id || data.batch,
     course: data.course?._id || data.course,
-    semester: data.semester,
-    template: data.templateId || (data.marks && data.marks.length > 0 ? data.marks[0].template : 'rg_modern') || 'rg_modern'
+    semester: data.semester
   });
 
   const [marksState, setMarksState] = useState(
@@ -76,12 +75,6 @@ const BulkEditMarksModal = ({ data, onClose, onSave, students, batches, courses,
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => <option key={sem} value={sem}>Semester {sem}</option>)}
               </select>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-bold text-slate-700 mb-1">Marksheet Template</label>
-              <select required disabled={isSaving} className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm bg-white disabled:opacity-50" value={groupDetails.template} onChange={(e) => setGroupDetails({ ...groupDetails, template: e.target.value })}>
-                {templates?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </div>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -134,17 +127,8 @@ const BulkEditMarksModal = ({ data, onClose, onSave, students, batches, courses,
 
           <div className="flex gap-3 pt-4 border-t border-slate-100">
             <button type="button" onClick={onClose} disabled={isSaving} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50">Cancel</button>
-            <button type="submit" disabled={isSaving} className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-              {isSaving ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save size={18} /> Save All Marks
-                </>
-              )}
+            <button type="button" disabled={isSaving} onClick={() => onSave(marksState, groupDetails)} className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 flex items-center justify-center gap-2">
+              Next: Choose Template
             </button>
           </div>
         </form>

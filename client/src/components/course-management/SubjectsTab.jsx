@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import CustomDataTable from "../../components/common/DataTable";
 import AssignStudentsModal from "../../components/modals/AssignStudentsModal";
 import MultiSelectSubjects from "../../components/common/MultiSelectSubjects";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -159,6 +160,8 @@ const SubjectsTab = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [batchStep, setBatchStep] = useState(1);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -396,20 +399,22 @@ const SubjectsTab = () => {
     fetchData();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete this ${config[activeTab].singular}?`,
-      )
-    ) {
-      try {
-        await api.delete(`${config[activeTab].endpoint}/${id}`);
-        setData(data.filter((item) => item._id !== id));
-        toast.success(`${config[activeTab].singular} deleted`);
-      } catch {
-        toast.error(`Error deleting ${activeTab}`);
-      }
+  const handleDelete = (id) => {
+    setItemToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+    try {
+      await api.delete(`${config[activeTab].endpoint}/${itemToDelete}`);
+      setData(data.filter((item) => item._id !== itemToDelete));
+      toast.success(`${config[activeTab].singular} deleted`);
+    } catch {
+      toast.error(`Error deleting ${activeTab}`);
     }
+    setDeleteModalOpen(false);
+    setItemToDelete(null);
   };
 
   const handleSubmit = async (e) => {
@@ -417,7 +422,7 @@ const SubjectsTab = () => {
 
     const formattedData = {
       ...formData,
-      name: formData.name ? toTitleCase(formData.name.trim()) : undefined,
+      name: formData.name ? formData.name.trim() : undefined,
     };
 
     try {
@@ -765,7 +770,16 @@ const SubjectsTab = () => {
         </button>
       </div>
 
-
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title={`Delete ${config[activeTab].singular}?`}
+        message={`Are you sure you want to delete this ${config[activeTab].singular}? This action cannot be undone.`}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
 
       {/* Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden pb-4">

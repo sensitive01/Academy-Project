@@ -77,22 +77,22 @@ const ConfirmationModal = ({
         </div>
 
         {/* Footer / Buttons Layout */}
-        <div className="p-8 pt-4 flex flex-col gap-3">
+        <div className="p-8 pt-4 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3.5 rounded-xl text-slate-500 bg-slate-50 font-bold text-sm hover:text-slate-700 hover:bg-slate-100 transition-all duration-200"
+          >
+            {cancelText}
+          </button>
+
           <button
             onClick={() => {
               onConfirm();
               onClose();
             }}
-            className={`w-full py-4 rounded-2xl font-black text-sm tracking-wide shadow-xl active:scale-[0.98] transition-all duration-200 ${config.btnClass}`}
+            className={`flex-1 py-3.5 rounded-xl font-black text-sm tracking-wide shadow-xl active:scale-[0.98] transition-all duration-200 ${config.btnClass}`}
           >
             {confirmText}
-          </button>
-          
-          <button
-            onClick={onClose}
-            className="w-full py-3.5 rounded-xl text-slate-400 font-bold text-sm hover:text-slate-600 hover:bg-slate-50 transition-all duration-200"
-          >
-            {cancelText}
           </button>
         </div>
 

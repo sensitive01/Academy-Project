@@ -64,14 +64,25 @@ router.get("/progress", protect, async (req, res) => {
     const batches = await Batch.find().populate("courses").lean();
     
     const stats = await Promise.all(batches.map(async (batch) => {
-      const totalStudents = await Student.countDocuments({ "enrolledCourses.batch": batch._id });
-      const studentsWithMarks = await Mark.distinct("student", { batch: batch._id });
+      const onboardedStudents = await Student.find({ "enrolledCourses.batch": batch._id }).select('_id').lean();
+      const onboardedStudentIds = onboardedStudents.map(s => s._id);
+      
+      const totalStudents = onboardedStudentIds.length;
+      
+      const uploadedMarks = await Mark.find({ 
+        batch: batch._id,
+        student: { $in: onboardedStudentIds }
+      }).populate('exam', 'name').lean();
+      
+      const studentsWithMarks = [...new Set(uploadedMarks.map(m => m.student.toString()))];
+      const uniqueExams = [...new Set(uploadedMarks.filter(m => m.exam).map(m => m.exam.name))];
       
       return {
         _id: batch._id,
         batchId: batch.batchId,
         name: batch.name,
         courseNames: batch.courses ? batch.courses.map(c => c.title).join(", ") : "",
+        examNames: uniqueExams.length > 0 ? uniqueExams.join(", ") : "",
         totalStudents,
         uploadedCount: studentsWithMarks.length,
         remainingCount: totalStudents - studentsWithMarks.length
@@ -83,6 +94,79 @@ router.get("/progress", protect, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+//////////////////////////////////////////////////////
+// GET BATCH PROGRESS STUDENTS
+//////////////////////////////////////////////////////
+router.get("/:id/progress-students", protect, async (req, res) => {
+  try {
+    const batch = await Batch.findById(req.params.id)
+      .populate("courses")
+      .populate("centers")
+      .lean();
+      
+    if (!batch) {
+      return res.status(404).json({ message: "Batch not found" });
+    }
+
+    const onboardedStudents = await Student.find({ "enrolledCourses.batch": batch._id })
+      .populate("center")
+      .lean();
+      
+    const onboardedStudentIds = onboardedStudents.map(s => s._id);
+    const uploadedMarks = await Mark.find({ 
+      batch: batch._id,
+      student: { $in: onboardedStudentIds }
+    }).populate('exam', 'name').lean();
+    
+    const uploadedStudentIdsStr = [...new Set(uploadedMarks.map(m => m.student.toString()))];
+    
+    const uploadedStudents = [];
+    const remainingStudents = [];
+    
+    for (const student of onboardedStudents) {
+      const studentMarks = uploadedMarks.filter(m => m.student.toString() === student._id.toString());
+      const examName = studentMarks.length > 0 && studentMarks[0].exam ? studentMarks[0].exam.name : null;
+
+      // Create a mapped structure to send back clean data for datatable
+      const mappedStudent = {
+        _id: student._id,
+        studentId: student.studentId,
+        studentNameEnglish: student.studentNameEnglish,
+        centerCode: student.center?.centerId || 'N/A',
+        centerName: student.center?.name || 'N/A',
+        examName: examName
+      };
+      
+      if (uploadedStudentIdsStr.includes(student._id.toString())) {
+        uploadedStudents.push(mappedStudent);
+      } else {
+        remainingStudents.push(mappedStudent);
+      }
+    }
+    
+    res.json({
+      batch,
+      totalStudents: onboardedStudents.map(s => {
+        const studentMarks = uploadedMarks.filter(m => m.student.toString() === s._id.toString());
+        const examName = studentMarks.length > 0 && studentMarks[0].exam ? studentMarks[0].exam.name : null;
+        return {
+          _id: s._id,
+          studentId: s.studentId,
+          studentNameEnglish: s.studentNameEnglish,
+          centerCode: s.center?.centerId || 'N/A',
+          centerName: s.center?.name || 'N/A',
+          examName: examName
+        };
+      }),
+      uploadedStudents,
+      remainingStudents
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 //////////////////////////////////////////////////////
 // UPDATE BATCH

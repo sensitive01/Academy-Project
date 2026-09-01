@@ -19,11 +19,11 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
 
   const processedData = React.useMemo(() => {
     if (!validateRow) return { all: previewData.map((r, i) => ({ ...r, _originalIndex: i, _errors: {} })), invalid: [], missingMarks: [] };
-    
+
     const all = [];
     const invalid = [];
     const missingMarks = [];
-    
+
     previewData.forEach((row, idx) => {
       const { isValid, errors } = validateRow(row);
       const rowWithMeta = { ...row, _originalIndex: idx, _errors: errors };
@@ -42,7 +42,7 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
         missingMarks.push(rowWithMeta);
       }
     });
-    
+
     return { all, invalid, missingMarks };
   }, [previewData, validateRow]);
 
@@ -61,12 +61,12 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
       const theoryKey = updatedRow[`Subject ${subjectIndex} Theory`] !== undefined ? `Subject ${subjectIndex} Theory` : `Subject ${subjectIndex} Mark`;
       const internalKey = `Subject ${subjectIndex} Internal`;
       const totalKey = `Subject ${subjectIndex} Total`;
-      
+
       // Only update total if the Total column exists in the data
       if (updatedRow[totalKey] !== undefined) {
         const thVal = String(updatedRow[theoryKey] || "").trim().toUpperCase();
         const intVal = String(updatedRow[internalKey] || "").trim().toUpperCase();
-        
+
         if (thVal === 'AB' || intVal === 'AB') {
           updatedRow[totalKey] = 'AB';
         } else {
@@ -91,13 +91,11 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
       alert("Please fix all invalid records before uploading.");
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
-      // Filter out records that have missing marks
-      const dataToUpload = processedData.all.filter(row => 
-        !processedData.missingMarks.some(m => m._originalIndex === row._originalIndex)
-      );
+      // Upload all records (missing marks will be treated as 0 by the backend if not invalid)
+      const dataToUpload = processedData.all;
 
       // Clean up metadata before saving
       const cleanData = dataToUpload.map(row => {
@@ -120,19 +118,6 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
             <h2 className="text-xl font-bold text-slate-900">Bulk Upload Preview</h2>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-bold text-slate-700">Marksheet Template:</label>
-              <select
-                className="rounded-lg border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2 text-sm bg-white"
-                value={selectedTemplate}
-                onChange={(e) => setSelectedTemplate(e.target.value)}
-                disabled={isSubmitting}
-              >
-                {templates.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
             <button onClick={onClose} disabled={isSubmitting} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors disabled:opacity-50">
               <X size={20} />
             </button>
@@ -142,22 +127,20 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
         <div className="flex gap-4 border-b border-slate-200 mb-4 px-2 shrink-0">
           <button
             onClick={() => setActiveTab('all')}
-            className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 ${
-              activeTab === 'all'
+            className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 ${activeTab === 'all'
                 ? 'border-brand-500 text-brand-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
+              }`}
           >
             All Records ({processedData.all.length})
           </button>
           {processedData.invalid.length > 0 && (
             <button
               onClick={() => setActiveTab('invalid')}
-              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
-                activeTab === 'invalid'
+              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${activeTab === 'invalid'
                   ? 'border-red-500 text-red-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+                }`}
             >
               Needs Correction ({processedData.invalid.length})
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
@@ -166,11 +149,10 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
           {processedData.missingMarks.length > 0 && (
             <button
               onClick={() => setActiveTab('missingMarks')}
-              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
-                activeTab === 'missingMarks'
+              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${activeTab === 'missingMarks'
                   ? 'border-yellow-500 text-yellow-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+                }`}
             >
               Missing Marks ({processedData.missingMarks.length})
             </button>
@@ -178,11 +160,10 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
           {missingStudentsData.length > 0 && (
             <button
               onClick={() => setActiveTab('missing')}
-              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${
-                activeTab === 'missing'
+              className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${activeTab === 'missing'
                   ? 'border-orange-500 text-orange-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+                }`}
             >
               Missing in Sheet ({missingStudentsData.length})
             </button>
@@ -199,7 +180,7 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
               </div>
             </div>
           )}
-          
+
           {activeTab === 'missing' ? (
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-30 shadow-sm">
@@ -228,57 +209,57 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
               </tbody>
             </table>
           ) : (
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-30 shadow-sm">
-              <tr>
-                <th className="px-4 py-3 whitespace-nowrap">S.No</th>
-                {headers.map(h => <th key={h} className="px-4 py-3 whitespace-nowrap">{h}</th>)}
-                <th className="px-4 py-3 whitespace-nowrap text-center text-slate-600 bg-slate-100 sticky right-0 z-40 border-l border-slate-200">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentDisplayData.map((row) => (
-                <tr key={row._originalIndex} className="bg-white border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{row._originalIndex + 1}</td>
-                  {headers.map(h => (
-                    <td key={h} className="px-4 py-3 relative group">
-                      <input
-                        type="text"
-                        value={row[h] !== undefined && row[h] !== null ? row[h] : ''}
-                        onChange={(e) => handleEditCell(row._originalIndex, h, e.target.value)}
-                        disabled={isSubmitting}
-                        className={`w-full bg-transparent border-b ${row._errors && row._errors[h] ? 'border-red-500 text-red-600 font-bold bg-red-50' : 'border-transparent hover:border-slate-300'} focus:border-brand-500 focus:ring-0 px-1 py-1 transition-colors min-w-[80px] disabled:opacity-50`}
-                        title={row._errors && row._errors[h] ? row._errors[h] : ''}
-                      />
-                      {row._errors && row._errors[h] && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50 whitespace-nowrap bg-red-600 text-white text-[11px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none">
-                          {row._errors[h]}
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-red-600"></div>
-                        </div>
-                      )}
-                    </td>
-                  ))}
-                  <td className="px-4 py-3 text-center sticky right-0 z-20 bg-white border-l border-slate-100 group-hover:bg-slate-50 flex items-center justify-center gap-2">
-                    {onPreviewRow && (
-                      <button disabled={isSubmitting} onClick={() => onPreviewRow(row, selectedTemplate)} className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50" title="Preview Marksheet">
-                        <FileArchive size={16} />
-                      </button>
-                    )}
-                    <button disabled={isSubmitting} onClick={() => handleDeleteRow(row._originalIndex)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50" title="Delete Row">
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {currentDisplayData.length === 0 && (
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-30 shadow-sm">
                 <tr>
-                  <td colSpan={headers.length + 2} className="px-4 py-8 text-center text-slate-500">
-                    No records found in this tab.
-                  </td>
+                  <th className="px-4 py-3 whitespace-nowrap">S.No</th>
+                  {headers.map(h => <th key={h} className="px-4 py-3 whitespace-nowrap">{h}</th>)}
+                  <th className="px-4 py-3 whitespace-nowrap text-center text-slate-600 bg-slate-100 sticky right-0 z-40 border-l border-slate-200">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {currentDisplayData.map((row) => (
+                  <tr key={row._originalIndex} className="bg-white border-b border-slate-100 hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">{row._originalIndex + 1}</td>
+                    {headers.map(h => (
+                      <td key={h} className="px-4 py-3 relative group">
+                        <input
+                          type="text"
+                          value={row[h] !== undefined && row[h] !== null ? row[h] : ''}
+                          onChange={(e) => handleEditCell(row._originalIndex, h, e.target.value)}
+                          disabled={isSubmitting}
+                          className={`w-full bg-transparent border-b ${row._errors && row._errors[h] ? 'border-red-500 text-red-600 font-bold bg-red-50' : 'border-transparent hover:border-slate-300'} focus:border-brand-500 focus:ring-0 px-1 py-1 transition-colors min-w-[80px] disabled:opacity-50`}
+                          title={row._errors && row._errors[h] ? row._errors[h] : ''}
+                        />
+                        {row._errors && row._errors[h] && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50 whitespace-nowrap bg-red-600 text-white text-[11px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none">
+                            {row._errors[h]}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-red-600"></div>
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-center sticky right-0 z-20 bg-white border-l border-slate-100 group-hover:bg-slate-50 flex items-center justify-center gap-2">
+                      {onPreviewRow && (
+                        <button disabled={isSubmitting} onClick={() => onPreviewRow(row, selectedTemplate)} className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50" title="Preview Marksheet">
+                          <FileArchive size={16} />
+                        </button>
+                      )}
+                      <button disabled={isSubmitting} onClick={() => handleDeleteRow(row._originalIndex)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50" title="Delete Row">
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {currentDisplayData.length === 0 && (
+                  <tr>
+                    <td colSpan={headers.length + 2} className="px-4 py-8 text-center text-slate-500">
+                      No records found in this tab.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           )}
         </div>
 
@@ -286,16 +267,12 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
           <button type="button" disabled={isSubmitting} onClick={onClose} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50">
             Cancel
           </button>
-          <button 
-            onClick={handleSubmit} 
-            disabled={previewData.length === 0 || isSubmitting || processedData.invalid.length > 0 || (processedData.all.length - processedData.missingMarks.length) === 0}
-            className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          <button
+            onClick={handleSubmit}
+            disabled={previewData.length === 0 || isSubmitting || processedData.invalid.length > 0}
+            className="px-6 py-2 bg-brand-600 text-white rounded-xl font-bold shadow-md shadow-brand-600/20 hover:bg-brand-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isSubmitting ? (
-              <><Loader2 size={18} className="animate-spin" /> Uploading...</>
-            ) : (
-              <><Save size={18} /> Confirm Upload ({processedData.all.length - processedData.missingMarks.length} Records)</>
-            )}
+            Next: Choose Template
           </button>
         </div>
       </div>

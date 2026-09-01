@@ -15,6 +15,7 @@ import sealDrRgAcademy from '../../assets/seal-dr-rg-academy.png';
 import sealUnicarewel from '../../assets/seal-unicarewel.png';
 import sealBglrgm from '../../assets/seal-bglrgm.png';
 import sealRgmtn from '../../assets/seal-rgmtn.png';
+import councilHeader from '../../assets/council-header.png';
 
 const getTemplateLogo = (templateId) => {
   switch (templateId) {
@@ -322,28 +323,8 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                   {/* Dynamic Header Block */}
                   {template?.id === 'vocational_council' ? (
-                    <div className="flex mb-1 pb-1 min-h-[75px] items-center justify-between w-full mt-2">
-                      {/* Left Logo */}
-                      <div className="w-[120px] shrink-0 flex justify-start items-start -ml-4">
-                        <img src={getTemplateLogo(template?.id)} alt="CVESW Logo" className="w-28 h-28 object-contain" />
-                      </div>
-                      {/* Center Text */}
-                      <div className="flex-1 text-center flex flex-col justify-center items-center text-[#1a365d]">
-                        <h2 className="text-[20px] font-bold m-0 leading-normal whitespace-nowrap" style={{ fontFamily: 'Arial, sans-serif' }}>
-                          कौशल विकास एवं सामाजिक कल्याण की परिषद
-                        </h2>
-                        <h1 className="text-[18px] font-black m-0 leading-tight whitespace-nowrap" style={{ fontFamily: 'Arial, sans-serif' }}>
-                          Council for Vocational Education and Social Welfare
-                        </h1>
-                        <p className="text-[10px] text-slate-800 m-0 mt-1.5 font-semibold tracking-wide whitespace-nowrap">
-                          Autonomous National Vocational Skill Development licensed Body under section 8, MCA
-                        </p>
-                        <p className="text-[18px] font-black m-0 mt-1 tracking-widest uppercase text-black">
-                          GOVERNMENT OF INDIA
-                        </p>
-                      </div>
-                      {/* Right Spacer to enforce true page centering */}
-                      <div className="w-[130px] shrink-0 -mr-4"></div>
+                    <div className="flex justify-center w-full mt-2 mb-2 px-2">
+                      <img src={councilHeader} alt="Council Header" className="w-full h-auto object-contain" />
                     </div>
                   ) : (
                     <div className="flex pb-0 min-h-[65px] items-center justify-between w-full mt-1 ">
@@ -409,28 +390,28 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                       {/* Row 1: Student Headers */}
                       <tr>
                         <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[20%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>REGISTER NUMBER</th>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE CANDIDATE</th>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE COURSE</th>
+                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="1" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE CANDIDATE</th>
+                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="3" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE COURSE</th>
                       </tr>
 
                       {/* Row 2: Student Values */}
                       <tr>
                         <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="2">{student.studentId}</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal capitalize" colSpan="2">{student.studentNameEnglish}</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="2">{course?.title}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal capitalize" colSpan="1">{student.studentNameEnglish}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="3">{course?.title}</td>
                       </tr>
 
                       {/* Row 3: Marks Headers */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[10%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>PAPER</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[15%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>COURSE CODE</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[25%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TITLE OF THE SUBJECT</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[35%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>MARKS</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[15%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>RESULT</th>
+                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[8%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>PAPER</th>
+                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[12%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>COURSE CODE</th>
+                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[40%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TITLE OF THE SUBJECT</th>
+                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[26%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>MARKS</th>
+                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[14%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>RESULT</th>
                       </tr>
                       <tr>
-                        <th className="border border-black p-2 text-center text-[9px] font-bold w-[17%]" style={{ fontFamily: 'Times New Roman, serif' }}>ALLOTTED</th>
-                        <th className="border border-black p-2 text-center text-[9px] font-bold w-[18%]" style={{ fontFamily: 'Times New Roman, serif' }}>OBTAINED</th>
+                        <th className="border border-black p-2 text-center text-[9px] font-bold w-[13%]" style={{ fontFamily: 'Times New Roman, serif' }}>ALLOTTED</th>
+                        <th className="border border-black p-2 text-center text-[9px] font-bold w-[13%]" style={{ fontFamily: 'Times New Roman, serif' }}>OBTAINED</th>
                       </tr>
 
                       {/* Dynamic Marks Rows */}
@@ -491,7 +472,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                       {/* Row: DOB and Total */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>DATE OF<br />BIRTH</th>
+                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: 'Times New Roman, serif' }}>DATE OF<br />BIRTH</th>
                         <td className="border border-black p-2 text-center text-[12.5px] font-normal">
                           {student.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '-'}
                         </td>
@@ -511,7 +492,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                       {/* Row: Centre Values */}
                       <tr>
                         <td className="border border-black p-2 text-center text-[12.5px] font-normal uppercase" colSpan="1">{student.center?.centerId || 'N/A'}</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal uppercase" colSpan="3">
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal whitespace-pre-wrap" colSpan="3">
                           {(() => {
                             const shortName = student.center?.name;
                             if (!shortName) return 'N/A';

@@ -21,18 +21,18 @@ const isAdmin = (req, res, next) => {
 const validateMarkLimits = async (courseId, semester, batchId, subjectId, theoryMark, internalMark, practicalMark) => {
   const examQuery = { course: courseId, semester };
   if (batchId) examQuery.batch = batchId;
-  
+
   const exam = await Exam.findOne(examQuery).sort({ createdAt: -1 }).lean();
   if (!exam || !exam.subjects) return null; // No limit checks if exam doesn't exist
-  
+
   const examSubject = exam.subjects.find(s => s.subject.toString() === subjectId.toString());
   if (!examSubject) return null; // Subject not in exam
-  
+
   const errors = [];
   if (internalMark > examSubject.internalMark) {
     errors.push(`Internal mark (${internalMark}) exceeds maximum allowed (${examSubject.internalMark})`);
   }
-  
+
   // External mark is compared against theoryMark or practicalMark depending on subject type
   // Since we don't have subject type here, we just check whichever one is provided > 0 against externalMark
   const providedExternal = Math.max(theoryMark || 0, practicalMark || 0);
@@ -40,7 +40,7 @@ const validateMarkLimits = async (courseId, semester, batchId, subjectId, theory
   if (maxExternal > 0 && providedExternal > maxExternal) {
     errors.push(`External mark (${providedExternal}) exceeds maximum allowed (${maxExternal})`);
   }
-  
+
   if (errors.length > 0) return errors.join(', ');
   return null;
 };
@@ -62,7 +62,7 @@ router.get('/', protect, async (req, res) => {
     marks = marks.map(mark => {
       let passMark = 40; // fallback default
       if (mark.course && mark.subject) {
-        const exam = exams.find(e => 
+        const exam = exams.find(e =>
           e.course.toString() === mark.course._id.toString() &&
           e.semester === mark.semester &&
           (!e.batch || !mark.batch || e.batch.toString() === mark.batch._id.toString())
@@ -77,7 +77,7 @@ router.get('/', protect, async (req, res) => {
       // Calculate isPass dynamically here as well
       const obtained = mark.subject?.type === "Practical" ? (mark.practicalMark || 0) : ((mark.theoryMark || 0) + (mark.internalMark || 0));
       const isPass = obtained >= passMark;
-      
+
       return { ...mark, passMark, isPass };
     });
 
@@ -101,7 +101,7 @@ router.get('/student/:studentId', protect, async (req, res) => {
     marks = marks.map(mark => {
       let passMark = 40; // fallback default
       if (mark.course && mark.subject) {
-        const exam = exams.find(e => 
+        const exam = exams.find(e =>
           e.course.toString() === mark.course._id.toString() &&
           e.semester === mark.semester &&
           (!e.batch || !mark.batch || e.batch.toString() === mark.batch.toString())
@@ -115,7 +115,7 @@ router.get('/student/:studentId', protect, async (req, res) => {
       }
       const obtained = mark.subject?.type === "Practical" ? (mark.practicalMark || 0) : ((mark.theoryMark || 0) + (mark.internalMark || 0));
       const isPass = obtained >= passMark;
-      
+
       return { ...mark, passMark, isPass };
     });
 
@@ -129,7 +129,7 @@ router.get('/student/:studentId', protect, async (req, res) => {
 router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
   try {
     const { student, batch, course, semester, subjects, template, exam } = req.body;
-    
+
     if (!student || !course || !semester || !Array.isArray(subjects)) {
       return res.status(400).json({ message: 'Missing required fields or invalid format' });
     }
@@ -181,7 +181,7 @@ router.post('/bulk-student-semester', protect, isAdmin, async (req, res) => {
 router.post('/', protect, isAdmin, async (req, res) => {
   try {
     const { student, semester, batch, course, exam, subject, theoryMark, internalMark, practicalMark, template } = req.body;
-    
+
     // Check if mark for this student, semester and subject already exists
     const existing = await Mark.findOne({ student, semester, subject });
     if (existing) {
@@ -208,7 +208,7 @@ router.post('/', protect, isAdmin, async (req, res) => {
     };
 
     const mark = await Mark.create(markData);
-    
+
     // Notify student
     const studentDoc = await Student.findById(student).select('user');
     if (studentDoc && studentDoc.user) {
@@ -233,7 +233,7 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
   try {
     const { student, semester, batch, course, exam, subject, theoryMark, internalMark, practicalMark, template } = req.body;
     const mark = await Mark.findById(req.params.id);
-    
+
     if (!mark) {
       return res.status(404).json({ message: 'Mark not found' });
     }
@@ -296,7 +296,7 @@ router.post('/bulk-missing-students', protect, isAdmin, async (req, res) => {
 
     // 1. Find the students that ARE in the Excel sheet
     const uploadedStudents = await Student.find({ studentId: { $in: studentIds } }).populate('center');
-    
+
     // 2. Extract unique (center, course, batch) combinations
     const cohorts = new Set();
     uploadedStudents.forEach(student => {
@@ -336,9 +336,9 @@ router.post('/bulk-missing-students', protect, isAdmin, async (req, res) => {
         { studentId: { $nin: studentIds } }
       ]
     })
-    .populate('center', 'name centerId')
-    .populate('enrolledCourses.course', 'title courseCode')
-    .lean();
+      .populate('center', 'name centerId')
+      .populate('enrolledCourses.course', 'title courseCode')
+      .lean();
 
     res.json({ missingStudents });
   } catch (error) {
@@ -375,7 +375,7 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
         const rawStudentId = row['Student ID'];
         const studentIdStr = rawStudentId ? String(rawStudentId).trim() : "";
         const studentDoc = await Student.findOne({ studentId: studentIdStr });
-        
+
         let courseDoc = null;
         let batchDoc = null;
         let semester;
@@ -390,19 +390,38 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
         } else {
           // Legacy string matching fallback
           let actualCourseTitle = row['Course Title'];
+          let extractedCourseId = "";
           if (actualCourseTitle && String(actualCourseTitle).includes(' - ')) {
             const parts = String(actualCourseTitle).split(' - ');
+            extractedCourseId = parts[0].trim();
             actualCourseTitle = parts.slice(1).join(' - ').trim();
           }
-          courseDoc = await Course.findOne({ title: actualCourseTitle });
+          const queryOr = [{ title: actualCourseTitle }];
+          if (extractedCourseId) {
+            queryOr.push({ courseId: extractedCourseId });
+          }
+          courseDoc = await Course.findOne({ $or: queryOr });
           if (row['Batch Name']) {
             batchDoc = await Batch.findOne({ name: row['Batch Name'] });
           }
-          semester = Number(row['Semester']);
+          const semesterStr = String(row['Semester'] || '1').replace(/\D/g, '');
+          semester = parseInt(semesterStr, 10);
         }
 
         if (!studentDoc || !courseDoc || isNaN(semester)) {
           throw new Error(`Missing student, course, or invalid semester`);
+        }
+
+        let rowExamDoc = examDoc;
+        if (!rowExamDoc) {
+          const query = { course: courseDoc._id, semester };
+          if (batchDoc) query.batch = batchDoc._id;
+          rowExamDoc = await Exam.findOne(query).sort({ date: -1 }); // Prioritize latest
+          
+          if (!rowExamDoc && batchDoc) {
+            // If batch specific exam not found, try finding general exam for course/semester
+            rowExamDoc = await Exam.findOne({ course: courseDoc._id, semester }).sort({ date: -1 });
+          }
         }
 
         let processedAny = false;
@@ -410,23 +429,29 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
         const processSubject = async (codeKey, markKey, internalKey) => {
           if (!row[codeKey]) return false;
           let actualCode = String(row[codeKey]).split(' - ')[0].trim();
-          
-          const subjectDoc = await Subject.findOne({ code: actualCode });
+          const regexCode = new RegExp('^\\s*' + actualCode.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '\\s*$', 'i');
+
+          const subjectDoc = await Subject.findOne({
+            code: regexCode,
+            course: courseDoc._id,
+            semester: semester
+          });
           if (!subjectDoc) {
-             results.failed += 1;
-             results.errors.push(`Row ${i + 1}: Subject code ${actualCode} not found`);
-             return true;
+            console.log(`Row ${i + 1}: Subject code ${actualCode} (regex: ${regexCode}) not found for course ${courseDoc._id} and semester ${semester}`);
+            results.failed += 1;
+            results.errors.push(`Row ${i + 1}: Subject code ${actualCode} not found for this course and semester`);
+            return true;
           }
-          
+
           let theoryMark = 0;
           let practicalMark = 0;
-          
+
           if (subjectDoc.type === "Practical") {
             practicalMark = Number(row[markKey] || 0);
           } else {
             theoryMark = Number(row[markKey] || 0);
           }
-          
+
           const internalMark = Number(row[internalKey] || 0);
 
           const validationError = await validateMarkLimits(courseDoc._id, semester, batchDoc ? batchDoc._id : null, subjectDoc._id, theoryMark, internalMark, practicalMark);
@@ -443,7 +468,7 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
             existing.practicalMark = practicalMark;
             if (template) existing.template = template;
             if (batchDoc) existing.batch = batchDoc._id;
-            if (examDoc) existing.exam = examDoc._id;
+            if (rowExamDoc) existing.exam = rowExamDoc._id;
             await existing.save();
             results.success += 1;
           } else {
@@ -458,7 +483,7 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
               practicalMark,
               template: template || 'rg_modern'
             };
-            if (examDoc) newMarkData.exam = examDoc._id;
+            if (rowExamDoc) newMarkData.exam = rowExamDoc._id;
             await Mark.create(newMarkData);
             results.success += 1;
           }
@@ -467,18 +492,18 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
 
         // Check for old format
         if (row['Subject Code']) {
-           await processSubject('Subject Code', 'Mark', 'Internal Mark');
-           processedAny = true;
+          await processSubject('Subject Code', 'Mark', 'Internal Mark');
+          processedAny = true;
         }
 
         // Check for new multiple-subject format (up to 20 subjects per row)
         for (let j = 1; j <= 20; j++) {
-           const found = await processSubject(`Subject ${j} Code`, `Subject ${j} Mark`, `Subject ${j} Internal`);
-           if (found) processedAny = true;
+          const found = await processSubject(`Subject ${j} Code`, `Subject ${j} Mark`, `Subject ${j} Internal`);
+          if (found) processedAny = true;
         }
 
         if (!processedAny) {
-           throw new Error('No valid subjects provided in row');
+          throw new Error('No valid subjects provided in row');
         }
 
       } catch (err) {

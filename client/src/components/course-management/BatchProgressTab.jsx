@@ -4,10 +4,15 @@ import api from "../../services/api";
 import CustomDataTable from "../../components/common/DataTable";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
+import BatchProgressDetails from "./BatchProgressDetails";
 
 const BatchProgressTab = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBatchId, setSelectedBatchId] = useState(null);
+  const [selectedTab, setSelectedTab] = useState("total");
+  const [search, setSearch] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
 
   useEffect(() => {
     fetchProgressData();
@@ -44,46 +49,125 @@ const BatchProgressTab = () => {
 
   const columns = [
     {
+      name: "S.No",
+      selector: (row, index) => index + 1,
+      sortable: true,
+      width: "90px",
+      center: true
+    },
+    {
       name: "Batch ID",
       selector: row => row.batchId,
-      sortable: true
+      sortable: true,
+      cell: row => (
+        <button 
+          onClick={() => { setSelectedBatchId(row._id); setSelectedTab("total"); }}
+          className="text-brand-600 hover:text-brand-800 hover:underline font-medium text-left"
+        >
+          {row.batchId}
+        </button>
+      )
     },
     {
       name: "Batch Name",
       selector: row => row.name,
       sortable: true,
-      wrap: true
+      wrap: true,
+      cell: row => (
+        <button 
+          onClick={() => { setSelectedBatchId(row._id); setSelectedTab("total"); }}
+          className="text-brand-600 hover:text-brand-800 hover:underline font-medium text-left"
+        >
+          {row.name}
+        </button>
+      )
     },
     {
       name: "Course(s)",
+      width: "230px", 
       selector: row => row.courseNames,
       sortable: true,
       wrap: true
     },
     {
+      name: "Exam Name(s)",
+      width: "200px",
+      selector: row => row.examNames,
+      sortable: true,
+      wrap: true,
+      cell: row => (
+        <span className="font-medium text-slate-700">{row.examNames || '-'}</span>
+      )
+    },
+    {
       name: "Total Onboarded",
       selector: row => row.totalStudents,
       sortable: true,
-      center: true
+      center: true,
+      width: "180px",
+      cell: row => (
+        <button 
+          onClick={() => { setSelectedBatchId(row._id); setSelectedTab("total"); }}
+          className="text-brand-600 hover:text-brand-800 hover:underline font-medium"
+        >
+          {row.totalStudents}
+        </button>
+      )
     },
     {
       name: "Results Uploaded",
       selector: row => row.uploadedCount,
       sortable: true,
-      center: true
+      center: true,
+      width: "180px",
+      cell: row => (
+        <button 
+          onClick={() => { setSelectedBatchId(row._id); setSelectedTab("uploaded"); }}
+          className="text-brand-600 hover:text-brand-800 hover:underline font-medium"
+        >
+          {row.uploadedCount}
+        </button>
+      )
     },
     {
-      name: "Remaining Pending",
+      name: "Pending",
       selector: row => row.remainingCount,
       sortable: true,
       center: true,
+      width: "180px",
       cell: row => (
-        <span className={row.remainingCount > 0 ? "text-amber-600 font-semibold" : "text-green-600 font-semibold"}>
+        <button 
+          onClick={() => { setSelectedBatchId(row._id); setSelectedTab("remaining"); }}
+          className={`hover:underline ${row.remainingCount > 0 ? "text-amber-600 font-semibold" : "text-green-600 font-semibold"}`}
+        >
           {row.remainingCount}
-        </span>
+        </button>
       )
     }
   ];
+
+  if (selectedBatchId) {
+    return (
+      <BatchProgressDetails 
+        batchId={selectedBatchId} 
+        initialTab={selectedTab}
+        onBack={() => setSelectedBatchId(null)} 
+      />
+    );
+  }
+
+  const uniqueCourses = [...new Set(data.flatMap(item => item.courseNames ? item.courseNames.split(", ") : []))].filter(Boolean);
+
+  const filteredData = data.filter(item => {
+    const matchesSearch = search.toLowerCase() === "" || 
+      (item.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.batchId || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.courseNames || "").toLowerCase().includes(search.toLowerCase());
+      
+    const matchesCourse = courseFilter === "" || (item.courseNames || "").includes(courseFilter);
+    
+    return matchesSearch && matchesCourse;
+  });
 
   return (
     <div className="space-y-4">
@@ -104,9 +188,21 @@ const BatchProgressTab = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <CustomDataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           loading={loading}
           searchPlaceholder="Search by batch name, ID, or course..."
+          search={search}
+          setSearch={setSearch}
+          additionalHeaderContent={
+            <select 
+              value={courseFilter} 
+              onChange={e => setCourseFilter(e.target.value)}
+              className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm shadow-sm"
+            >
+              <option value="">All Courses</option>
+              {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          }
         />
       </div>
     </div>
