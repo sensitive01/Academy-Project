@@ -3,6 +3,7 @@ const router = express.Router();
 const Batch = require("../models/Batch");
 const Student = require("../models/Student");
 const { protect } = require("../middleware/authMiddleware");
+const Mark = require("../models/Mark");
 
 //////////////////////////////////////////////////////
 // CREATE BATCH
@@ -50,6 +51,34 @@ router.get("/", protect, async (req, res) => {
       .populate("semesters.subjects")
       .lean();
     res.json(batches);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+//////////////////////////////////////////////////////
+// GET BATCH UPLOAD PROGRESS
+//////////////////////////////////////////////////////
+router.get("/progress", protect, async (req, res) => {
+  try {
+    const batches = await Batch.find().populate("courses").lean();
+    
+    const stats = await Promise.all(batches.map(async (batch) => {
+      const totalStudents = await Student.countDocuments({ "enrolledCourses.batch": batch._id });
+      const studentsWithMarks = await Mark.distinct("student", { batch: batch._id });
+      
+      return {
+        _id: batch._id,
+        batchId: batch.batchId,
+        name: batch.name,
+        courseNames: batch.courses ? batch.courses.map(c => c.title).join(", ") : "",
+        totalStudents,
+        uploadedCount: studentsWithMarks.length,
+        remainingCount: totalStudents - studentsWithMarks.length
+      };
+    }));
+    
+    res.json(stats);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

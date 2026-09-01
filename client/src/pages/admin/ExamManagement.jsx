@@ -13,6 +13,7 @@ import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
 import StudentFeesList from "../../components/payments/StudentFeesList";
 import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
 import Select from "react-select";
+import BatchProgressTab from "../../components/course-management/BatchProgressTab";
 
 const templates = [
   { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
@@ -1558,6 +1559,13 @@ const ExamManagement = () => {
             >
               <DollarSign size={18} /> Payments
             </button>
+            <button
+              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "upload_progress" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+                }`}
+              onClick={() => setActiveTab("upload_progress")}
+            >
+              <Layers size={18} /> Upload Progress
+            </button>
           </>
         )}
       </div>
@@ -1575,6 +1583,10 @@ const ExamManagement = () => {
           />
         ) : activeTab === "payments_list" ? (
           <StudentFeesList feeType="Exam" />
+        ) : activeTab === "upload_progress" ? (
+          <div className="p-6">
+            <BatchProgressTab />
+          </div>
         ) : activeTab === "hall_tickets" ? (
           <div className="p-6">
             {viewingBatch ? (
