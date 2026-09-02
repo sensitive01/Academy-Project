@@ -311,7 +311,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
               </button>
             )}
             <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors font-semibold text-sm">
-              <Download size={16} /> Save PDF
+              <Download size={16} /> Save as PDF
             </button>
             {/* <button onClick={handleBrowserPrint} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-sm">
               <Printer size={16} /> Print
@@ -355,21 +355,11 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                   {/* Dynamic Header Block */}
                   {(!template || template?.id === 'vocational_council') ? (
-                    <div className="flex items-center justify-center w-full mt-2 mb-2 px-2 gap-4">
-                      {/* Left Logo */}
-                      <div className="shrink-0">
-                        <img src={logoVocational} alt="Institution Logo" className="w-[85px] h-[85px] object-contain" />
-                      </div>
-
-                      {/* Right Text - Cropped original image */}
-                      <div 
-                        className="w-[70%] h-[140px]"
-                        style={{
-                          backgroundImage: `url(${councilHeader})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: '-150px center',
-                          backgroundRepeat: 'no-repeat'
-                        }}
+                    <div className="flex items-center justify-center w-full -mt-3 mb-3">
+                      <img 
+                        src={newHeaderBanner} 
+                        alt="Council Header Banner" 
+                        className="w-full h-auto object-contain translate-x-1" 
                       />
                     </div>
                   ) : (
@@ -419,7 +409,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                     </div>
                   )}
 
-                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mb-1 -mt-2' : template?.id === 'dr_rg_academy' ? 'mb-1 mt-1' : 'mb-1 -mt-1'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
+                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mb-3 -mt-14' : template?.id === 'dr_rg_academy' ? 'mb-1 mt-1' : 'mb-1 -mt-1'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
                     {(() => {
                       const map = {
                         1: 'FIRST', 2: 'SECOND', 3: 'THIRD', 4: 'FOURTH',
