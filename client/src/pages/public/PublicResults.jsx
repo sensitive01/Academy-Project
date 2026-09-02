@@ -240,7 +240,7 @@ const PublicResults = () => {
                     {selectedSemester && groupedMarks[selectedSemester] && (
                       (() => {
                         const semMarks = groupedMarks[selectedSemester];
-                        const templateId = semMarks[0]?.template || 'rg_modern';
+                        const templateId = semMarks[0]?.template || 'vocational_council';
                         const templateObj = templates.find(t => t.id === templateId);
 
                         const semData = {

@@ -146,33 +146,32 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
     const loadingToast = toast.loading('Generating PDF...');
 
     try {
-      // Get styles applied to the document
-      const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-        .map(el => el.outerHTML)
-        .join('\n');
-
-      const html = printRef.current.outerHTML;
-      const baseUrl = window.location.origin;
-
-      const response = await api.post('/public-results/generate-pdf', {
-        html,
-        styleTags,
-        baseUrl
-      }, {
-        responseType: 'blob'
+      const element = printRef.current;
+      
+      const canvas = await html2canvas(element, {
+        scale: 2, // Higher quality
+        useCORS: true, // Allow loading cross-origin images
+        logging: false,
+        backgroundColor: '#ffffff'
       });
 
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${student?.studentId || 'Student'}_Semester_${semester}_Marksheet.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      
+      // A4 dimensions in pt: 595.28 x 841.89
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: 'a4'
+      });
 
-      toast.success('PDF downloaded successfully!', { id: loadingToast });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      // Calculate height to maintain aspect ratio
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${student?.studentId || 'Student'}_Semester_${semester}_Marksheet.pdf`);
+
+      toast.success('PDF generated successfully!', { id: loadingToast });
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Failed to generate PDF', { id: loadingToast });
@@ -324,22 +323,23 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                 <div className="relative flex flex-col justify-between" style={{ border: '2px solid #b91c1c', padding: '2px 16px 4px 16px', background: '#fff' }}>
 
                   {/* Dynamic Header Block */}
-                  {template?.id === 'vocational_council' ? (
+                  {(!template || template?.id === 'vocational_council') ? (
                     <div className="flex items-center justify-center w-full mt-2 mb-2 px-2 gap-4">
-                      {/* Left Logo - decreased size */}
-                      <div className="shrink-0 flex justify-end items-center w-[120px]">
+                      {/* Left Logo */}
+                      <div className="shrink-0">
                         <img src={logoVocational} alt="Institution Logo" className="w-[85px] h-[85px] object-contain" />
                       </div>
 
                       {/* Right Text - Cropped original image */}
-                      <div className="flex-1 h-[100px] overflow-hidden ml-4">
-                        <img
-                          src={councilHeader}
-                          alt="Council Header Text"
-                          className="w-full h-full object-cover object-left"
-                          style={{ objectPosition: '-140px center' }}
-                        />
-                      </div>
+                      <div 
+                        className="w-[70%] h-[100px]"
+                        style={{
+                          backgroundImage: `url(${councilHeader})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: '-105px center',
+                          backgroundRepeat: 'no-repeat'
+                        }}
+                      />
                     </div>
                   ) : (
                     <div className="flex pb-0 min-h-[65px] items-center justify-between w-full mt-1 ">
@@ -373,7 +373,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                             )}
 
                             {/* Show full address block for RG Modern */}
-                            {(!template || template.id === 'rg_modern') && (
+                            {(template?.id === 'rg_modern') && (
                               <>
                                 <p className="text-black text-[11px] font-semibold m-0 mt-1 uppercase whitespace-nowrap">Managed By - R.G MODERN EDUCATIONAL AND CHARITABLE TRUST - (RGMECT)</p>
                                 <p className="text-black text-[10px] m-0 mt-1 font-medium whitespace-nowrap">No: 21, 3rd Floor, 9th Main, 6th Cross, RK Layout – 2nd Stage, Padmanabha Nagar, Bengaluru – 560070</p>
