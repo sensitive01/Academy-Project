@@ -301,13 +301,21 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
       <div className={`overflow-y-auto p-4 md:p-8 bg-white ${inline ? 'rounded-2xl' : 'rounded-b-2xl'}`}>
         {inline && (
-          <div className="relative flex justify-center items-center mb-6 min-h-[44px]">
-            {title && (
-              <h3 className="text-xl font-bold text-slate-800 uppercase tracking-wider">{title}</h3>
-            )}
-            <button onClick={handleDownloadPDF} className="absolute right-0 flex items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl hover:bg-brand-700 transition-colors font-bold text-sm shadow-md shadow-brand-600/20">
-              <Download size={18} /> Save as PDF
-            </button>
+          <div className="relative flex flex-col sm:block mb-6 min-h-[44px]">
+            <div className="flex justify-center sm:hidden mb-4">
+              <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl hover:bg-brand-700 transition-colors font-bold text-sm shadow-md shadow-brand-600/20">
+                <Download size={18} /> Save as PDF
+              </button>
+            </div>
+            
+            <div className="flex justify-center items-center relative">
+              {title && (
+                <h3 className="text-xl font-bold text-slate-800 uppercase tracking-wider text-center">{title}</h3>
+              )}
+              <button onClick={handleDownloadPDF} className="hidden sm:flex absolute right-0 items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl hover:bg-brand-700 transition-colors font-bold text-sm shadow-md shadow-brand-600/20">
+                <Download size={18} /> Save as PDF
+              </button>
+            </div>
           </div>
         )}
         <div ref={printRef} className="print-marksheet mx-auto text-black bg-white flex flex-col" style={{ width: '210mm', minHeight: '297mm', padding: '12mm', boxSizing: 'border-box' }}>

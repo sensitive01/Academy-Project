@@ -61,6 +61,7 @@ router.post('/results', async (req, res) => {
 
     const student = await Student.findOne({ studentId })
       .populate('enrolledCourses.course', 'title')
+      .populate('enrolledCourses.batch', 'numberOfSemesters')
       .populate('center');
       
     if (!student) {
@@ -89,8 +90,14 @@ router.post('/results', async (req, res) => {
       .sort({ semester: 1 });
 
     let courseName = '';
-    if (student.enrolledCourses && student.enrolledCourses.length > 0 && student.enrolledCourses[0].course) {
-       courseName = student.enrolledCourses[0].course.title;
+    let totalSemesters = 0;
+    if (student.enrolledCourses && student.enrolledCourses.length > 0) {
+      if (student.enrolledCourses[0].course) {
+        courseName = student.enrolledCourses[0].course.title;
+      }
+      if (student.enrolledCourses[0].batch && student.enrolledCourses[0].batch.numberOfSemesters) {
+        totalSemesters = student.enrolledCourses[0].batch.numberOfSemesters;
+      }
     }
 
     res.status(200).json({
@@ -98,7 +105,8 @@ router.post('/results', async (req, res) => {
       student: {
         name: student.studentNameEnglish,
         studentId: student.studentId,
-        courseName: courseName
+        courseName: courseName,
+        totalSemesters: totalSemesters
       },
       studentFull: student,
       marks

@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { Search, Calendar, FileText, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import MarksheetModal from '../../components/modals/MarksheetModal';
-import logoHeader from "../../assets/logo-2.jpeg";
+import logoHeader from "../../assets/RG-Academy.png";
 
 const templates = [
   { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
@@ -32,6 +32,13 @@ const PublicResults = () => {
     if (!studentId) return toast.error('Please enter your Student ID');
     if (!dob) return toast.error('Please enter your Date of Birth');
 
+    // If results are already fetched, move to step 2
+    if (results) {
+      if (!selectedSemester) return toast.error('Please select a semester');
+      setStep(2);
+      return;
+    }
+
     let formattedDob = dob;
     if (dob.includes('-') && dob.split('-')[0].length === 4) {
       const [year, month, day] = dob.split('-');
@@ -47,15 +54,26 @@ const PublicResults = () => {
       if (data.marks && data.marks.length > 0) {
         const semesters = [...new Set(data.marks.map(m => m.semester))].sort((a, b) => b - a);
         setSelectedSemester(semesters[0].toString());
+        toast.success('Details verified. Please select a semester.');
+      } else {
+        toast.error('No results found for this student');
       }
       
-      setStep(2);
-      toast.success('Results fetched successfully');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Invalid Student ID or Date of Birth');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStudentIdChange = (e) => {
+    setStudentId(e.target.value);
+    if (results) setResults(null);
+  };
+
+  const handleDobChange = (e) => {
+    setDob(e.target.value);
+    if (results) setResults(null);
   };
 
   const groupedMarks = {};
@@ -97,7 +115,7 @@ const PublicResults = () => {
                       type="text"
                       id="studentId"
                       value={studentId}
-                      onChange={(e) => setStudentId(e.target.value)}
+                      onChange={handleStudentIdChange}
                       className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-slate-900"
                       placeholder="e.g. STU-XXXX-YYYY"
                       required
@@ -115,12 +133,43 @@ const PublicResults = () => {
                       type="date"
                       id="dob"
                       value={dob}
-                      onChange={(e) => setDob(e.target.value)}
+                      onChange={handleDobChange}
                       className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-slate-900"
                       required
                     />
                   </div>
                 </div>
+
+                {results && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label htmlFor="semester" className="block text-sm font-medium text-slate-700 mb-1">Select Semester</label>
+                    <select
+                      id="semester"
+                      value={selectedSemester}
+                      onChange={(e) => setSelectedSemester(e.target.value)}
+                      className="block w-full px-3 py-2.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 bg-white"
+                      required
+                    >
+                      <option value="" disabled>Select a semester</option>
+                      {(() => {
+                        const totalSems = results.student?.totalSemesters || 0;
+                        const availableSems = Object.keys(groupedMarks).map(Number);
+                        const maxAvailable = availableSems.length > 0 ? Math.max(...availableSems) : 0;
+                        // Determine the maximum number of semesters to show
+                        const maxToShow = Math.max(totalSems, maxAvailable, 1);
+                        
+                        return Array.from({ length: maxToShow }, (_, i) => i + 1).map(sem => {
+                          const hasResult = availableSems.includes(sem);
+                          return (
+                            <option key={sem} value={sem} disabled={!hasResult}>
+                              Semester {sem} {!hasResult ? '(Result Not Available)' : ''}
+                            </option>
+                          );
+                        });
+                      })()}
+                    </select>
+                  </div>
+                )}
 
                 <div className="pt-4">
                   <button
@@ -131,7 +180,9 @@ const PublicResults = () => {
                     {loading ? (
                       <span>Loading...</span>
                     ) : (
-                      <>Submit <ArrowRight size={18} /></>
+                      <>
+                        {results ? 'View Result' : 'Fetch Semesters'} <ArrowRight size={18} />
+                      </>
                     )}
                   </button>
                 </div>
@@ -178,23 +229,7 @@ const PublicResults = () => {
               <div className="p-6 sm:p-8 bg-slate-50 rounded-b-lg">
                 {results.marks && results.marks.length > 0 ? (
                   <div className="space-y-8">
-                    <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-6">
-                      <div className="mb-4 sm:mb-0">
-                        <h3 className="font-bold text-slate-800 text-lg">Select Semester</h3>
-                        <p className="text-sm text-slate-500">Choose a semester to view its results</p>
-                      </div>
-                      <div className="w-full sm:w-64">
-                        <select 
-                          className="w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 text-base font-semibold bg-blue-50 text-blue-900 cursor-pointer"
-                          value={selectedSemester}
-                          onChange={(e) => setSelectedSemester(e.target.value)}
-                        >
-                          {Object.keys(groupedMarks).sort((a,b) => b-a).map(sem => (
-                            <option key={sem} value={sem}>Semester {sem}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                    {/* Semester selection moved to Step 1 */}
 
                     {selectedSemester && groupedMarks[selectedSemester] && (
                       (() => {
@@ -213,7 +248,7 @@ const PublicResults = () => {
 
                         return (
                           <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm">
-                            <div className="overflow-x-auto">
+                            <div className="overflow-hidden">
                               <MarksheetModal
                                 inline={true}
                                 title={`Semester ${selectedSemester} Result`}
