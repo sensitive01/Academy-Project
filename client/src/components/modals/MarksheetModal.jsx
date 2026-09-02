@@ -332,15 +332,13 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                       </div>
 
                       {/* Right Text - Cropped original image */}
-                      <div className="flex-1 flex justify-start items-center overflow-hidden">
-                        {/* We use margin/transform or clip-path to hide the left side of the councilHeader image (the logo and line) */}
-                        <div className="relative w-[130%] h-[125px] overflow-hidden flex items-center">
-                          <img
-                            src={councilHeader}
-                            alt="Council Header Text"
-                            className="absolute h-[115%] w-auto max-w-none object-contain left-[-150px]"
-                          />
-                        </div>
+                      <div className="flex-1 h-[100px] overflow-hidden ml-4">
+                        <img
+                          src={councilHeader}
+                          alt="Council Header Text"
+                          className="w-full h-full object-cover object-left"
+                          style={{ objectPosition: '-140px center' }}
+                        />
                       </div>
                     </div>
                   ) : (
