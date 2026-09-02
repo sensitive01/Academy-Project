@@ -61,7 +61,7 @@ router.post('/results', async (req, res) => {
 
     const student = await Student.findOne({ studentId })
       .populate('enrolledCourses.course', 'title')
-      .populate('enrolledCourses.batch', 'numberOfSemesters')
+      .populate('enrolledCourses.batch', 'numberOfSemesters name')
       .populate('center');
       
     if (!student) {
@@ -90,13 +90,19 @@ router.post('/results', async (req, res) => {
       .sort({ semester: 1 });
 
     let courseName = '';
+    let batchName = '';
     let totalSemesters = 0;
     if (student.enrolledCourses && student.enrolledCourses.length > 0) {
       if (student.enrolledCourses[0].course) {
         courseName = student.enrolledCourses[0].course.title;
       }
-      if (student.enrolledCourses[0].batch && student.enrolledCourses[0].batch.numberOfSemesters) {
-        totalSemesters = student.enrolledCourses[0].batch.numberOfSemesters;
+      if (student.enrolledCourses[0].batch) {
+        if (student.enrolledCourses[0].batch.numberOfSemesters) {
+          totalSemesters = student.enrolledCourses[0].batch.numberOfSemesters;
+        }
+        if (student.enrolledCourses[0].batch.name) {
+          batchName = student.enrolledCourses[0].batch.name;
+        }
       }
     }
 
@@ -106,6 +112,7 @@ router.post('/results', async (req, res) => {
         name: student.studentNameEnglish,
         studentId: student.studentId,
         courseName: courseName,
+        batchName: batchName,
         totalSemesters: totalSemesters
       },
       studentFull: student,

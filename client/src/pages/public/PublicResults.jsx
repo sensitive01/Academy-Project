@@ -208,7 +208,7 @@ const PublicResults = () => {
                     onClick={() => { setStep(1); setResults(null); setSelectedSemester(''); setStudentId(''); setDob(''); }}
                     className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-4 py-2 rounded-lg"
                   >
-                    <ArrowLeft size={16} /> Check Another Student
+                    <ArrowLeft size={16} /> Back
                   </button>
                 </div>
 
@@ -221,6 +221,12 @@ const PublicResults = () => {
                     <div>
                       <span className="block text-slate-500 uppercase tracking-wider text-xs mb-1">Course</span>
                       <span className="font-semibold">{results.student.courseName}</span>
+                    </div>
+                  )}
+                  {results.student.batchName && (
+                    <div>
+                      <span className="block text-slate-500 uppercase tracking-wider text-xs mb-1">Batch</span>
+                      <span className="font-semibold">{results.student.batchName}</span>
                     </div>
                   )}
                 </div>
