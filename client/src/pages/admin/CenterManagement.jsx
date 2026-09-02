@@ -160,6 +160,7 @@ const CenterManagement = ({ isTab = false }) => {
   // Form State
   const [formData, setFormData] = useState({
     name: "",
+    centerId: "",
     location: "",
     description: "",
     certificateDate: "",
@@ -334,6 +335,7 @@ const CenterManagement = ({ isTab = false }) => {
     if (item) {
       setFormData({
         name: item.name || "",
+        centerId: item.centerId || "",
         location: item.location || "",
         description: item.description || "",
         certificateDate: item.certificateDate || "",
@@ -357,6 +359,7 @@ const CenterManagement = ({ isTab = false }) => {
     } else {
       setFormData({
         name: "",
+        centerId: "",
         location: "",
         description: "",
         certificateDate: "",
@@ -780,6 +783,20 @@ const CenterManagement = ({ isTab = false }) => {
               {activeTab === "centers" && (
                 <>
                   <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Center ID
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border-gray-200 p-3"
+                      placeholder="Enter center ID..."
+                      value={formData.centerId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, centerId: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="mt-4">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
                       Location
                     </label>

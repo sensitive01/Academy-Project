@@ -20,12 +20,12 @@ const maskEmail = (email) => {
   if (!email) return '';
   const [localPart, domain] = email.split('@');
   if (!localPart || !domain) return email;
-  
+
   const visibleLength = Math.min(2, localPart.length);
   const visible = localPart.substring(0, visibleLength);
   const maskedLength = Math.max(0, localPart.length - visibleLength);
   const masked = '*'.repeat(maskedLength > 0 ? (maskedLength > 5 ? 5 : maskedLength) : 3);
-  
+
   return `${visible}${masked}@${domain}`;
 };
 
@@ -34,7 +34,7 @@ const maskEmail = (email) => {
 router.get('/student/:studentId', async (req, res) => {
   try {
     const student = await Student.findOne({ studentId: req.params.studentId });
-    
+
     if (!student) {
       return res.status(404).json({ message: 'Student not found with this Roll Number' });
     }
@@ -54,7 +54,7 @@ router.get('/student/:studentId', async (req, res) => {
 router.post('/results', async (req, res) => {
   try {
     const { studentId, dob } = req.body;
-    
+
     if (!studentId || !dob) {
       return res.status(400).json({ message: 'Student ID and Date of Birth are required' });
     }
@@ -63,7 +63,7 @@ router.post('/results', async (req, res) => {
       .populate('enrolledCourses.course', 'title')
       .populate('enrolledCourses.batch', 'numberOfSemesters name')
       .populate('center');
-      
+
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
@@ -121,6 +121,83 @@ router.post('/results', async (req, res) => {
   } catch (error) {
     console.error('VERIFY OTP & FETCH RESULTS ERROR:', error);
     res.status(500).json({ message: 'Verification or fetching results failed' });
+  }
+});
+
+const puppeteer = require('puppeteer');
+
+// @route   POST /api/public-results/generate-pdf
+// @desc    Generate PDF from HTML
+router.post('/generate-pdf', express.json({ limit: '50mb' }), async (req, res) => {
+  try {
+    const { html, styleTags, baseUrl } = req.body;
+
+    if (!html) {
+      return res.status(400).json({ message: 'HTML content is required' });
+    }
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <base href="${baseUrl}/">
+          <meta charset="UTF-8">
+          ${styleTags || ''}
+          <style>
+            body { 
+              margin: 0; 
+              padding: 0; 
+              background: #ffffff;
+              display: inline-block; /* Forces body to wrap content tightly */
+            }
+          </style>
+        </head>
+        <body>
+          ${html}
+        </body>
+      </html>
+    `;
+
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(fullHtml, { waitUntil: ['load', 'networkidle0'] });
+
+    // Get the exact dimensions of the full document
+    const boundingBox = await page.evaluate(() => {
+      // Small trick to force CSS to recognize the bottom border
+      const el = document.querySelector('.print-marksheet');
+      if (el) {
+        el.style.pageBreakInside = 'avoid';
+        el.style.breakInside = 'avoid';
+      }
+      return {
+        width: document.documentElement.scrollWidth,
+        height: document.documentElement.scrollHeight
+      };
+    });
+
+    const pdfBuffer = await page.pdf({
+      width: `${boundingBox.width}px`,
+      height: `${boundingBox.height + 40}px`, // Extra large padding to absolutely guarantee no overflow
+      printBackground: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      pageRanges: '1' // Strictly one page so the browser never fragments the border
+    });
+
+    await browser.close();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=marksheet.pdf');
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('PDF GENERATION ERROR:', error);
+    res.status(500).json({ message: 'Failed to generate PDF' });
   }
 });
 

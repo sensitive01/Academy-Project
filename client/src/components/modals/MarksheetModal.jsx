@@ -4,6 +4,7 @@ import { X, Printer, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { toast } from 'react-hot-toast';
+import api from '../../services/api';
 import logo2 from '../../assets/logo-2.png';
 import logoVocational from '../../assets/CVESW.png';
 import logoRGAcademy from '../../assets/RG-Academy.png';
@@ -145,38 +146,31 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
     const loadingToast = toast.loading('Generating PDF...');
 
     try {
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        scrollY: -window.scrollY
+      // Get styles applied to the document
+      const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+        .map(el => el.outerHTML)
+        .join('\n');
+
+      const html = printRef.current.outerHTML;
+      const baseUrl = window.location.origin;
+
+      const response = await api.post('/public-results/generate-pdf', {
+        html,
+        styleTags,
+        baseUrl
+      }, {
+        responseType: 'blob'
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      let width = pdfWidth;
-      let height = pdfHeight;
-      let xOffset = 0;
-
-      // If the image is taller than the A4 page, scale it down to fit on one page
-      if (pdfHeight > pageHeight) {
-        height = pageHeight;
-        width = (canvas.width * pageHeight) / canvas.height;
-        xOffset = (pdfWidth - width) / 2; // Center horizontally
-      }
-
-      pdf.addImage(imgData, 'PNG', xOffset, 0, width, height);
-      pdf.save(`${student?.studentId || 'Student'}_Semester_${semester}_Marksheet.pdf`);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${student?.studentId || 'Student'}_Semester_${semester}_Marksheet.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
       toast.success('PDF downloaded successfully!', { id: loadingToast });
     } catch (error) {
@@ -307,7 +301,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                 <Download size={18} /> Save as PDF
               </button>
             </div>
-            
+
             <div className="flex justify-center items-center relative">
               {title && (
                 <h3 className="text-xl font-bold text-slate-800 uppercase tracking-wider text-center">{title}</h3>
@@ -318,21 +312,36 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
             </div>
           </div>
         )}
-        <div ref={printRef} className="print-marksheet mx-auto text-black bg-white flex flex-col" style={{ width: '210mm', minHeight: '297mm', padding: '12mm', boxSizing: 'border-box' }}>
+        <div ref={printRef} className="print-marksheet mx-auto text-black bg-white" style={{ width: '210mm', padding: '12mm', boxSizing: 'border-box' }}>
 
           {/* Outer gold frame */}
-          <div className="flex-1 flex flex-col" style={{ background: 'linear-gradient(135deg, #b8860b 0%, #ffd700 30%, #daa520 50%, #ffd700 70%, #b8860b 100%)', padding: '4px' }}>
+          <div style={{ background: 'linear-gradient(135deg, #b8860b 0%, #ffd700 30%, #daa520 50%, #ffd700 70%, #b8860b 100%)', padding: '4px' }}>
             {/* Thin white gap */}
-            <div className="flex-1 flex flex-col" style={{ background: '#fff', padding: '2px' }}>
+            <div style={{ background: '#fff', padding: '2px' }}>
               {/* Thin gold inner liner */}
-              <div className="flex-1 flex flex-col" style={{ border: '1px solid #b8860b', padding: '2px' }}>
+              <div style={{ border: '1px solid #b8860b', padding: '2px' }}>
                 {/* Red content border */}
-                <div className="flex-1 flex flex-col relative" style={{ border: '2px solid #b91c1c', padding: '2px 16px 4px 16px', background: '#fff' }}>
+                <div className="relative flex flex-col justify-between" style={{ border: '2px solid #b91c1c', padding: '2px 16px 4px 16px', background: '#fff' }}>
 
                   {/* Dynamic Header Block */}
                   {template?.id === 'vocational_council' ? (
-                    <div className="flex justify-center w-full mt-2 mb-2 px-2">
-                      <img src={councilHeader} alt="Council Header" className="w-full h-auto object-contain" />
+                    <div className="flex items-center justify-center w-full mt-2 mb-2 px-2 gap-4">
+                      {/* Left Logo - decreased size */}
+                      <div className="shrink-0 flex justify-end items-center w-[120px]">
+                        <img src={logoVocational} alt="Institution Logo" className="w-[85px] h-[85px] object-contain" />
+                      </div>
+
+                      {/* Right Text - Cropped original image */}
+                      <div className="flex-1 flex justify-start items-center overflow-hidden">
+                        {/* We use margin/transform or clip-path to hide the left side of the councilHeader image (the logo and line) */}
+                        <div className="relative w-[130%] h-[125px] overflow-hidden flex items-center">
+                          <img
+                            src={councilHeader}
+                            alt="Council Header Text"
+                            className="absolute h-[115%] w-auto max-w-none object-contain left-[-150px]"
+                          />
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex pb-0 min-h-[65px] items-center justify-between w-full mt-1 ">
@@ -467,12 +476,12 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                           return (
                             <tr key={m._id}>
-                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal">{toRoman(idx + 1)}</td>
-                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{m.subject?.code || '-'}</td>
-                              <td className="border border-black py-2 px-2 text-left pl-4 text-[12.5px] font-normal">{m.subject?.name}</td>
-                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal">{maxMark}</td>
-                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal">{obtained}</td>
-                              <td className="border border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{isPass ? 'PASS' : 'FAIL'}</td>
+                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal">{toRoman(idx + 1)}</td>
+                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{m.subject?.code || '-'}</td>
+                              <td className="border-x border-black py-2 px-2 text-left pl-4 text-[12.5px] font-normal">{m.subject?.name}</td>
+                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal">{maxMark}</td>
+                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal">{obtained}</td>
+                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{isPass ? 'PASS' : 'FAIL'}</td>
                             </tr>
                           );
                         });
@@ -485,8 +494,8 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                           {student.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '-'}
                         </td>
                         <th className="border border-black p-2 text-right pr-4 text-[11px] font-bold" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TOTAL MARKS SECURED</th>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandTotal}</td>
-                        <td className="border border-black p-2 text-center"></td>
+                        <td className="border border-black border-r-0 p-2 text-center text-[12.5px] font-normal">{grandTotal}</td>
+                        <td className="border border-black border-l-0 p-2 text-center"></td>
                       </tr>
 
                       {/* Row: Centre Headers */}
@@ -508,27 +517,31 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                           })()}
                         </td>
                         <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandMax > 0 ? ((grandTotal / grandMax) * 100).toFixed(1) : '0.0'} %</td>
-                        <td className="border border-black p-2 text-center font-bold text-lg">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
+                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
                       </tr>
 
                       {/* Row: Grade Classification & Abbreviations */}
                       <tr>
-                        <td className="border border-black p-2" colSpan="6" style={{ fontFamily: 'Times New Roman, serif' }}>
-                          <div className="flex flex-col gap-2">
+                        <td className="border border-black p-3 pl-4" colSpan="6" style={{ fontFamily: 'Times New Roman, serif' }}>
+                          <div className="flex flex-col gap-1.5">
                             <div>
-                              <div className="font-bold text-[12px] mb-1 uppercase">GRADE CLASSIFICATION :</div>
-                              <div className="grid grid-cols-2 gap-x-12 gap-y-0.5 text-[11.5px] max-w-[600px]">
-                                <div className="flex"><span className="font-bold w-32">O : Outstanding</span><span>(90% & above)</span></div>
-                                <div className="flex"><span className="font-bold w-32">C : Fair</span><span>(45% to 59.9%)</span></div>
+                              <div className="font-bold text-[12px] mb-1.5 uppercase tracking-wide">GRADE CLASSIFICATION :</div>
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-[11.5px] max-w-[550px] ml-8">
+                                <div className="flex"><span className="font-bold w-[110px]">O : Outstanding</span><span>(90% & above)</span></div>
+                                <div className="flex"><span className="font-bold w-[90px]">C : Fair</span><span>(45% to 59.9%)</span></div>
 
-                                <div className="flex"><span className="font-bold w-32">A : Excellent</span><span>(75% to 89.9%)</span></div>
-                                <div className="flex"><span className="font-bold w-32">D : Average</span><span>(40% to 44.9%)</span></div>
+                                <div className="flex"><span className="font-bold w-[110px]">A : Excellent</span><span>(75% to 89.9%)</span></div>
+                                <div className="flex"><span className="font-bold w-[90px]">D : Average</span><span>(40% to 44.9%)</span></div>
 
-                                <div className="flex"><span className="font-bold w-32">B : Good</span><span>(60% to 74.9%)</span></div>
-                                <div className="flex"><span className="font-bold w-32">F : Fail</span><span>(Below {passMark}%)</span></div>
-
-                                <div className="flex"><span className="font-bold w-32">AB : Absent</span><span></span></div>
-                                <div className="flex"><span className="font-bold w-32">RA : Reappear</span><span></span></div>
+                                <div className="flex"><span className="font-bold w-[110px]">B : Good</span><span>(60% to 74.9%)</span></div>
+                                <div className="flex"><span className="font-bold w-[90px]">F : Fail</span><span>(Below {passMark}%)</span></div>
+                              </div>
+                            </div>
+                            <div className="mt-0.5">
+                              <div className="font-bold text-[12px] mb-1.5 uppercase tracking-wide">ABBREVIATION :</div>
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-[11.5px] max-w-[550px] ml-8">
+                                <div className="flex"><span className="font-bold w-[110px]">AB - Absent</span></div>
+                                <div className="flex"><span className="font-bold w-[90px]">RA - Reappear</span></div>
                               </div>
                             </div>
                           </div>
@@ -545,7 +558,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                   </table>
 
                   {/* Footer Signatures */}
-                  <div className="mt-8 relative flex items-center justify-between pt-4 mb-4 px-8 min-h-[90px]">
+                  <div className="mt-auto relative flex items-center justify-between pt-4 mb-4 px-8 min-h-[150px]">
                     {/* Left */}
                     <div className={`flex-1 flex justify-start ${template?.id === 'vocational_council' ? 'pl-4' : 'pl-12'}`}>
                       <p className="text-[12px] font-bold text-black m-0 uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>

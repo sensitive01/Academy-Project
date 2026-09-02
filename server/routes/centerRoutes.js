@@ -8,14 +8,19 @@ const { protect } = require("../middleware/authMiddleware");
 //////////////////////////////////////////////////////
 router.post("/", protect, async (req, res) => {
   try {
-    const { name, location, description } = req.body;
+    const { name, location, description, centerId } = req.body;
 
     const exists = await Center.findOne({ name });
     if (exists) {
       return res.status(400).json({ message: "Center already exists" });
     }
+    
+    if (centerId) {
+      const idExists = await Center.findOne({ centerId });
+      if (idExists) return res.status(400).json({ message: "Center ID already exists" });
+    }
 
-    const center = await Center.create({ name, location, description });
+    const center = await Center.create({ name, location, description, centerId });
 
     res.status(201).json(center);
   } catch (err) {
@@ -41,7 +46,7 @@ router.get("/", async (req, res) => {
 //////////////////////////////////////////////////////
 router.put("/:id", protect, async (req, res) => {
   try {
-    const { name, location, description } = req.body;
+    const { name, location, description, centerId } = req.body;
 
     const center = await Center.findById(req.params.id);
     if (!center) {
@@ -51,6 +56,14 @@ router.put("/:id", protect, async (req, res) => {
     if (name) center.name = name;
     if (location) center.location = location;
     if (description) center.description = description;
+    if (centerId) {
+      // Check if centerId is unique before updating
+      if (center.centerId !== centerId) {
+        const idExists = await Center.findOne({ centerId });
+        if (idExists) return res.status(400).json({ message: "Center ID already exists" });
+        center.centerId = centerId;
+      }
+    }
     if (req.body.bankDetails) center.bankDetails = req.body.bankDetails;
 
     await center.save();

@@ -202,7 +202,7 @@ const PublicResults = () => {
 
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-8">
               <div className="p-6 sm:p-8 border-b border-slate-200">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <div className="flex justify-between items-start sm:items-center gap-4 mb-4">
                   <h2 className="text-2xl font-bold text-slate-900">{results.student.name}</h2>
                   <button 
                     onClick={() => { setStep(1); setResults(null); setSelectedSemester(''); setStudentId(''); setDob(''); }}
