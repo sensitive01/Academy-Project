@@ -17,6 +17,8 @@ import sealUnicarewel from '../../assets/seal-unicarewel.png';
 import sealBglrgm from '../../assets/seal-bglrgm.png';
 import sealRgmtn from '../../assets/seal-rgmtn.png';
 import councilHeader from '../../assets/council-header.png';
+import newRedSeal from '../../assets/new-red-seal.png';
+import newHeaderBanner from '../../assets/new-header-banner.png';
 
 const getTemplateLogo = (templateId) => {
   switch (templateId) {
@@ -104,6 +106,18 @@ const DynamicSeal = ({ template }) => {
   const logoSrc = getTemplateLogo(template?.id);
   const points = getStarPoints(45, 50, 46, 50);
 
+  if (template?.id === 'vocational_council' || !template) {
+    return (
+      <div className="relative w-[105px] h-[105px] flex justify-center items-center">
+        <img 
+          src={newRedSeal} 
+          alt="National Council Seal" 
+          className="w-full h-full object-contain drop-shadow-md" 
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-[100px] h-[100px] flex justify-center items-center">
       <svg className="absolute inset-0 w-full h-full drop-shadow-md" viewBox="0 0 100 100">
@@ -165,10 +179,27 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      // Calculate height to maintain aspect ratio
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgRatio = canvas.width / canvas.height;
+      const pdfRatio = pdfWidth / pdfHeight;
 
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      let drawWidth = pdfWidth;
+      let drawHeight = pdfHeight;
+
+      if (imgRatio > pdfRatio) {
+        // Image is wider than PDF aspect ratio, constrain by width
+        drawHeight = pdfWidth / imgRatio;
+      } else {
+        // Image is taller than PDF aspect ratio, constrain by height
+        drawWidth = pdfHeight * imgRatio;
+      }
+
+      // Center horizontally and vertically on the page
+      const x = (pdfWidth - drawWidth) / 2;
+      const y = (pdfHeight - drawHeight) / 2;
+
+      pdf.addImage(imgData, 'JPEG', x, y, drawWidth, drawHeight);
       pdf.save(`${student?.studentId || 'Student'}_Semester_${semester}_Marksheet.pdf`);
 
       toast.success('PDF generated successfully!', { id: loadingToast });
@@ -332,11 +363,11 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                       {/* Right Text - Cropped original image */}
                       <div 
-                        className="w-[70%] h-[100px]"
+                        className="w-[70%] h-[140px]"
                         style={{
                           backgroundImage: `url(${councilHeader})`,
                           backgroundSize: 'cover',
-                          backgroundPosition: '-105px center',
+                          backgroundPosition: '-150px center',
                           backgroundRepeat: 'no-repeat'
                         }}
                       />
@@ -565,7 +596,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                     </div>
 
                     {/* Center */}
-                    <div className="absolute left-[44%] top-1/2 -translate-x-1/2 -translate-y-1/2 flex justify-center items-center">
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex justify-center items-center">
                       <DynamicSeal template={template} />
                     </div>
 
