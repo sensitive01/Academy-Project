@@ -358,19 +358,19 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                     <div className="flex items-center justify-between w-full pt-1 pb-1 mb-1 gap-4">
                       {/* Left Logo - aligned to table left edge */}
                       <div className="shrink-0 flex items-center justify-start">
-                        <img 
-                          src={logoVocational} 
-                          alt="CVESW Logo" 
-                          className="w-[95px] h-[95px] object-contain" 
+                        <img
+                          src={logoVocational}
+                          alt="CVESW Logo"
+                          className="w-[95px] h-[95px] object-contain"
                         />
                       </div>
 
                       {/* Right Wordings Banner - stretched to table right edge */}
                       <div className="flex-1 flex items-center justify-end">
-                        <img 
-                          src={newHeaderBanner} 
-                          alt="Council Header Banner" 
-                          className="w-full h-auto object-contain" 
+                        <img
+                          src={newHeaderBanner}
+                          alt="Council Header Banner"
+                          className="w-full h-auto object-contain"
                         />
                       </div>
                     </div>
@@ -421,7 +421,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                     </div>
                   )}
 
-                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mt-2 mb-3' : template?.id === 'dr_rg_academy' ? 'mb-1 mt-1' : 'mb-1 mt-0'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
+                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mt-2 mb-6' : template?.id === 'dr_rg_academy' ? 'mb-5 mt-1' : 'mb-5 mt-1'}`} style={{ fontFamily: 'Times New Roman, serif', marginBottom: '22px' }}>
                     {(() => {
                       const map = {
                         1: 'FIRST', 2: 'SECOND', 3: 'THIRD', 4: 'FOURTH',
@@ -433,33 +433,33 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                   </div>
 
                   {/* Main Monolithic Table */}
-                  <table className="w-full border-collapse border border-black text-[13px] text-black" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                  <table className="w-full border-collapse border border-black text-[13px] text-black mb-4 [&_td]:align-middle [&_th]:align-middle" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
                     <tbody>
                       {/* Row 1: Student Headers */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[20%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>REGISTER NUMBER</th>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="1" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE CANDIDATE</th>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="3" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE COURSE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] uppercase font-bold w-[20%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>REGISTER NUMBER</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="1" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE CANDIDATE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="3" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE COURSE</th>
                       </tr>
 
                       {/* Row 2: Student Values */}
                       <tr>
-                        <td className="border border-black py-2.5 px-2 text-center text-[12.5px] font-normal leading-snug" colSpan="2" style={{ verticalAlign: 'middle' }}>{student.studentId}</td>
-                        <td className="border border-black py-2.5 px-2 text-center text-[12.5px] font-normal capitalize leading-snug" colSpan="1" style={{ verticalAlign: 'middle' }}>{student.studentNameEnglish}</td>
-                        <td className="border border-black py-2.5 px-2 text-center text-[12.5px] font-normal leading-snug" colSpan="3" style={{ verticalAlign: 'middle' }}>{course?.title}</td>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal leading-snug" colSpan="2" style={{ verticalAlign: 'middle' }}>{student.studentId}</td>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal capitalize leading-snug" colSpan="1" style={{ verticalAlign: 'middle' }}>{student.studentNameEnglish}</td>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal leading-snug" colSpan="3" style={{ verticalAlign: 'middle' }}>{course?.title}</td>
                       </tr>
 
                       {/* Row 3: Marks Headers */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[8%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>PAPER</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[12%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>COURSE CODE</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[40%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TITLE OF THE SUBJECT</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[26%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>MARKS</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold w-[14%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>RESULT</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold w-[8%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>PAPER</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold w-[12%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>COURSE CODE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold w-[40%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>TITLE OF THE SUBJECT</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold w-[26%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>MARKS</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold w-[14%]" rowSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>RESULT</th>
                       </tr>
                       <tr>
-                        <th className="border border-black p-2 text-center text-[9px] font-bold w-[13%]" style={{ fontFamily: 'Times New Roman, serif' }}>ALLOTTED</th>
-                        <th className="border border-black p-2 text-center text-[9px] font-bold w-[13%]" style={{ fontFamily: 'Times New Roman, serif' }}>OBTAINED</th>
+                        <th className="border border-black pt-1.5 pb-2.5 px-2 text-center text-[9px] font-bold w-[13%]" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>ALLOTTED</th>
+                        <th className="border border-black pt-1.5 pb-2.5 px-2 text-center text-[9px] font-bold w-[13%]" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>OBTAINED</th>
                       </tr>
 
                       {/* Dynamic Marks Rows */}
@@ -507,12 +507,12 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                           return (
                             <tr key={m._id}>
-                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal">{toRoman(idx + 1)}</td>
-                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{m.subject?.code || '-'}</td>
-                              <td className="border-x border-black py-2 px-2 text-left pl-4 text-[12.5px] font-normal">{m.subject?.name}</td>
-                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal">{maxMark}</td>
-                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal">{obtained}</td>
-                              <td className="border-x border-black py-2 px-2 text-center text-[12.5px] font-normal uppercase">{isPass ? 'PASS' : 'FAIL'}</td>
+                              <td className="border-x border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{toRoman(idx + 1)}</td>
+                              <td className="border-x border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal uppercase" style={{ verticalAlign: 'middle' }}>{m.subject?.code || '-'}</td>
+                              <td className="border-x border-black pt-2 pb-3.5 px-2 text-left pl-4 text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{m.subject?.name}</td>
+                              <td className="border-x border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{maxMark}</td>
+                              <td className="border-x border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{obtained}</td>
+                              <td className="border-x border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal uppercase" style={{ verticalAlign: 'middle' }}>{isPass ? 'PASS' : 'FAIL'}</td>
                             </tr>
                           );
                         });
@@ -520,40 +520,40 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                       {/* Row: DOB and Total */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: 'Times New Roman, serif' }}>DATE OF<br />BIRTH</th>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold uppercase whitespace-nowrap" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>DATE OF<br />BIRTH</th>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>
                           {student.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '-'}
                         </td>
-                        <th className="border border-black p-2 text-right pr-4 text-[11px] font-bold" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>TOTAL MARKS SECURED</th>
-                        <td className="border border-black border-r-0 p-2 text-center text-[12.5px] font-normal">{grandTotal}</td>
-                        <td className="border border-black border-l-0 p-2 text-center"></td>
+                        <th className="border border-black pt-2 pb-3 px-2 text-right pr-4 text-[11px] font-bold" colSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>TOTAL MARKS SECURED</th>
+                        <td className="border border-black border-r-0 pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{grandTotal}</td>
+                        <td className="border border-black border-l-0 pt-2 pb-3.5 px-2 text-center" style={{ verticalAlign: 'middle' }}></td>
                       </tr>
 
                       {/* Row: Centre Headers */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase" colSpan="1" style={{ fontFamily: 'Times New Roman, serif' }}>CENTRE<br />CODE</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase" colSpan="3" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE CENTRE</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>PERCENTAGE</th>
-                        <th className="border border-black p-2 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>GRADE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold uppercase" colSpan="1" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>CENTRE<br />CODE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold uppercase" colSpan="3" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE CENTRE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>PERCENTAGE</th>
+                        <th className="border border-black pt-2 pb-3 px-2 text-center text-[11px] font-bold uppercase" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>GRADE</th>
                       </tr>
 
                       {/* Row: Centre Values */}
                       <tr>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal uppercase" colSpan="1">{student.center?.centerId || 'N/A'}</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal whitespace-pre-wrap" colSpan="3">
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal uppercase" colSpan="1" style={{ verticalAlign: 'middle' }}>{student.center?.centerId || 'N/A'}</td>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal whitespace-pre-wrap" colSpan="3" style={{ verticalAlign: 'middle' }}>
                           {(() => {
                             const shortName = student.center?.name;
                             if (!shortName) return 'N/A';
                             return shortName;
                           })()}
                         </td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandMax > 0 ? ((grandTotal / grandMax) * 100).toFixed(1) : '0.0'} %</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal">{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{grandMax > 0 ? ((grandTotal / grandMax) * 100).toFixed(1) : '0.0'} %</td>
+                        <td className="border border-black pt-2 pb-3.5 px-2 text-center text-[12.5px] font-normal" style={{ verticalAlign: 'middle' }}>{grandMax > 0 ? getGrade((grandTotal / grandMax) * 100) : '-'}</td>
                       </tr>
 
                       {/* Row: Grade Classification & Abbreviations */}
                       <tr>
-                        <td className="border border-black p-3 pl-4" colSpan="6" style={{ fontFamily: 'Times New Roman, serif' }}>
+                        <td className="border border-black p-3 pb-3.5 pl-4" colSpan="6" style={{ fontFamily: 'Times New Roman, serif' }}>
                           <div className="flex flex-col gap-1.5">
                             <div>
                               <div className="font-bold text-[12px] mb-1.5 uppercase tracking-wide">GRADE CLASSIFICATION :</div>
@@ -581,7 +581,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                       {/* Row: Footer Note */}
                       <tr>
-                        <td className="border border-black p-2 text-[11px] font-medium" colSpan="7" style={{ fontFamily: 'Times New Roman, serif' }}>
+                        <td className="border border-black px-4 pt-3 pb-8 text-[11px] font-medium leading-relaxed" colSpan="6" style={{ fontFamily: 'Times New Roman, serif', paddingBottom: '28px' }}>
                           <span className="font-bold">Note :</span> Any Correction found in this entry, should be brought to the Notice of the Controller of Examinations for Investigation.
                         </td>
                       </tr>
