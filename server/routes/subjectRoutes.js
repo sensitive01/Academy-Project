@@ -9,25 +9,21 @@ const { protect } = require("../middleware/authMiddleware");
 //////////////////////////////////////////////////////
 router.post("/", protect, async (req, res) => {
   try {
-    const { name, code, type, semester, course } = req.body;
+    const { name, code, type, semester, courses } = req.body;
 
-    const exists = await Subject.findOne({ 
-      course, 
-      semester, 
-      $or: [{ name }, { code }] 
-    });
+    const exists = await Subject.findOne({ code: { $regex: new RegExp(`^${code}$`, 'i') } });
     
     if (exists) {
-      return res.status(400).json({ message: "Subject with this name or code already exists in this course and semester" });
+      return res.status(400).json({ message: "Subject with this code already exists" });
     }
 
-    const subject = await Subject.create({ name, code, type, semester, course });
+    const subject = await Subject.create({ name, code, type, semester, courses });
 
-    if (course) {
-      await Course.findByIdAndUpdate(course, { $addToSet: { subjects: subject._id } });
+    if (courses && courses.length > 0) {
+      await Course.updateMany({ _id: { $in: courses } }, { $addToSet: { subjects: subject._id } });
     }
 
-    await subject.populate("course");
+    await subject.populate("courses");
 
     res.status(201).json(subject);
   } catch (err) {
@@ -41,7 +37,7 @@ router.post("/", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.get("/", protect, async (req, res) => {
   try {
-    const subjects = await Subject.find().populate("course").lean();
+    const subjects = await Subject.find().populate("courses").lean();
     res.json(subjects);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -53,49 +49,50 @@ router.get("/", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.put("/:id", protect, async (req, res) => {
   try {
-    const { name, code, type, semester, course } = req.body;
+    const { name, code, type, semester, courses } = req.body;
 
     const subject = await Subject.findById(req.params.id);
     if (!subject) {
       return res.status(404).json({ message: "Subject not found" });
     }
 
-    const oldCourseId = subject.course;
+    const oldCourses = subject.courses || [];
     
-    const checkCourse = course !== undefined ? course : subject.course;
-    const checkSemester = semester !== undefined ? semester : subject.semester;
-    const checkName = name || subject.name;
     const checkCode = code || subject.code;
     
     const exists = await Subject.findOne({
       _id: { $ne: subject._id },
-      course: checkCourse,
-      semester: checkSemester,
-      $or: [{ name: checkName }, { code: checkCode }]
+      code: { $regex: new RegExp(`^${checkCode}$`, 'i') }
     });
 
     if (exists) {
-      return res.status(400).json({ message: "Subject with this name or code already exists in this course and semester" });
+      return res.status(400).json({ message: "Subject with this code already exists" });
     }
 
     if (name) subject.name = name;
     if (code) subject.code = code;
     if (type) subject.type = type;
     if (semester) subject.semester = semester;
-    if (course !== undefined) subject.course = course;
+    if (courses !== undefined) subject.courses = courses;
 
     await subject.save();
 
-    if (course !== undefined && String(course) !== String(oldCourseId)) {
-      if (oldCourseId) {
-        await Course.findByIdAndUpdate(oldCourseId, { $pull: { subjects: subject._id } });
+    if (courses !== undefined) {
+      const oldCoursesStr = oldCourses.map(id => id.toString());
+      const newCoursesStr = courses.map(id => id.toString());
+      
+      const addedCourses = courses.filter(c => !oldCoursesStr.includes(c.toString()));
+      const removedCourses = oldCourses.filter(c => !newCoursesStr.includes(c.toString()));
+      
+      if (removedCourses.length > 0) {
+        await Course.updateMany({ _id: { $in: removedCourses } }, { $pull: { subjects: subject._id } });
       }
-      if (course) {
-        await Course.findByIdAndUpdate(course, { $addToSet: { subjects: subject._id } });
+      if (addedCourses.length > 0) {
+        await Course.updateMany({ _id: { $in: addedCourses } }, { $addToSet: { subjects: subject._id } });
       }
     }
     
-    await subject.populate("course");
+    await subject.populate("courses");
 
     res.json(subject);
   } catch (err) {
@@ -114,8 +111,8 @@ router.delete("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Subject not found" });
     }
 
-    if (subject.course) {
-      await Course.findByIdAndUpdate(subject.course, { $pull: { subjects: subject._id } });
+    if (subject.courses && subject.courses.length > 0) {
+      await Course.updateMany({ _id: { $in: subject.courses } }, { $pull: { subjects: subject._id } });
     }
 
     await subject.deleteOne();

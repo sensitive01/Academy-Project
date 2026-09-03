@@ -23,11 +23,11 @@ const subjectSchema = new mongoose.Schema(
       max: 8,
       default: 1
     },
-    course: {
+    courses: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Course',
       required: true,
-    },
+    }],
   },
   { timestamps: true }
 );

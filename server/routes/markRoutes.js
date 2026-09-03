@@ -433,7 +433,7 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
 
           const subjectDoc = await Subject.findOne({
             code: regexCode,
-            course: courseDoc._id,
+            courses: courseDoc._id,
             semester: semester
           });
           if (!subjectDoc) {

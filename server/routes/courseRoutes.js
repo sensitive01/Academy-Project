@@ -262,7 +262,7 @@ router.post('/', (req, res, next) => {
                     const newSubjectIds = [];
                     for (const sub of parsedInlineSubjects) {
                         if (sub.name && sub.code) { // Basic validation
-                            let existingSub = await Subject.findOne({ $or: [{ code: sub.code }, { name: sub.name }] });
+                            let existingSub = await Subject.findOne({ code: { $regex: new RegExp(`^${sub.code}$`, 'i') } });
                             if (existingSub) {
                                 newSubjectIds.push(existingSub._id);
                             } else {
@@ -271,7 +271,7 @@ router.post('/', (req, res, next) => {
                                     code: sub.code,
                                     semester: sub.semester || 1,
                                     type: sub.type || 'Theory',
-                                    course: createdCourse._id
+                                    courses: [createdCourse._id]
                                 });
                                 await newSub.save();
                                 newSubjectIds.push(newSub._id);
@@ -383,7 +383,7 @@ router.put('/:id', upload.single('thumbnail'), async (req, res) => {
                             newSubjectIds.push(sub._id);
                         } else if (sub.name && sub.code) {
                             // Create new subject or use existing
-                            let existingSub = await Subject.findOne({ $or: [{ code: sub.code }, { name: sub.name }] });
+                            let existingSub = await Subject.findOne({ code: { $regex: new RegExp(`^${sub.code}$`, 'i') } });
                             if (existingSub) {
                                 newSubjectIds.push(existingSub._id);
                             } else {
@@ -392,7 +392,7 @@ router.put('/:id', upload.single('thumbnail'), async (req, res) => {
                                     code: sub.code,
                                     semester: sub.semester || 1,
                                     type: sub.type || 'Theory',
-                                    course: updatedCourse._id
+                                    courses: [updatedCourse._id]
                                 });
                                 await newSub.save();
                                 newSubjectIds.push(newSub._id);

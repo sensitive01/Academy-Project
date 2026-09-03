@@ -144,6 +144,86 @@ const ActionsDropdown = ({
   );
 };
 
+const MultiSelectDropdown = ({ options, selected, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabels = options
+    .filter((opt) => selected.includes(opt.value))
+    .map((opt) => opt.label);
+
+  const filteredOptions = options.filter(opt => 
+    opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div
+        className="w-full rounded-xl border-gray-200 shadow-sm focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 border p-3 bg-white flex justify-between items-center cursor-pointer"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className={`truncate text-sm ${selectedLabels.length === 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+          {selectedLabels.length > 0 ? selectedLabels.join(", ") : placeholder}
+        </span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-col">
+          <div className="p-2 border-b border-gray-100">
+            <input 
+              type="text" 
+              className="w-full text-sm rounded-lg border-gray-200 p-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50" 
+              placeholder="Search courses..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div className="max-h-60 overflow-auto py-1">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-500 text-center font-medium">No matches found</div>
+            ) : (
+               filteredOptions.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex items-center px-4 py-2.5 hover:bg-brand-50 cursor-pointer text-sm text-gray-700 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-3 h-4 w-4"
+                    checked={selected.includes(opt.value)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onChange([...selected, opt.value]);
+                      } else {
+                        onChange(selected.filter((v) => v !== opt.value));
+                      }
+                    }}
+                  />
+                  <span className="truncate">{opt.label}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const toTitleCase = (str) => {
   return str
     .toLowerCase()
@@ -174,6 +254,7 @@ const SubjectsTab = () => {
     semester: 1,
     center: "",
     course: "",
+    courses: [],
     batch: "",
     fee: 0,
     feeType: "Term",
@@ -196,7 +277,7 @@ const SubjectsTab = () => {
       "S.No": i + 1,
       "Subject Name": sub.name || "-",
       "Subject Code": sub.code || "-",
-      "Course": sub.course?.title || "-",
+      "Course": sub.courses?.map(c => c.title).join(", ") || "-",
       "Semester": sub.semester ? `Semester ${sub.semester}` : "-",
       "Type": sub.type || "-"
     }));
@@ -244,7 +325,7 @@ const SubjectsTab = () => {
         index + 1,
         sub.name || "-",
         sub.code || "-",
-        sub.course?.title || "-",
+        sub.courses?.map(c => c.title).join(", ") || "-",
         sub.semester ? `Semester ${sub.semester}` : "-",
         sub.type || "-"
       ];
@@ -462,6 +543,7 @@ const SubjectsTab = () => {
         semester: item.semester || 1,
         center: item.center?._id || item.center || "",
         course: item.course?._id || item.course || "",
+        courses: item.courses?.map(c => c._id || c) || [],
         batch: item.batch?._id || item.batch || "",
         fee: item.fee || 0,
         feeType: item.feeType || "Term",
@@ -485,6 +567,7 @@ const SubjectsTab = () => {
         semester: 1,
         center: "",
         course: "",
+        courses: [],
         batch: "",
         fee: 0,
         feeType: "Term",
@@ -638,7 +721,7 @@ const SubjectsTab = () => {
         },
         {
           name: "Course",
-          selector: r => r.course?.title || "N/A",
+          selector: r => r.courses?.map(c => c.title).join(", ") || "N/A",
           sortable: true,
         },
         {
@@ -749,8 +832,8 @@ const SubjectsTab = () => {
                           item.code?.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (activeTab === "subjects") {
-      const subjectCourseId = item.course?._id ? item.course._id.toString() : item.course?.toString() || "";
-      const matchesCourse = selectedCourseFilter === "all" || subjectCourseId === selectedCourseFilter;
+      const subjectCourseIds = item.courses?.map(c => c._id ? c._id.toString() : c.toString()) || [];
+      const matchesCourse = selectedCourseFilter === "all" || subjectCourseIds.includes(selectedCourseFilter);
       const matchesSem = selectedSemFilter === "all" || String(item.semester) === String(selectedSemFilter);
       return matchesSearch && matchesCourse && matchesSem;
     }
@@ -997,18 +1080,13 @@ const SubjectsTab = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
-                    <select
-                      required
-                      className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 bg-white"
-                      value={formData.course}
-                      onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                    >
-                      <option value="">Select Course</option>
-                      {coursesList.map(c => (
-                        <option key={c._id} value={c._id}>{c.title}</option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Courses <span className="text-red-500">*</span></label>
+                    <MultiSelectDropdown
+                      options={coursesList.map(c => ({ label: c.title, value: c._id }))}
+                      selected={formData.courses}
+                      onChange={(newSelected) => setFormData({ ...formData, courses: newSelected })}
+                      placeholder="Select Courses"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Semester</label>

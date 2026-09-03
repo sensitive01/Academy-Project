@@ -505,37 +505,43 @@ const PublicLayout = () => {
                 )}
               </div>
 
-              <div className="hidden md:flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
                 <Link
                   to="/results"
-                  className="relative group flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2 rounded font-bold hover:from-red-600 hover:to-red-700 transition-all shadow-md overflow-visible"
+                  className="relative group flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1.5 md:px-5 md:py-2 rounded font-bold hover:from-red-600 hover:to-red-700 transition-all shadow-md overflow-visible"
                 >
-                  <span className="absolute -top-2.5 -right-2.5 bg-amber-400 text-slate-900 text-[10px] uppercase font-black px-2 py-0.5 rounded-full shadow border border-amber-300 animate-bounce">
+                  <span className="absolute -top-2.5 -right-2 md:-right-2.5 bg-amber-400 text-slate-900 text-[8px] md:text-[10px] uppercase font-black px-1.5 py-0.5 md:px-2 md:py-0.5 rounded-full shadow border border-amber-300 animate-bounce">
                     New
                   </span>
-                  <span className="text-sm">Exam Results Published Here</span>
+                  <span className="text-[11px] md:text-sm whitespace-nowrap">
+                    <span className="md:hidden">Results</span>
+                    <span className="hidden md:inline">Exam Results Published Here</span>
+                  </span>
                 </Link>
-                <Link
-                  to="/login"
-                  className="text-brand-700 font-bold hover:bg-brand-50 px-4 py-2 rounded transition-colors text-sm"
-                >
-                  Log In
-                </Link>
-                <Link
-                  to="/student-registration"
-                  target="_blank"
-                  className="bg-white border border-brand-700 text-brand-700 px-5 py-2 rounded font-bold hover:bg-brand-50 transition-colors text-sm shadow-sm"
-                >
-                  Join for Free
-                </Link>
-              </div>
 
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden p-2 text-slate-600 hover:text-slate-900"
-              >
-                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
+                <div className="hidden md:flex items-center gap-3">
+                  <Link
+                    to="/login"
+                    className="text-brand-700 font-bold hover:bg-brand-50 px-4 py-2 rounded transition-colors text-sm"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    to="/student-registration"
+                    target="_blank"
+                    className="bg-white border border-brand-700 text-brand-700 px-5 py-2 rounded font-bold hover:bg-brand-50 transition-colors text-sm shadow-sm"
+                  >
+                    Join for Free
+                  </Link>
+                </div>
+
+                <button
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="md:hidden p-2 text-slate-600 hover:text-slate-900 ml-1"
+                >
+                  {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
+              </div>
             </div>
           </div>
         </div>
