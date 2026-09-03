@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { Link } from "react-router-dom";
-import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign } from "lucide-react";
+import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign, ArrowLeft } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import CustomDataTable from "../../components/common/DataTable";
@@ -103,6 +103,7 @@ const ExamManagement = () => {
   const [markSearchQuery, setMarkSearchQuery] = useState("");
 
   const fileInputRef = React.useRef(null);
+  const marksheetRef = React.useRef(null);
 
   const fetchData = async () => {
     try {
@@ -1966,31 +1967,70 @@ const ExamManagement = () => {
         ) : (
           <div className="p-6">
             {currentViewingMarkBatch ? (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Results - {currentViewingMarkBatch.batch?.name}</h3>
-                    <p className="text-sm text-slate-500">{currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})</p>
+              showMarksheetModal && selectedGroupData ? (
+                <div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-800">
+                        Marksheet - {selectedGroupData.student?.studentNameEnglish} ({selectedGroupData.student?.studentId})
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {currentViewingMarkBatch.batch?.name} • {currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => marksheetRef.current?.downloadPDF()}
+                        className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-xl hover:bg-brand-700 transition-all font-bold text-sm shadow-md shadow-brand-600/20"
+                      >
+                        <Download size={18} /> Save as PDF
+                      </button>
+                      <button
+                        onClick={() => { setShowMarksheetModal(false); setSelectedGroupData(null); }}
+                        className="text-slate-600 hover:text-slate-900 font-bold flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                      >
+                        <ArrowLeft size={18} /> Back to Results
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => { setViewingMarkBatch(null); setMarkSearchQuery(""); }}
-                    className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
-                  >
-                    Back
-                  </button>
+                  <div className="bg-slate-100/70 p-4 sm:p-6 rounded-2xl border border-slate-200">
+                    <MarksheetModal
+                      ref={marksheetRef}
+                      data={selectedGroupData}
+                      inline={true}
+                      hideInlineHeader={true}
+                      onClose={() => { setShowMarksheetModal(false); setSelectedGroupData(null); }}
+                      template={{ id: selectedGroupData.templateId || (selectedGroupData.marks && selectedGroupData.marks.length > 0 ? selectedGroupData.marks[0].template : 'rg_modern') }}
+                    />
+                  </div>
                 </div>
-                <CustomDataTable
-                  columns={markColumns}
-                  data={(currentViewingMarkBatch.students || []).filter(m =>
-                    (m.student?.studentNameEnglish || "").toLowerCase().includes(markSearchQuery.toLowerCase()) ||
-                    (m.student?.studentId || "").toLowerCase().includes(markSearchQuery.toLowerCase())
-                  )}
-                  progressPending={false}
-                  search={markSearchQuery}
-                  setSearch={setMarkSearchQuery}
-                  searchPlaceholder="Search students by name or ID..."
-                />
-              </div>
+              ) : (
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-800">Results - {currentViewingMarkBatch.batch?.name}</h3>
+                      <p className="text-sm text-slate-500">{currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})</p>
+                    </div>
+                    <button
+                      onClick={() => { setViewingMarkBatch(null); setMarkSearchQuery(""); }}
+                      className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
+                    >
+                      Back
+                    </button>
+                  </div>
+                  <CustomDataTable
+                    columns={markColumns}
+                    data={(currentViewingMarkBatch.students || []).filter(m =>
+                      (m.student?.studentNameEnglish || "").toLowerCase().includes(markSearchQuery.toLowerCase()) ||
+                      (m.student?.studentId || "").toLowerCase().includes(markSearchQuery.toLowerCase())
+                    )}
+                    progressPending={false}
+                    search={markSearchQuery}
+                    setSearch={setMarkSearchQuery}
+                    searchPlaceholder="Search students by name or ID..."
+                  />
+                </div>
+              )
             ) : (
               <div>
                 <div className="flex justify-between items-center mb-6">
@@ -2447,7 +2487,7 @@ const ExamManagement = () => {
         </div>
       )}
 
-      {showMarksheetModal && selectedGroupData && (
+      {showMarksheetModal && selectedGroupData && !currentViewingMarkBatch && (
         <MarksheetModal
           data={selectedGroupData}
           onClose={() => setShowMarksheetModal(false)}

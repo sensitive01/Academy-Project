@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Printer, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -19,6 +19,7 @@ import sealRgmtn from '../../assets/seal-rgmtn.png';
 import councilHeader from '../../assets/council-header.png';
 import newRedSeal from '../../assets/new-red-seal.png';
 import newHeaderBanner from '../../assets/new-header-banner.png';
+import signatureImg from '../../assets/signature.png';
 
 const getTemplateLogo = (templateId) => {
   switch (templateId) {
@@ -151,8 +152,13 @@ const DynamicSeal = ({ template }) => {
   );
 };
 
-const MarksheetModal = ({ data, onClose, template, inline = false, title, onConfirm }) => {
+const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, title, onConfirm, hideInlineHeader = false }, ref) => {
   const printRef = useRef();
+
+  useImperativeHandle(ref, () => ({
+    downloadPDF: handleDownloadPDF,
+    browserPrint: handleBrowserPrint
+  }));
 
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
@@ -333,7 +339,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
       )}
 
       <div className={`overflow-y-auto p-4 md:p-8 bg-white ${inline ? 'rounded-2xl' : 'rounded-b-2xl'}`}>
-        {inline && (
+        {inline && !hideInlineHeader && (
           <div className="relative flex flex-col sm:block mb-6 min-h-[44px]">
             <div className="flex justify-center sm:hidden mb-4">
               <button onClick={handleDownloadPDF} className="flex items-center gap-2 bg-brand-600 text-white px-6 py-2.5 rounded-xl hover:bg-brand-700 transition-colors font-bold text-sm shadow-md shadow-brand-600/20">
@@ -613,7 +619,13 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                     {/* Right */}
                     <div className="flex-1 flex justify-end pr-4">
-                      <div className="flex flex-col items-center">
+                      <div className="relative flex flex-col items-center">
+                        <img
+                          src={signatureImg}
+                          alt="Controller of Examination Signature"
+                          className="absolute bottom-full mb-0.5 w-[210px] h-auto max-h-[75px] object-contain pointer-events-none"
+                          style={{ mixBlendMode: 'multiply' }}
+                        />
                         <p className="text-[11.5px] font-bold text-black m-0 uppercase tracking-wide whitespace-nowrap" style={{ fontFamily: 'Times New Roman, serif' }}>CONTROLLER OF EXAMINATION</p>
                       </div>
                     </div>
@@ -635,6 +647,8 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
     </div>,
     document.body
   );
-};
+});
+
+MarksheetModal.displayName = 'MarksheetModal';
 
 export default MarksheetModal;
