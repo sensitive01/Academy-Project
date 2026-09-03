@@ -194,7 +194,23 @@ router.post('/', (req, res, next) => {
         log(`POST /api/courses started`);
         log(`Body keys: ${Object.keys(req.body).join(', ')}`);
 
-        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, subjects, type, inlineSubjects } = req.body;
+        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, subjects, type, inlineSubjects, courseId } = req.body;
+
+        const effectiveType = type || 'Academic';
+        const trimmedCourseId = courseId ? courseId.trim() : "";
+
+        if (effectiveType === 'Center Courses' && !trimmedCourseId) {
+            return res.status(400).json({ message: 'Course ID is required for Center Courses' });
+        }
+
+        if (trimmedCourseId) {
+            const existingCourse = await Course.findOne({ 
+                courseId: { $regex: new RegExp(`^${trimmedCourseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+            });
+            if (existingCourse) {
+                return res.status(400).json({ message: `Course ID "${trimmedCourseId}" already exists. Please choose a unique Course ID.` });
+            }
+        }
 
         const thumbnail = req.file ? {
             url: req.file.path,
@@ -219,6 +235,7 @@ router.post('/', (req, res, next) => {
         }
 
         const course = new Course({
+            ...(trimmedCourseId ? { courseId: trimmedCourseId } : {}),
             title,
             description,
             duration: duration ? Number(duration) : 0,
@@ -230,7 +247,7 @@ router.post('/', (req, res, next) => {
             price: Number(price) || 0,
             category,
             level,
-            type: type || 'Academic',
+            type: effectiveType,
             subjects: typeof subjects === 'string' ? JSON.parse(subjects) : subjects || []
         });
 
@@ -288,7 +305,28 @@ router.put('/:id', upload.single('thumbnail'), async (req, res) => {
         const course = await Course.findById(req.params.id);
         if (!course) return res.status(404).json({ message: 'Course not found' });
 
-        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, lessons, subjects, type, inlineSubjects } = req.body;
+        const { title, description, instructor, price, category, level, duration, durationUnit, syllabus, isActive, lessons, subjects, type, inlineSubjects, courseId } = req.body;
+        
+        const effectiveType = type || course.type;
+        if (courseId !== undefined) {
+            const trimmedCourseId = courseId ? courseId.trim() : "";
+            if (effectiveType === 'Center Courses' && !trimmedCourseId) {
+                return res.status(400).json({ message: 'Course ID is required for Center Courses' });
+            }
+
+            if (trimmedCourseId) {
+                const existing = await Course.findOne({ 
+                    courseId: { $regex: new RegExp(`^${trimmedCourseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                    _id: { $ne: course._id }
+                });
+                if (existing) {
+                    return res.status(400).json({ message: `Course ID "${trimmedCourseId}" already exists in another course.` });
+                }
+                course.courseId = trimmedCourseId;
+            } else {
+                course.courseId = undefined;
+            }
+        }
         
         if (lessons) {
             course.lessons = lessons;

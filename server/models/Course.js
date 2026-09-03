@@ -40,7 +40,9 @@ const courseSchema = mongoose.Schema({
   
   courseId: {
     type: String,
-    unique: true
+    unique: true,
+    sparse: true,
+    trim: true,
   },
 
   title: {
@@ -148,14 +150,6 @@ const courseSchema = mongoose.Schema({
 
 }, {
   timestamps: true,
-});
-
-courseSchema.pre("save", function () {
-  if (!this.courseId) {
-    const year = new Date().getFullYear();
-    const unique = Date.now().toString().slice(-4) + Math.floor(Math.random() * 100);
-    this.courseId = `CRS-${unique}`;
-  }
 });
 
 const Course = mongoose.model('Course', courseSchema);

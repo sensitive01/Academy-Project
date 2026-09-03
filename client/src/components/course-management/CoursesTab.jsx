@@ -31,6 +31,7 @@ const ActionsDropdown = ({
   row, 
   handleToggleStatus, 
   handleView, 
+  handleEdit,
   handleShowStudents, 
   handleManageLessons, 
   handleDelete,
@@ -102,6 +103,12 @@ const ActionsDropdown = ({
         <Eye size={16} className="text-brand-600"/> View Details
       </button>
       <button 
+        onClick={() => { setOpen(false); handleEdit(row); }} 
+        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
+      >
+        <Edit size={16} className="text-blue-600"/> Edit Course
+      </button>
+      <button 
         onClick={() => { setOpen(false); handleShowStudents(row); }} 
         className="w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 hover:bg-slate-50 transition-colors text-slate-700"
       >
@@ -162,6 +169,7 @@ const CoursesTab = ({ courseType }) => {
 
   // Form State
   const [formData, setFormData] = useState({
+    courseId: "",
     title: "",
     description: "",
     price: "",
@@ -230,6 +238,7 @@ const CoursesTab = ({ courseType }) => {
   const handleEdit = (course) => {
     setSelectedCourse(course);
     setFormData({
+      courseId: course.courseId || "",
       title: course.title,
       description: course.description,
       price: course.price,
@@ -264,6 +273,7 @@ const CoursesTab = ({ courseType }) => {
     setIsViewOnly(true);
     setSelectedCourse(course);
     setFormData({
+      courseId: course.courseId || "",
       title: course.title,
       description: course.description,
       price: course.price,
@@ -439,9 +449,17 @@ const CoursesTab = ({ courseType }) => {
   const handleSave = async (e) => {
     e.preventDefault();
 
+    if (courseType === "Center Courses" && !formData.courseId?.trim()) {
+      toast.error("Please enter a Course ID for Center Courses");
+      return;
+    }
+
     const loadingToast = toast.loading("Saving course...");
     try {
       const data = new FormData();
+      if (formData.courseId !== undefined) {
+        data.append("courseId", formData.courseId.trim());
+      }
       data.append("title", formData.title || "Untitled Course");
       data.append("description", formData.description || "");
       data.append("price", courseType === "Center Courses" ? "0" : (formData.price || "0"));
@@ -479,7 +497,7 @@ const CoursesTab = ({ courseType }) => {
       resetForm();
     } catch (error) {
       console.error("Error saving:", error);
-      toast.error("Failed to save course");
+      toast.error(error.response?.data?.message || "Failed to save course");
     } finally {
       toast.dismiss(loadingToast);
     }
@@ -488,6 +506,7 @@ const CoursesTab = ({ courseType }) => {
   const resetForm = () => {
     setSelectedCourse(null);
     setFormData({
+      courseId: "",
       title: "",
       description: "",
       price: courseType === "Center Courses" ? "0" : "",
@@ -555,6 +574,7 @@ const CoursesTab = ({ courseType }) => {
           row={row} 
           handleToggleStatus={handleToggleStatus}
           handleView={handleView}
+          handleEdit={handleEdit}
           handleShowStudents={handleShowStudents}
           handleManageLessons={handleManageLessons}
           handleDelete={handleDelete}
@@ -564,7 +584,11 @@ const CoursesTab = ({ courseType }) => {
     }
   ];
 
-  const filteredCourses = courses.filter(c => c.type === courseType && (c.title?.toLowerCase().includes(searchQuery.toLowerCase()) || c.category?.toLowerCase().includes(searchQuery.toLowerCase())));
+  const filteredCourses = courses.filter(c => c.type === courseType && (
+    c.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.courseId?.toLowerCase().includes(searchQuery.toLowerCase())
+  ));
 
   return (
     <div className="space-y-6">
@@ -572,9 +596,9 @@ const CoursesTab = ({ courseType }) => {
         <h2 className="text-xl font-bold text-gray-800">{courseType}</h2>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700 transition-colors"
+          className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700 transition-colors shadow-sm font-semibold text-sm"
         >
-          <Plus size={20} /> Add New Course
+          <Plus size={20} /> {courseType === "Center Courses" ? "Add Center Course" : "Add New Course"}
         </button>
       </div>
 
@@ -586,7 +610,7 @@ const CoursesTab = ({ courseType }) => {
           progressComponent={<Loading message="Loading courses..." />}
           search={searchQuery}
           setSearch={setSearchQuery}
-          searchPlaceholder="Search courses by title or category..."
+          searchPlaceholder="Search courses by title, ID, or category..."
         />
       </div>
 
@@ -671,8 +695,8 @@ const CoursesTab = ({ courseType }) => {
                   {isViewOnly
                     ? "Course Details"
                     : isEdit
-                      ? "Edit Course"
-                      : "Create New Course"}
+                      ? (courseType === "Center Courses" ? "Edit Center Course" : "Edit Course")
+                      : (courseType === "Center Courses" ? "Add Center Course" : "Create New Course")}
                 </h2>
                 <p className="text-sm text-gray-500">
                   {isEdit
@@ -706,9 +730,16 @@ const CoursesTab = ({ courseType }) => {
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
                     <div className="absolute bottom-6 left-8 right-8 text-white">
-                      <span className="px-3 py-1 bg-brand-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-full mb-3 inline-block">
-                        {formData.category}
-                      </span>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="px-3 py-1 bg-brand-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-full inline-block">
+                          {formData.category}
+                        </span>
+                        {formData.courseId && (
+                          <span className="px-3 py-1 bg-black/50 backdrop-blur-md text-brand-200 border border-brand-400/40 text-[10px] font-mono font-bold tracking-wider rounded-full inline-block">
+                            ID: {formData.courseId}
+                          </span>
+                        )}
+                      </div>
                       <h3 className="text-3xl font-black">{formData.title}</h3>
                     </div>
                     <button
@@ -725,9 +756,16 @@ const CoursesTab = ({ courseType }) => {
                     
                     <div className="absolute bottom-0 left-0 right-0 p-8 flex justify-between items-end gap-8 z-10">
                       <div className="text-white flex-1 min-w-0">
-                        <span className="px-3 py-1 bg-brand-500/20 backdrop-blur-md text-brand-100 border border-brand-500/30 text-[10px] font-black uppercase tracking-widest rounded-md mb-4 inline-block">
-                          {formData.category}
-                        </span>
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="px-3 py-1 bg-brand-500/20 backdrop-blur-md text-brand-100 border border-brand-500/30 text-[10px] font-black uppercase tracking-widest rounded-md inline-block">
+                            {formData.category}
+                          </span>
+                          {formData.courseId && (
+                            <span className="px-3 py-1 bg-white/10 backdrop-blur-md text-white border border-white/20 text-[10px] font-mono font-bold tracking-wider rounded-md inline-block">
+                              ID: {formData.courseId}
+                            </span>
+                          )}
+                        </div>
                         <h3 className="text-3xl lg:text-4xl font-black tracking-tight leading-tight">{formData.title}</h3>
                       </div>
                       <button
@@ -855,7 +893,21 @@ const CoursesTab = ({ courseType }) => {
                       </p>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-xl shadow-sm text-brand-600 font-mono font-black text-sm">
+                          ID
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">
+                            Course ID
+                          </p>
+                          <p className="text-lg font-black text-slate-900 font-mono tracking-wide">
+                            {formData.courseId || "NO-ID"}
+                          </p>
+                        </div>
+                      </div>
+
                       <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex items-center gap-4">
                         <div className="p-3 bg-white rounded-xl shadow-sm text-brand-600">
                           <BookOpen size={24} />
@@ -958,19 +1010,38 @@ const CoursesTab = ({ courseType }) => {
                     <h3 className="text-sm font-bold text-brand-600 uppercase tracking-wider">
                       Basic Information
                     </h3>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Course Title
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm"
-                        placeholder="e.g. Master React in 30 Days"
-                        value={formData.title}
-                        onChange={(e) =>
-                          setFormData({ ...formData, title: e.target.value })
-                        }
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Course ID {courseType === "Center Courses" ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(Optional)</span>}
+                        </label>
+                        <input
+                          type="text"
+                          required={courseType === "Center Courses"}
+                          className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm font-semibold tracking-wider font-mono uppercase"
+                          placeholder={courseType === "Center Courses" ? "e.g. ADCA, DCA-01" : "e.g. REACT-01"}
+                          value={formData.courseId || ""}
+                          onChange={(e) =>
+                            setFormData({ ...formData, courseId: e.target.value })
+                          }
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Manual course code / ID</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Course Title <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full rounded-lg border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-2.5 text-sm"
+                          placeholder={courseType === "Center Courses" ? "e.g. Advanced Diploma in Computer Applications" : "e.g. Master React in 30 Days"}
+                          value={formData.title}
+                          onChange={(e) =>
+                            setFormData({ ...formData, title: e.target.value })
+                          }
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">

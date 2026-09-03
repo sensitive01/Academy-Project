@@ -173,7 +173,7 @@ const BatchProgressDetails = ({ batchId, initialTab = "total", onBack }) => {
           <CustomDataTable
             columns={columns}
             data={getActiveData()}
-            loading={loading}
+            progressPending={loading}
             searchPlaceholder="Search by student name, ID, or center..."
             search={search}
             setSearch={setSearch}

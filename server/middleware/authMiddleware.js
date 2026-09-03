@@ -15,22 +15,30 @@ const protect = async (req, res, next) => {
                 throw new Error('Valid token missing');
             }
 
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            let decoded;
+            try {
+                decoded = jwt.verify(token, process.env.JWT_SECRET);
+            } catch (err) {
+                console.error(`[Auth] JWT Verify Failed on ${req.originalUrl}:`, err.message);
+                return res.status(402).json({ message: 'JWT Verify Failed: ' + err.message });
+            }
 
             req.user = await User.findById(decoded.id).select('-password');
             if (!req.user) {
-                return res.status(401).json({ message: 'User no longer exists' });
+                console.error(`[Auth] User not found for id ${decoded.id} on ${req.originalUrl}`);
+                return res.status(403).json({ message: 'User no longer exists' });
             }
 
             next();
         } catch (error) {
-            // console.error(error); // Don't spam stack traces for auth failures
-            res.status(401).json({ message: 'Not authorized, token failed' });
+            console.error("[Auth] DB Error:", error);
+            res.status(500).json({ message: 'Internal Server Error during authentication' });
         }
     }
 
     if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token' });
+        console.error(`[Auth] No token provided on ${req.originalUrl}`);
+        res.status(400).json({ message: 'Not authorized, no token' });
     }
 };
 

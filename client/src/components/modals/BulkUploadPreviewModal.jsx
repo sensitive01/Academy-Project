@@ -240,11 +240,6 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
                       </td>
                     ))}
                     <td className="px-4 py-3 text-center sticky right-0 z-20 bg-white border-l border-slate-100 group-hover:bg-slate-50 flex items-center justify-center gap-2">
-                      {onPreviewRow && (
-                        <button disabled={isSubmitting} onClick={() => onPreviewRow(row, selectedTemplate)} className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50" title="Preview Marksheet">
-                          <FileArchive size={16} />
-                        </button>
-                      )}
                       <button disabled={isSubmitting} onClick={() => handleDeleteRow(row._originalIndex)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50" title="Delete Row">
                         <Trash2 size={16} />
                       </button>
@@ -263,8 +258,8 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
           )}
         </div>
 
-        <div className="flex gap-3 pt-4 mt-4 border-t border-slate-100 shrink-0">
-          <button type="button" disabled={isSubmitting} onClick={onClose} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50">
+        <div className="flex justify-between items-center pt-4 mt-4 border-t border-slate-100 shrink-0">
+          <button type="button" disabled={isSubmitting} onClick={onClose} className="px-5 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50 text-sm">
             Cancel
           </button>
           <button

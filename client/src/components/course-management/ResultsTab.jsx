@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -1154,8 +1155,8 @@ const ResultsTab = () => {
         />
       )}
 
-      {uploadProgress.isUploading && (
-        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {uploadProgress.isUploading && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-800 mb-4">Uploading Data...</h3>
             <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden relative">
@@ -1168,7 +1169,8 @@ const ResultsTab = () => {
               Processing {uploadProgress.current} of {uploadProgress.total} records
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

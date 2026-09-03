@@ -109,10 +109,10 @@ const DynamicSeal = ({ template }) => {
   if (template?.id === 'vocational_council' || !template) {
     return (
       <div className="relative w-[105px] h-[105px] flex justify-center items-center">
-        <img 
-          src={newRedSeal} 
-          alt="National Council Seal" 
-          className="w-full h-full object-contain drop-shadow-md" 
+        <img
+          src={newRedSeal}
+          alt="National Council Seal"
+          className="w-full h-full object-contain drop-shadow-md"
         />
       </div>
     );
@@ -161,7 +161,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
     try {
       const element = printRef.current;
-      
+
       const canvas = await html2canvas(element, {
         scale: 2, // Higher quality
         useCORS: true, // Allow loading cross-origin images
@@ -170,7 +170,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
+
       // A4 dimensions in pt: 595.28 x 841.89
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -180,7 +180,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
+
       const imgRatio = canvas.width / canvas.height;
       const pdfRatio = pdfWidth / pdfHeight;
 
@@ -355,12 +355,24 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
 
                   {/* Dynamic Header Block */}
                   {(!template || template?.id === 'vocational_council') ? (
-                    <div className="flex items-center justify-center w-full -mt-3 mb-3">
-                      <img 
-                        src={newHeaderBanner} 
-                        alt="Council Header Banner" 
-                        className="w-full h-auto object-contain translate-x-1" 
-                      />
+                    <div className="flex items-center justify-between w-full pt-1 pb-1 mb-1 gap-4">
+                      {/* Left Logo - aligned to table left edge */}
+                      <div className="shrink-0 flex items-center justify-start">
+                        <img 
+                          src={logoVocational} 
+                          alt="CVESW Logo" 
+                          className="w-[95px] h-[95px] object-contain" 
+                        />
+                      </div>
+
+                      {/* Right Wordings Banner - stretched to table right edge */}
+                      <div className="flex-1 flex items-center justify-end">
+                        <img 
+                          src={newHeaderBanner} 
+                          alt="Council Header Banner" 
+                          className="w-full h-auto object-contain" 
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="flex pb-0 min-h-[65px] items-center justify-between w-full mt-1 ">
@@ -409,7 +421,7 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                     </div>
                   )}
 
-                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mb-3 -mt-14' : template?.id === 'dr_rg_academy' ? 'mb-1 mt-1' : 'mb-1 -mt-1'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
+                  <div className={`text-center text-[18px] font-extrabold tracking-widest text-black uppercase ${template?.id === 'vocational_council' ? 'mt-2 mb-3' : template?.id === 'dr_rg_academy' ? 'mb-1 mt-1' : 'mb-1 mt-0'}`} style={{ fontFamily: 'Times New Roman, serif' }}>
                     {(() => {
                       const map = {
                         1: 'FIRST', 2: 'SECOND', 3: 'THIRD', 4: 'FOURTH',
@@ -425,16 +437,16 @@ const MarksheetModal = ({ data, onClose, template, inline = false, title, onConf
                     <tbody>
                       {/* Row 1: Student Headers */}
                       <tr>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[20%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif' }}>REGISTER NUMBER</th>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="1" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE CANDIDATE</th>
-                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="3" style={{ fontFamily: 'Times New Roman, serif' }}>NAME OF THE COURSE</th>
+                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[20%]" colSpan="2" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>REGISTER NUMBER</th>
+                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="1" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE CANDIDATE</th>
+                        <th className="border border-black p-2 text-center text-[11px] uppercase font-bold w-[40%]" colSpan="3" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>NAME OF THE COURSE</th>
                       </tr>
 
                       {/* Row 2: Student Values */}
                       <tr>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="2">{student.studentId}</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal capitalize" colSpan="1">{student.studentNameEnglish}</td>
-                        <td className="border border-black p-2 text-center text-[12.5px] font-normal" colSpan="3">{course?.title}</td>
+                        <td className="border border-black py-2.5 px-2 text-center text-[12.5px] font-normal leading-snug" colSpan="2" style={{ verticalAlign: 'middle' }}>{student.studentId}</td>
+                        <td className="border border-black py-2.5 px-2 text-center text-[12.5px] font-normal capitalize leading-snug" colSpan="1" style={{ verticalAlign: 'middle' }}>{student.studentNameEnglish}</td>
+                        <td className="border border-black py-2.5 px-2 text-center text-[12.5px] font-normal leading-snug" colSpan="3" style={{ verticalAlign: 'middle' }}>{course?.title}</td>
                       </tr>
 
                       {/* Row 3: Marks Headers */}

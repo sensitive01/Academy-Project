@@ -189,7 +189,7 @@ const BatchProgressTab = () => {
         <CustomDataTable
           columns={columns}
           data={filteredData}
-          loading={loading}
+          progressPending={loading}
           searchPlaceholder="Search by batch name, ID, or course..."
           search={search}
           setSearch={setSearch}

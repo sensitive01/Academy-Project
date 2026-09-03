@@ -446,6 +446,16 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
           let theoryMark = 0;
           let practicalMark = 0;
 
+          // Check if user actually entered any data for this subject
+          const rawMark = row[markKey];
+          const rawInternal = row[internalKey];
+          const markIsBlank = rawMark === undefined || rawMark === null || String(rawMark).trim() === '';
+          const internalIsBlank = rawInternal === undefined || rawInternal === null || String(rawInternal).trim() === '';
+          if (markIsBlank && internalIsBlank) {
+            // User left this subject row completely empty — skip silently
+            return false;
+          }
+
           if (subjectDoc.type === "Practical") {
             practicalMark = Number(row[markKey] || 0);
           } else {
@@ -503,7 +513,8 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
         }
 
         if (!processedAny) {
-          throw new Error('No valid subjects provided in row');
+          // All subject cells were blank for this student — skip silently
+          continue;
         }
 
       } catch (err) {

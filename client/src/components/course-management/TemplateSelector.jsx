@@ -19,21 +19,21 @@ const TemplateSelector = ({ templates, selectedTemplate, onSelect, onPreview, on
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex flex-wrap gap-6 justify-center">
         {templates.map(t => {
           const isSelected = selectedTemplate === t.id;
           return (
             <div 
               key={t.id}
               onClick={() => onSelect(t.id)}
-              className={`relative bg-white rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 border-2
+              className={`relative bg-white rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 border-2 w-[320px]
                 ${isSelected ? 'border-brand-600 shadow-[0_0_30px_rgba(220,38,38,0.15)] scale-[1.02] z-10' : 'border-transparent shadow-md hover:shadow-xl hover:scale-[1.01] hover:border-slate-200'}
               `}
             >
               {/* Template Card Header/Mockup */}
               <div className="h-64 bg-slate-50 border-b border-slate-100 flex flex-col items-center justify-center p-4 relative group">
                 <div className="w-full h-full relative overflow-hidden bg-white shadow-sm border border-slate-200 rounded-lg flex items-center justify-center pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
-                  <div className="absolute top-0 left-0 origin-top-left" style={{ transform: 'scale(0.18)', width: '800px' }}>
+                  <div className="absolute top-1/2 left-1/2" style={{ transform: 'translate(-50%, -50%) scale(0.18)', width: '800px', transformOrigin: 'center center' }}>
                     <MarksheetModal 
                       inline={true} 
                       data={{

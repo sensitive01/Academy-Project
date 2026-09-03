@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { Link } from "react-router-dom";
 import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign } from "lucide-react";
 import api from "../../services/api";
@@ -467,15 +468,46 @@ const ExamManagement = () => {
 
       let successCount = 0;
       let failedCount = 0;
-      const chunkSize = 10;
+      const chunkSize = 5; // Smaller chunks to reduce per-request load
 
       for (let i = 0; i < total; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
-        const res = await api.post("/marks/bulk", { marks: chunk, template: templateId });
-        successCount += res.data.results.success;
-        failedCount += res.data.results.failed;
-        if (res.data.results.errors && res.data.results.errors.length > 0) {
-          console.error("Bulk Upload Errors in chunk", i, ":", res.data.results.errors);
+
+        let res = null;
+        let lastError = null;
+        const maxRetries = 3;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            res = await api.post("/marks/bulk", { marks: chunk, template: templateId });
+            lastError = null;
+            break; // success
+          } catch (err) {
+            lastError = err;
+            const status = err?.response?.status;
+            if (status === 401) {
+              // Token expired — stop immediately
+              toast.error("Session expired during upload. Please log in again and retry.");
+              setUploadProgress({ isUploading: false, current: 0, total: 0 });
+              return;
+            }
+            if (attempt < maxRetries) {
+              // Wait 2s before retrying on network errors
+              await new Promise(r => setTimeout(r, 2000 * attempt));
+            }
+          }
+        }
+
+        if (lastError) {
+          // All retries failed — count the chunk rows as failed
+          failedCount += chunk.length;
+          console.error(`Bulk Upload chunk ${i} failed after ${maxRetries} attempts:`, lastError.message);
+        } else {
+          successCount += res.data.results.success;
+          failedCount += res.data.results.failed;
+          if (res.data.results.errors && res.data.results.errors.length > 0) {
+            console.error("Bulk Upload Errors in chunk", i, ":", res.data.results.errors);
+          }
         }
 
         setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total });
@@ -2605,8 +2637,8 @@ const ExamManagement = () => {
         />
       )}
 
-      {uploadProgress.isUploading && (
-        <div className="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {uploadProgress.isUploading && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-800 mb-4">Uploading Data...</h3>
             <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden relative">
@@ -2619,7 +2651,8 @@ const ExamManagement = () => {
               Processing {uploadProgress.current} of {uploadProgress.total} records
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
