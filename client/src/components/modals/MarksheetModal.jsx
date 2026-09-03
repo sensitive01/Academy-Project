@@ -178,7 +178,11 @@ const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, ti
           style.innerHTML = `
             .print-marksheet table td,
             .print-marksheet table th {
-              padding-bottom: 16px !important;
+              padding-top: 2px !important;
+              padding-bottom: 18px !important;
+            }
+            .pdf-header-container {
+              gap: 1rem !important;
             }
           `;
           clonedDoc.head.appendChild(style);
@@ -366,26 +370,26 @@ const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, ti
               {/* Thin gold inner liner */}
               <div style={{ border: '1px solid #b8860b', padding: '2px' }}>
                 {/* Red content border */}
-                <div className="relative flex flex-col justify-between" style={{ border: '2px solid #b91c1c', padding: '10px 10px 4px 10px', background: '#fff' }}>
+                <div className="relative flex flex-col justify-between" style={{ border: '2px solid #b91c1c', padding: '10px 20px 4px 20px', background: '#fff' }}>
 
                   {/* Dynamic Header Block */}
                   {(!template || template?.id === 'vocational_council') ? (
-                    <div className="flex items-center justify-between w-full pt-2 pb-1 mb-1 gap-4">
-                      {/* Left Logo - aligned to table left edge */}
-                      <div className="shrink-0 flex items-center justify-start">
+                    <div className="flex items-center justify-between w-full pt-2 pb-1 mb-1 pdf-header-container">
+                      {/* Left Logo - pulled inwards with margin */}
+                      <div className="shrink-0 flex items-center justify-start w-[140px] h-[130px] ml-8"> 
                         <img
                           src={logoVocational}
                           alt="CVESW Logo"
-                          className="w-[130px] h-[130px] object-contain"
+                          className="w-full h-full object-contain object-left"
                         />
                       </div>
 
-                      {/* Right Wordings Banner - stretched to table right edge */}
-                      <div className="flex-1 flex items-center justify-end">
+                      {/* Right Wordings Banner - pulled inwards with margin */}
+                      <div className="flex-1 flex items-center justify-end h-[130px] mr-8">
                         <img
                           src={newHeaderBanner}
                           alt="Council Header Banner"
-                          className="w-full h-auto object-contain"
+                          className="max-w-full max-h-full object-contain object-right"
                         />
                       </div>
                     </div>
@@ -604,7 +608,7 @@ const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, ti
                   </table>
 
                   {/* Footer Signatures */}
-                  <div className="mt-auto relative flex items-center justify-between pt-4 mb-4 px-8 min-h-[150px]">
+                  <div className="mt-auto relative flex items-center justify-between pt-4 pb-4 mb-1 px-8 min-h-[130px]">
                     {/* Left */}
                     <div className={`flex-1 flex justify-start ${template?.id === 'vocational_council' ? 'pl-4' : 'pl-12'}`}>
                       <p className="text-[12px] font-bold text-black m-0 uppercase" style={{ fontFamily: 'Times New Roman, serif' }}>
@@ -623,7 +627,7 @@ const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, ti
                         <img
                           src={signatureImg}
                           alt="Controller of Examination Signature"
-                          className="absolute bottom-full mb-0.5 w-[210px] h-auto max-h-[75px] object-contain pointer-events-none"
+                          className="absolute bottom-full mb-0.5 w-[210px] h-auto max-h-[55px] object-contain pointer-events-none"
                           style={{ mixBlendMode: 'multiply' }}
                         />
                         <p className="text-[11.5px] font-bold text-black m-0 uppercase tracking-wide whitespace-nowrap" style={{ fontFamily: 'Times New Roman, serif' }}>CONTROLLER OF EXAMINATION</p>
