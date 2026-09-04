@@ -266,10 +266,15 @@ const ExamManagement = () => {
     if (batchHasSubjectsConfigured) {
       return subjects.filter(sub => allowedSubjectIds.includes(String(sub._id)));
     } else {
-      return subjects.filter(sub =>
-        String(sub.course?._id || sub.course) === String(courseId) &&
-        Number(sub.semester) === semNum
-      );
+      return subjects.filter(sub => {
+        const matchesSemester = Number(sub.semester) === semNum;
+        if (!matchesSemester) return false;
+
+        const subCourseIds = (sub.courses || []).map(c => String(c._id || c));
+        const legacySubCourseId = sub.course ? String(sub.course._id || sub.course) : null;
+
+        return subCourseIds.includes(String(courseId)) || legacySubCourseId === String(courseId);
+      });
     }
   };
 
@@ -460,7 +465,7 @@ const ExamManagement = () => {
 
   const processBulkUpload = async (data, templateId) => {
     try {
-      
+
       const total = data.length;
       if (total === 0) return;
 
@@ -578,11 +583,15 @@ const ExamManagement = () => {
         let rawTitle = String(row[`Subject ${i} Code`] || `Subject ${i}`);
         let subCode = rawTitle.includes(' - ') ? rawTitle.split(' - ')[0].trim() : rawTitle.trim();
 
-        const subjectObj = subjects.find(s => 
-          (s.code?.trim().toLowerCase() === subCode.toLowerCase() || s.name?.trim().toLowerCase() === subCode.toLowerCase()) &&
-          (courseObj ? String(s.course?._id || s.course) === String(courseObj._id) : true) &&
-          Number(s.semester) === Number(semNum)
-        );
+        const subjectObj = subjects.find(s => {
+          const nameOrCodeMatches = (s.code?.trim().toLowerCase() === subCode.toLowerCase() || s.name?.trim().toLowerCase() === subCode.toLowerCase());
+          if (!nameOrCodeMatches) return false;
+          if (Number(s.semester) !== Number(semNum)) return false;
+          if (!courseObj) return true;
+          const subCourseIds = (s.courses || []).map(c => String(c._id || c));
+          const legacySubCourseId = s.course ? String(s.course._id || s.course) : null;
+          return subCourseIds.includes(String(courseObj._id)) || legacySubCourseId === String(courseObj._id);
+        });
 
         if (!subjectObj) {
           errors[`Subject ${i} Code`] = "Subject not found";
@@ -645,7 +654,7 @@ const ExamManagement = () => {
     const studentData = students.find(s => String(s.studentId).trim() === sId) || { studentNameEnglish: 'Student Name', studentId: row["Student ID"], year: 'I Year' };
 
     const mockMarks = [];
-    
+
     let extractedCourseId = "";
     let extractedTitle = row["Course Title"] || 'Course';
     if (extractedTitle.includes(' - ')) {
@@ -681,11 +690,15 @@ const ExamManagement = () => {
         const extNum = th === 'AB' ? 0 : th + (prac === 'AB' ? 0 : prac);
         const intNum = int === 'AB' ? 0 : int;
 
-        const subjectObj = subjects.find(s => 
-          (s.code === subCode || s.name === subCode) &&
-          (courseObj ? String(s.course?._id || s.course) === String(courseObj._id) : true) &&
-          Number(s.semester) === Number(semNum)
-        );
+        const subjectObj = subjects.find(s => {
+          const nameOrCodeMatches = (s.code === subCode || s.name === subCode);
+          if (!nameOrCodeMatches) return false;
+          if (Number(s.semester) !== Number(semNum)) return false;
+          if (!courseObj) return true;
+          const subCourseIds = (s.courses || []).map(c => String(c._id || c));
+          const legacySubCourseId = s.course ? String(s.course._id || s.course) : null;
+          return subCourseIds.includes(String(courseObj._id)) || legacySubCourseId === String(courseObj._id);
+        });
         const actualType = subjectObj ? subjectObj.type : 'Theory';
 
         mockMarks.push({
@@ -1143,8 +1156,8 @@ const ExamManagement = () => {
       name: "Exam",
       selector: row => {
         if (row.exam?.name) return row.exam.name;
-        const inferredExam = exams.find(e => 
-          (e.course?._id || e.course) === (row.course?._id || row.course) && 
+        const inferredExam = exams.find(e =>
+          (e.course?._id || e.course) === (row.course?._id || row.course) &&
           e.semester === row.semester
         );
         return inferredExam?.name;
@@ -1153,8 +1166,8 @@ const ExamManagement = () => {
       cell: row => {
         let examName = row.exam?.name;
         if (!examName) {
-          const inferredExam = exams.find(e => 
-            (e.course?._id || e.course) === (row.course?._id || row.course) && 
+          const inferredExam = exams.find(e =>
+            (e.course?._id || e.course) === (row.course?._id || row.course) &&
             e.semester === row.semester
           );
           examName = inferredExam?.name;
@@ -1353,8 +1366,8 @@ const ExamManagement = () => {
       name: "Exam",
       selector: row => {
         if (row.exam?.name) return row.exam.name;
-        const inferredExam = exams.find(e => 
-          (e.course?._id || e.course) === (row.course?._id || row.course) && 
+        const inferredExam = exams.find(e =>
+          (e.course?._id || e.course) === (row.course?._id || row.course) &&
           e.semester === row.semester
         );
         return inferredExam?.name;
@@ -1363,8 +1376,8 @@ const ExamManagement = () => {
       cell: row => {
         let examName = row.exam?.name;
         if (!examName) {
-          const inferredExam = exams.find(e => 
-            (e.course?._id || e.course) === (row.course?._id || row.course) && 
+          const inferredExam = exams.find(e =>
+            (e.course?._id || e.course) === (row.course?._id || row.course) &&
             e.semester === row.semester
           );
           examName = inferredExam?.name;
@@ -1520,46 +1533,46 @@ const ExamManagement = () => {
 
   // CRITICAL FIX: Ensure viewingMarkBatch is always up-to-date with the latest data
   // so that optimistic updates and fetchData don't leave the user looking at stale closure data!
-  const currentViewingMarkBatch = viewingMarkBatch 
-    ? batchMarksArray.find(b => b.key === viewingMarkBatch.key) 
+  const currentViewingMarkBatch = viewingMarkBatch
+    ? batchMarksArray.find(b => b.key === viewingMarkBatch.key)
     : null;
 
 
   const handleTemplateConfirm = async (templateId) => {
     if (!templateSelectionTarget) return;
-    
+
     try {
       setIsSaving(true);
       if (templateSelectionTarget.type === 'bulk') {
-          const bulkData = templateSelectionTarget.data;
-          setTemplateSelectionTarget(null);
-          await processBulkUpload(bulkData, templateId);
-          return;
-        } else if (templateSelectionTarget.type === 'bulk-edit') {
-          const { updatedMarks, groupDetails } = templateSelectionTarget.data;
-          await Promise.all(updatedMarks.map(m => {
-            return api.put(`/marks/${m._id}`, {
-              student: groupDetails.student,
-              batch: groupDetails.batch,
-              course: groupDetails.course,
-              semester: groupDetails.semester,
-              subject: m.subject,
-              theoryMark: m.theoryMark,
-              internalMark: m.internalMark,
-              practicalMark: m.practicalMark,
-              template: templateId
-            });
-          }));
-          toast.success("Semester marks updated successfully");
-        }
-      
+        const bulkData = templateSelectionTarget.data;
+        setTemplateSelectionTarget(null);
+        await processBulkUpload(bulkData, templateId);
+        return;
+      } else if (templateSelectionTarget.type === 'bulk-edit') {
+        const { updatedMarks, groupDetails } = templateSelectionTarget.data;
+        await Promise.all(updatedMarks.map(m => {
+          return api.put(`/marks/${m._id}`, {
+            student: groupDetails.student,
+            batch: groupDetails.batch,
+            course: groupDetails.course,
+            semester: groupDetails.semester,
+            subject: m.subject,
+            theoryMark: m.theoryMark,
+            internalMark: m.internalMark,
+            practicalMark: m.practicalMark,
+            template: templateId
+          });
+        }));
+        toast.success("Semester marks updated successfully");
+      }
+
       if (templateSelectionTarget.type === 'edit') {
         const payload = { ...templateSelectionTarget.data, template: templateId };
         if (payload.subjects && payload.subjects.length > 0) {
-           payload.subject = payload.subjects[0].subject;
-           payload.theoryMark = payload.subjects[0].theoryMark;
-           payload.internalMark = payload.subjects[0].internalMark;
-           payload.practicalMark = payload.subjects[0].practicalMark;
+          payload.subject = payload.subjects[0].subject;
+          payload.theoryMark = payload.subjects[0].theoryMark;
+          payload.internalMark = payload.subjects[0].internalMark;
+          payload.practicalMark = payload.subjects[0].practicalMark;
         }
         await api.put(`/marks/${templateSelectionTarget.currentId}`, payload);
         toast.success("Mark updated successfully");
@@ -1568,7 +1581,7 @@ const ExamManagement = () => {
         const student = students.find(s => s._id === payload.student) || {};
         const course = courses.find(c => c._id === payload.course) || {};
         const batch = batches.find(b => b._id === payload.batch) || {};
-        
+
         const marksForPreview = payload.subjects.map(subConf => {
           const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject)) || {};
           return {
@@ -1590,7 +1603,7 @@ const ExamManagement = () => {
           marks: marksForPreview,
           templateId: templateId
         };
-        
+
         const finalPayload = {
           student: previewData.student._id,
           batch: previewData.batch._id,
@@ -1623,75 +1636,75 @@ const ExamManagement = () => {
   };
 
   const handleTemplatePreview = (templateId) => {
-      if (templateSelectionTarget?.type === 'bulk') {
-        const firstRow = templateSelectionTarget.data[0];
-        if (firstRow) handlePreviewRow(firstRow, templateId);
-      } else if (templateSelectionTarget?.type === 'bulk-edit') {
-        const { updatedMarks, groupDetails } = templateSelectionTarget.data;
-        const student = students.find(s => s._id === groupDetails.student) || {};
-        const course = courses.find(c => c._id === groupDetails.course) || {};
-        const batch = batches.find(b => b._id === groupDetails.batch) || {};
-        
-        const marksForPreview = updatedMarks.map(m => {
-          const subjectDetails = subjects.find(s => s._id === m.subject) || {};
-          return {
-            subject: subjectDetails,
-            theoryMark: m.theoryMark,
-            internalMark: m.internalMark,
-            practicalMark: m.practicalMark || 0,
-            passMark: 40,
-            template: templateId
-          };
-        });
+    if (templateSelectionTarget?.type === 'bulk') {
+      const firstRow = templateSelectionTarget.data[0];
+      if (firstRow) handlePreviewRow(firstRow, templateId);
+    } else if (templateSelectionTarget?.type === 'bulk-edit') {
+      const { updatedMarks, groupDetails } = templateSelectionTarget.data;
+      const student = students.find(s => s._id === groupDetails.student) || {};
+      const course = courses.find(c => c._id === groupDetails.course) || {};
+      const batch = batches.find(b => b._id === groupDetails.batch) || {};
 
-        setPreviewSingleData({
-          student,
-          semester: groupDetails.semester,
-          course,
-          exam: exams.find(e => e.course === groupDetails.course && e.semester === groupDetails.semester) || {},
-          batch,
-          marks: marksForPreview,
-          templateId: templateId
-        });
-        setShowSinglePreview(true);
-      } else {
-        const payload = templateSelectionTarget.data;
-        const student = students.find(s => s._id === payload.student) || {};
-        const course = courses.find(c => c._id === payload.course) || {};
-        const batch = batches.find(b => b._id === payload.batch) || {};
-        
-        const marksForPreview = payload.subjects.map(subConf => {
-          const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject)) || {};
-          return {
-            subject: subjectDetails,
-            theoryMark: subConf.theoryMark,
-            internalMark: subConf.internalMark,
-            practicalMark: subConf.practicalMark || 0,
-            passMark: 40,
-            template: templateId
-          };
-        });
+      const marksForPreview = updatedMarks.map(m => {
+        const subjectDetails = subjects.find(s => s._id === m.subject) || {};
+        return {
+          subject: subjectDetails,
+          theoryMark: m.theoryMark,
+          internalMark: m.internalMark,
+          practicalMark: m.practicalMark || 0,
+          passMark: 40,
+          template: templateId
+        };
+      });
 
-        setPreviewSingleData({
-          student,
-          semester: payload.semester,
-          course,
-          exam: exams.find(e => e._id === payload.exam) || {},
-          batch,
-          marks: marksForPreview,
-          templateId: templateId
-        });
-        setShowSinglePreview(true);
-     }
+      setPreviewSingleData({
+        student,
+        semester: groupDetails.semester,
+        course,
+        exam: exams.find(e => e.course === groupDetails.course && e.semester === groupDetails.semester) || {},
+        batch,
+        marks: marksForPreview,
+        templateId: templateId
+      });
+      setShowSinglePreview(true);
+    } else {
+      const payload = templateSelectionTarget.data;
+      const student = students.find(s => s._id === payload.student) || {};
+      const course = courses.find(c => c._id === payload.course) || {};
+      const batch = batches.find(b => b._id === payload.batch) || {};
+
+      const marksForPreview = payload.subjects.map(subConf => {
+        const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject)) || {};
+        return {
+          subject: subjectDetails,
+          theoryMark: subConf.theoryMark,
+          internalMark: subConf.internalMark,
+          practicalMark: subConf.practicalMark || 0,
+          passMark: 40,
+          template: templateId
+        };
+      });
+
+      setPreviewSingleData({
+        student,
+        semester: payload.semester,
+        course,
+        exam: exams.find(e => e._id === payload.exam) || {},
+        batch,
+        marks: marksForPreview,
+        templateId: templateId
+      });
+      setShowSinglePreview(true);
+    }
   };
 
   if (templateSelectionTarget) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        <TemplateSelector 
+        <TemplateSelector
           templates={templates}
           selectedTemplate={templateSelectionTarget.selectedTemplateId || templateSelectionTarget.data.template || "rg_modern"}
-          onSelect={(id) => setTemplateSelectionTarget({...templateSelectionTarget, selectedTemplateId: id})}
+          onSelect={(id) => setTemplateSelectionTarget({ ...templateSelectionTarget, selectedTemplateId: id })}
           onPreview={handleTemplatePreview}
           onSubmit={() => handleTemplateConfirm(templateSelectionTarget.selectedTemplateId || templateSelectionTarget.data.template || "rg_modern")}
           onBack={() => {
@@ -1702,7 +1715,7 @@ const ExamManagement = () => {
           }}
           isSaving={isSaving}
         />
-        
+
         {showMarksheetModal && selectedGroupData && (
           <MarksheetModal
             data={selectedGroupData}
@@ -1710,7 +1723,7 @@ const ExamManagement = () => {
             template={{ id: selectedGroupData.templateId || 'rg_modern' }}
           />
         )}
-        
+
         {showSinglePreview && previewSingleData && (
           <MarksheetModal
             data={previewSingleData}
@@ -1726,586 +1739,586 @@ const ExamManagement = () => {
     <div className="space-y-6">
 
       {!showMarkModal && !showBulkUploadPreviewModal && (<>
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Examination Management</h1>
-          <p className="text-sm text-slate-500">Manage academy examinations, schedules, and student results</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Examination Management</h1>
+            <p className="text-sm text-slate-500">Manage academy examinations, schedules, and student results</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            {isAdmin && activeTab === "exams" && (
+              <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
+                <Plus size={20} /> Add Exam
+              </button>
+            )}
+            {isAdmin && activeTab === "marks" && (
+              <>
+                <button onClick={() => setShowSampleCsvModal(true)} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
+                  <Download size={20} /> Sample CSV
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
+                  <Upload size={20} /> Bulk Upload
+                </button>
+                <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
+                <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
+                  <Plus size={20} /> Upload Result
+                </button>
+              </>
+            )}
+
+          </div>
         </div>
-        <div className="flex gap-2 items-center">
-          {isAdmin && activeTab === "exams" && (
-            <button onClick={() => openModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
-              <Plus size={20} /> Add Exam
-            </button>
-          )}
-          {isAdmin && activeTab === "marks" && (
+
+        {/* Tabs */}
+        <div className="flex items-center gap-4 border-b border-slate-200">
+          <button
+            className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+              }`}
+            onClick={() => setActiveTab("exams")}
+          >
+            <FileText size={18} /> Exams
+          </button>
+          <button
+            className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+              }`}
+            onClick={() => setActiveTab("marks")}
+          >
+            <CheckSquare size={18} /> Results
+          </button>
+          {isAdmin && (
             <>
-              <button onClick={() => setShowSampleCsvModal(true)} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
-                <Download size={20} /> Sample CSV
+
+              <button
+                className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "hall_tickets" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+                  }`}
+                onClick={() => setActiveTab("hall_tickets")}
+              >
+                <FileText size={18} /> Hall Tickets
               </button>
-              <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
-                <Upload size={20} /> Bulk Upload
+              <button
+                className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "payments_list" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+                  }`}
+                onClick={() => setActiveTab("payments_list")}
+              >
+                <DollarSign size={18} /> Payments
               </button>
-              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
-              <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
-                <Plus size={20} /> Upload Result
+              <button
+                className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "upload_progress" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
+                  }`}
+                onClick={() => setActiveTab("upload_progress")}
+              >
+                <Layers size={18} /> Upload Progress
               </button>
             </>
           )}
-
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-4 border-b border-slate-200">
-        <button
-          className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-            }`}
-          onClick={() => setActiveTab("exams")}
-        >
-          <FileText size={18} /> Exams
-        </button>
-        <button
-          className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-            }`}
-          onClick={() => setActiveTab("marks")}
-        >
-          <CheckSquare size={18} /> Results
-        </button>
-        {isAdmin && (
-          <>
-
-            <button
-              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "hall_tickets" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-                }`}
-              onClick={() => setActiveTab("hall_tickets")}
-            >
-              <FileText size={18} /> Hall Tickets
-            </button>
-            <button
-              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "payments_list" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-                }`}
-              onClick={() => setActiveTab("payments_list")}
-            >
-              <DollarSign size={18} /> Payments
-            </button>
-            <button
-              className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "upload_progress" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
-                }`}
-              onClick={() => setActiveTab("upload_progress")}
-            >
-              <Layers size={18} /> Upload Progress
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        {activeTab === "exams" ? (
-          <CustomDataTable
-            columns={examColumns}
-            data={filteredExams}
-            progressPending={loading}
-            search={searchQuery}
-            setSearch={setSearchQuery}
-            searchPlaceholder="Search exams by name or course..."
-          />
-        ) : activeTab === "payments_list" ? (
-          <StudentFeesList feeType="Exam" />
-        ) : activeTab === "upload_progress" ? (
-          <div className="p-6">
-            <BatchProgressTab />
-          </div>
-        ) : activeTab === "hall_tickets" ? (
-          <div className="p-6">
-            {viewingBatch ? (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Students - {viewingBatch.exam?.name}</h3>
-                    <p className="text-sm text-slate-500">Hall tickets generated on {new Date(viewingBatch.generatedAt).toLocaleDateString()}</p>
-                  </div>
-                  <button
-                    onClick={() => { setViewingBatch(null); setStudentSearchQuery(""); }}
-                    className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
-                  >
-                    Back
-                  </button>
-                </div>
-                <CustomDataTable
-                  columns={batchStudentColumns}
-                  data={(viewingBatch.students || []).filter(s =>
-                    (s.studentNameEnglish || "").toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-                    (s.studentId || "").toLowerCase().includes(studentSearchQuery.toLowerCase())
-                  )}
-                  progressPending={false}
-                  search={studentSearchQuery}
-                  setSearch={setStudentSearchQuery}
-                  searchPlaceholder="Search students by name or ID..."
-                />
-              </div>
-            ) : !showGenerateView ? (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-slate-800">Generated Hall Tickets</h3>
-                  <button
-                    onClick={() => setShowGenerateView(true)}
-                    className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold"
-                  >
-                    <Plus size={20} /> Generate New
-                  </button>
-                </div>
-                <CustomDataTable
-                  columns={hallTicketColumns}
-                  data={hallTickets}
-                  progressPending={loading}
-                  search={searchQuery}
-                  setSearch={setSearchQuery}
-                  searchPlaceholder="Search generated hall tickets..."
-                />
-              </div>
-            ) : (
-              <>
-                <div className="mb-6 flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-slate-800">Generate New Hall Tickets</h3>
-                  <button
-                    onClick={() => {
-                      setShowGenerateView(false);
-                      setIsGenerateMode(false);
-                      setSelectedHallTicketExam("");
-                    }}
-                    className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
-                  >
-                    Back to History
-                  </button>
-                </div>
-                <div className="mb-6 flex items-end gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Select Exam Schedule</label>
-                    <select
-                      className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50"
-                      value={selectedHallTicketExam}
-                      onChange={(e) => {
-                        setSelectedHallTicketExam(e.target.value);
-                        setSelectedHallTicketStudents([]);
-                        setIsGenerateMode(false);
-                      }}
-                    >
-                      <option value="">-- Select Exam --</option>
-                      {exams.map(exam => (
-                        <option key={exam._id} value={exam._id}>{exam.name} - Sem {exam.semester}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="shrink-0 flex gap-2">
-                    {!isGenerateMode && selectedHallTicketExam && (
-                      <button
-                        onClick={() => setIsGenerateMode(true)}
-                        className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20"
-                      >
-                        Generate Hall Tickets
-                      </button>
-                    )}
-                    {isGenerateMode && (
-                      <>
-                        <button
-                          onClick={() => { setIsGenerateMode(false); setSelectedHallTicketStudents([]); }}
-                          className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleConfirmGeneration}
-                          disabled={selectedHallTicketStudents.length === 0}
-                          className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Confirm Generation ({selectedHallTicketStudents.length})
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {selectedHallTicketExam && (
-                  <CustomDataTable
-                    columns={[
-                      { name: "S.NO", selector: (row, idx) => idx + 1, width: "80px", center: true },
-                      { name: "STUDENT ID", selector: row => row.studentId, sortable: true },
-                      { name: "NAME", selector: row => row.studentNameEnglish, sortable: true },
-                      { name: "COURSE", selector: row => row.enrolledCourses?.[0]?.course?.title || 'N/A' },
-                      { name: "BATCH", selector: row => batches.find(b => String(b._id) === String(row.enrolledCourses?.[0]?.batch))?.name || 'N/A' },
-                    ]}
-                    data={students.filter(student => {
-                      const examObj = exams.find(e => String(e._id) === String(selectedHallTicketExam));
-                      if (!examObj || !examObj.batch) return false;
-
-                      // Exclude students who already have a hall ticket for this exam
-                      const hasHallTicket = hallTickets.some(ht => {
-                        const isSameExam = String(typeof ht.exam === 'object' ? ht.exam?._id : ht.exam) === String(selectedHallTicketExam);
-                        if (!isSameExam) return false;
-                        return ht.students?.some(s => String(typeof s === 'object' ? s?._id : s) === String(student._id));
-                      });
-                      if (hasHallTicket) return false;
-
-                      // Filter students by this exam's batch
-                      const studentBatch = student.enrolledCourses?.[0]?.batch;
-                      if (!studentBatch) return false;
-                      return String(typeof studentBatch === 'object' ? studentBatch._id : studentBatch) === String(typeof examObj.batch === 'object' ? examObj.batch._id : examObj.batch);
-                    })}
-                    selectableRows={isGenerateMode}
-                    onSelectedRowsChange={({ selectedRows }) => {
-                      setSelectedHallTicketStudents(selectedRows);
-                    }}
-                    search={searchQuery}
-                    setSearch={setSearchQuery}
-                    searchPlaceholder="Search students..."
-                  />
-                )}
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="p-6">
-            {currentViewingMarkBatch ? (
-              showMarksheetModal && selectedGroupData ? (
-                <div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-800">
-                        Marksheet - {selectedGroupData.student?.studentNameEnglish} ({selectedGroupData.student?.studentId})
-                      </h3>
-                      <p className="text-sm text-slate-500">
-                        {currentViewingMarkBatch.batch?.name} • {currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => marksheetRef.current?.downloadPDF()}
-                        className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-xl hover:bg-brand-700 transition-all font-bold text-sm shadow-md shadow-brand-600/20"
-                      >
-                        <Download size={18} /> Save as PDF
-                      </button>
-                      <button
-                        onClick={() => { setShowMarksheetModal(false); setSelectedGroupData(null); }}
-                        className="text-slate-600 hover:text-slate-900 font-bold flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
-                      >
-                        <ArrowLeft size={18} /> Back to Results
-                      </button>
-                    </div>
-                  </div>
-                  <div className="bg-slate-100/70 p-4 sm:p-6 rounded-2xl border border-slate-200">
-                    <MarksheetModal
-                      ref={marksheetRef}
-                      data={selectedGroupData}
-                      inline={true}
-                      hideInlineHeader={true}
-                      onClose={() => { setShowMarksheetModal(false); setSelectedGroupData(null); }}
-                      template={{ id: selectedGroupData.templateId || (selectedGroupData.marks && selectedGroupData.marks.length > 0 ? selectedGroupData.marks[0].template : 'rg_modern') }}
-                    />
-                  </div>
-                </div>
-              ) : (
+        {/* Tab Content */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          {activeTab === "exams" ? (
+            <CustomDataTable
+              columns={examColumns}
+              data={filteredExams}
+              progressPending={loading}
+              search={searchQuery}
+              setSearch={setSearchQuery}
+              searchPlaceholder="Search exams by name or course..."
+            />
+          ) : activeTab === "payments_list" ? (
+            <StudentFeesList feeType="Exam" />
+          ) : activeTab === "upload_progress" ? (
+            <div className="p-6">
+              <BatchProgressTab />
+            </div>
+          ) : activeTab === "hall_tickets" ? (
+            <div className="p-6">
+              {viewingBatch ? (
                 <div>
                   <div className="flex justify-between items-center mb-6">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-800">Results - {currentViewingMarkBatch.batch?.name}</h3>
-                      <p className="text-sm text-slate-500">{currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})</p>
+                      <h3 className="text-lg font-bold text-slate-800">Students - {viewingBatch.exam?.name}</h3>
+                      <p className="text-sm text-slate-500">Hall tickets generated on {new Date(viewingBatch.generatedAt).toLocaleDateString()}</p>
                     </div>
                     <button
-                      onClick={() => { setViewingMarkBatch(null); setMarkSearchQuery(""); }}
+                      onClick={() => { setViewingBatch(null); setStudentSearchQuery(""); }}
                       className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
                     >
                       Back
                     </button>
                   </div>
                   <CustomDataTable
-                    columns={markColumns}
-                    data={(currentViewingMarkBatch.students || []).filter(m =>
-                      (m.student?.studentNameEnglish || "").toLowerCase().includes(markSearchQuery.toLowerCase()) ||
-                      (m.student?.studentId || "").toLowerCase().includes(markSearchQuery.toLowerCase())
+                    columns={batchStudentColumns}
+                    data={(viewingBatch.students || []).filter(s =>
+                      (s.studentNameEnglish || "").toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                      (s.studentId || "").toLowerCase().includes(studentSearchQuery.toLowerCase())
                     )}
                     progressPending={false}
-                    search={markSearchQuery}
-                    setSearch={setMarkSearchQuery}
+                    search={studentSearchQuery}
+                    setSearch={setStudentSearchQuery}
                     searchPlaceholder="Search students by name or ID..."
                   />
                 </div>
-              )
-            ) : (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-slate-800">Exam Results</h3>
-                </div>
-                <CustomDataTable
-                  columns={markBatchColumns}
-                  data={filteredBatchMarks}
-                  progressPending={loading}
-                  search={searchQuery}
-                  setSearch={setSearchQuery}
-                  searchPlaceholder="Search results by batch or course name..."
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Exam Modal */}
-      {showModal && isAdmin && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
-                  <FileText size={24} />
-                </div>
-                <h2 className="text-xl font-bold text-slate-900">{isEditing ? "Edit Exam" : "Create New Exam"}</h2>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ) : !showGenerateView ? (
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Base Exam Code</label>
-                  <input type="text" required placeholder="e.g. MIDTERM-01" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800">Generated Hall Tickets</h3>
+                    <button
+                      onClick={() => setShowGenerateView(true)}
+                      className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold"
+                    >
+                      <Plus size={20} /> Generate New
+                    </button>
+                  </div>
+                  <CustomDataTable
+                    columns={hallTicketColumns}
+                    data={hallTickets}
+                    progressPending={loading}
+                    search={searchQuery}
+                    setSearch={setSearchQuery}
+                    searchPlaceholder="Search generated hall tickets..."
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Batch</label>
-                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.batch} onChange={(e) => {
-                    const selectedBatchId = e.target.value;
-                    const selectedBatch = batches.find(b => String(b._id) === String(selectedBatchId));
-                    setFormData({
-                      ...formData,
-                      batch: selectedBatchId,
-                      course: (() => {
-                        const batchCourses = selectedBatch?.courses?.map(c => c._id || c) || [];
-                        const legacyCourse = selectedBatch?.course?._id || selectedBatch?.course;
-                        if (legacyCourse && !batchCourses.includes(legacyCourse)) batchCourses.push(legacyCourse);
-                        return batchCourses.length === 1 ? batchCourses[0].toString() : (batchCourses.includes(formData.course) ? formData.course : "");
-                      })()
-                    });
-                  }}>
-                    <option value="">Select Batch</option>
-                    {batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Course</label>
-                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.course} onChange={(e) => setFormData({ ...formData, course: e.target.value })}>
-                    <option value="">Select Course</option>
-                    {courses
-                      .filter(c => {
-                        if (!formData.batch) return true;
-                        const b = batches.find(b => String(b._id) === String(formData.batch));
-                        const batchCourses = b?.courses?.map(c => c._id?.toString() || c.toString()) || [];
-                        const legacyCourse = b?.course?._id?.toString() || b?.course?.toString();
-                        if (legacyCourse && !batchCourses.includes(legacyCourse)) batchCourses.push(legacyCourse);
-                        return batchCourses.includes(String(c._id));
-                      })
-                      .map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
-                  <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.semester} onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}>
-                    {getAvailableSemesters(formData.batch).map(s => <option key={s} value={s}>Semester {s}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-bold text-slate-700 mb-1">Assign to Centers</label>
-                <button
-                  type="button"
-                  onClick={() => setShowCenterDropdown(!showCenterDropdown)}
-                  className="w-full flex items-center justify-between rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50 text-left transition-all"
-                >
-                  <span className={formData.centers.length === 0 ? "text-slate-500" : "text-slate-900 font-medium"}>
-                    {formData.centers.length === 0 ? "Select Centers..." : `${formData.centers.length} Centers Selected`}
-                  </span>
-                  <div className="text-slate-400 text-[10px] shrink-0">▼</div>
-                </button>
-                {showCenterDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                    <div className="p-2 space-y-1">
-                      {centers.map(center => {
-                        const isSelected = formData.centers.includes(center._id);
-                        return (
-                          <label key={center._id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => handleCenterToggle(center._id)}
-                              className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 focus:ring-offset-0"
-                            />
-                            <span className="text-sm text-slate-700 font-medium">{center.name}</span>
-                          </label>
-                        );
-                      })}
+              ) : (
+                <>
+                  <div className="mb-6 flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-slate-800">Generate New Hall Tickets</h3>
+                    <button
+                      onClick={() => {
+                        setShowGenerateView(false);
+                        setIsGenerateMode(false);
+                        setSelectedHallTicketExam("");
+                      }}
+                      className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
+                    >
+                      Back to History
+                    </button>
+                  </div>
+                  <div className="mb-6 flex items-end gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Select Exam Schedule</label>
+                      <select
+                        className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50"
+                        value={selectedHallTicketExam}
+                        onChange={(e) => {
+                          setSelectedHallTicketExam(e.target.value);
+                          setSelectedHallTicketStudents([]);
+                          setIsGenerateMode(false);
+                        }}
+                      >
+                        <option value="">-- Select Exam --</option>
+                        {exams.map(exam => (
+                          <option key={exam._id} value={exam._id}>{exam.name} - Sem {exam.semester}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="shrink-0 flex gap-2">
+                      {!isGenerateMode && selectedHallTicketExam && (
+                        <button
+                          onClick={() => setIsGenerateMode(true)}
+                          className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20"
+                        >
+                          Generate Hall Tickets
+                        </button>
+                      )}
+                      {isGenerateMode && (
+                        <>
+                          <button
+                            onClick={() => { setIsGenerateMode(false); setSelectedHallTicketStudents([]); }}
+                            className="bg-slate-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleConfirmGeneration}
+                            disabled={selectedHallTicketStudents.length === 0}
+                            className="bg-brand-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Confirm Generation ({selectedHallTicketStudents.length})
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
-                )}
-                {formData.centers.length === 0 && !showCenterDropdown && <p className="text-xs text-red-500 mt-1">Please select at least one center.</p>}
-              </div>
 
-              {formData.batch && formData.course && formData.semester && (
-                <div className="mt-6 border-t border-slate-200 pt-6">
-                  <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <BookOpen size={16} className="text-brand-500" /> Subject Configurations
-                  </h3>
+                  {selectedHallTicketExam && (
+                    <CustomDataTable
+                      columns={[
+                        { name: "S.NO", selector: (row, idx) => idx + 1, width: "80px", center: true },
+                        { name: "STUDENT ID", selector: row => row.studentId, sortable: true },
+                        { name: "NAME", selector: row => row.studentNameEnglish, sortable: true },
+                        { name: "COURSE", selector: row => row.enrolledCourses?.[0]?.course?.title || 'N/A' },
+                        { name: "BATCH", selector: row => batches.find(b => String(b._id) === String(row.enrolledCourses?.[0]?.batch))?.name || 'N/A' },
+                      ]}
+                      data={students.filter(student => {
+                        const examObj = exams.find(e => String(e._id) === String(selectedHallTicketExam));
+                        if (!examObj || !examObj.batch) return false;
 
-                  {formData.subjects.length === 0 ? (
-                    <div className="p-8 text-center bg-slate-50 border border-slate-200 border-dashed rounded-xl">
-                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <BookOpen size={24} className="text-slate-400" />
-                      </div>
-                      <h4 className="text-sm font-bold text-slate-700 mb-1">No Subjects Found</h4>
-                      <p className="text-xs text-slate-500 mt-2">
-                        There are no subjects assigned to this course and semester.{" "}
-                        <Link to="/dashboard/admin/courses" onClick={() => setShowModal(false)} className="text-brand-600 font-semibold hover:underline">
-                          Add Subjects
-                        </Link>
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
-                      {formData.subjects.map((subConf, idx) => {
-                        const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject));
-                        if (!subjectDetails) return null;
-                        return (
-                          <div key={subConf.subject} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                            <div className="font-bold text-sm text-slate-800 mb-3 flex items-center justify-between">
-                              <span>{subjectDetails.name} ({subjectDetails.code})</span>
-                              <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase">{subjectDetails.type}</span>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                              <div className="md:col-span-2">
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Exam Date</label>
-                                <input type="date" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.date} onChange={(e) => handleSubjectChange(subConf.subject, 'date', e.target.value)} />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Total Mark</label>
-                                <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.totalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'totalMark', Number(e.target.value))} />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Pass Mark</label>
-                                <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.passMark} onChange={(e) => handleSubjectChange(subConf.subject, 'passMark', Number(e.target.value))} />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">External</label>
-                                <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.externalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'externalMark', Number(e.target.value))} />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Internal</label>
-                                <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.internalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'internalMark', Number(e.target.value))} />
-                              </div>
-                            </div>
-                          </div>
-                        );
+                        // Exclude students who already have a hall ticket for this exam
+                        const hasHallTicket = hallTickets.some(ht => {
+                          const isSameExam = String(typeof ht.exam === 'object' ? ht.exam?._id : ht.exam) === String(selectedHallTicketExam);
+                          if (!isSameExam) return false;
+                          return ht.students?.some(s => String(typeof s === 'object' ? s?._id : s) === String(student._id));
+                        });
+                        if (hasHallTicket) return false;
+
+                        // Filter students by this exam's batch
+                        const studentBatch = student.enrolledCourses?.[0]?.batch;
+                        if (!studentBatch) return false;
+                        return String(typeof studentBatch === 'object' ? studentBatch._id : studentBatch) === String(typeof examObj.batch === 'object' ? examObj.batch._id : examObj.batch);
                       })}
-                    </div>
+                      selectableRows={isGenerateMode}
+                      onSelectedRowsChange={({ selectedRows }) => {
+                        setSelectedHallTicketStudents(selectedRows);
+                      }}
+                      search={searchQuery}
+                      setSearch={setSearchQuery}
+                      searchPlaceholder="Search students..."
+                    />
                   )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="p-6">
+              {currentViewingMarkBatch ? (
+                showMarksheetModal && selectedGroupData ? (
+                  <div>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-800">
+                          Marksheet - {selectedGroupData.student?.studentNameEnglish} ({selectedGroupData.student?.studentId})
+                        </h3>
+                        <p className="text-sm text-slate-500">
+                          {currentViewingMarkBatch.batch?.name} • {currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => marksheetRef.current?.downloadPDF()}
+                          className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-xl hover:bg-brand-700 transition-all font-bold text-sm shadow-md shadow-brand-600/20"
+                        >
+                          <Download size={18} /> Save as PDF
+                        </button>
+                        <button
+                          onClick={() => { setShowMarksheetModal(false); setSelectedGroupData(null); }}
+                          className="text-slate-600 hover:text-slate-900 font-bold flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                        >
+                          <ArrowLeft size={18} /> Back to Results
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-100/70 p-4 sm:p-6 rounded-2xl border border-slate-200">
+                      <MarksheetModal
+                        ref={marksheetRef}
+                        data={selectedGroupData}
+                        inline={true}
+                        hideInlineHeader={true}
+                        onClose={() => { setShowMarksheetModal(false); setSelectedGroupData(null); }}
+                        template={{ id: selectedGroupData.templateId || (selectedGroupData.marks && selectedGroupData.marks.length > 0 ? selectedGroupData.marks[0].template : 'rg_modern') }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-800">Results - {currentViewingMarkBatch.batch?.name}</h3>
+                        <p className="text-sm text-slate-500">{currentViewingMarkBatch.course?.title} (Sem {currentViewingMarkBatch.semester})</p>
+                      </div>
+                      <button
+                        onClick={() => { setViewingMarkBatch(null); setMarkSearchQuery(""); }}
+                        className="text-slate-500 hover:text-slate-700 font-bold flex items-center gap-2"
+                      >
+                        Back
+                      </button>
+                    </div>
+                    <CustomDataTable
+                      columns={markColumns}
+                      data={(currentViewingMarkBatch.students || []).filter(m =>
+                        (m.student?.studentNameEnglish || "").toLowerCase().includes(markSearchQuery.toLowerCase()) ||
+                        (m.student?.studentId || "").toLowerCase().includes(markSearchQuery.toLowerCase())
+                      )}
+                      progressPending={false}
+                      search={markSearchQuery}
+                      setSearch={setMarkSearchQuery}
+                      searchPlaceholder="Search students by name or ID..."
+                    />
+                  </div>
+                )
+              ) : (
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-slate-800">Exam Results</h3>
+                  </div>
+                  <CustomDataTable
+                    columns={markBatchColumns}
+                    data={filteredBatchMarks}
+                    progressPending={loading}
+                    search={searchQuery}
+                    setSearch={setSearchQuery}
+                    searchPlaceholder="Search results by batch or course name..."
+                  />
                 </div>
               )}
+            </div>
+          )}
+        </div>
 
-              <div className="flex gap-3 pt-4 border-t border-slate-100">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
-                <button
-                  type="submit"
-                  disabled={formData.centers.length === 0 || formData.subjects.length === 0}
-                  className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isEditing ? "Update Exam Schedule" : "Create Exam Schedule"}
+        {/* Exam Modal */}
+        {showModal && isAdmin && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                    <FileText size={24} />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900">{isEditing ? "Edit Exam" : "Create New Exam"}</h2>
+                </div>
+                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
+                  <X size={20} />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* View Exam Schedule Modal */}
-      {showViewModal && selectedExamData && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
-                  <Layers size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">Exam Schedule: {selectedExamData.name}</h2>
-                  <div className="text-sm text-slate-500 font-medium flex gap-4 mt-1">
-                    <span className="flex items-center gap-1"><BookOpen size={14} /> {selectedExamData.course?.title} - Sem {selectedExamData.semester}</span>
-                    <span className="flex items-center gap-1"><MapPin size={14} /> {selectedExamData.centers?.length || 0} Centers</span>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Base Exam Code</label>
+                    <input type="text" required placeholder="e.g. MIDTERM-01" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Batch</label>
+                    <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.batch} onChange={(e) => {
+                      const selectedBatchId = e.target.value;
+                      const selectedBatch = batches.find(b => String(b._id) === String(selectedBatchId));
+                      setFormData({
+                        ...formData,
+                        batch: selectedBatchId,
+                        course: (() => {
+                          const batchCourses = selectedBatch?.courses?.map(c => c._id || c) || [];
+                          const legacyCourse = selectedBatch?.course?._id || selectedBatch?.course;
+                          if (legacyCourse && !batchCourses.includes(legacyCourse)) batchCourses.push(legacyCourse);
+                          return batchCourses.length === 1 ? batchCourses[0].toString() : (batchCourses.includes(formData.course) ? formData.course : "");
+                        })()
+                      });
+                    }}>
+                      <option value="">Select Batch</option>
+                      {batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Course</label>
+                    <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.course} onChange={(e) => setFormData({ ...formData, course: e.target.value })}>
+                      <option value="">Select Course</option>
+                      {courses
+                        .filter(c => {
+                          if (!formData.batch) return true;
+                          const b = batches.find(b => String(b._id) === String(formData.batch));
+                          const batchCourses = b?.courses?.map(c => c._id?.toString() || c.toString()) || [];
+                          const legacyCourse = b?.course?._id?.toString() || b?.course?.toString();
+                          if (legacyCourse && !batchCourses.includes(legacyCourse)) batchCourses.push(legacyCourse);
+                          return batchCourses.includes(String(c._id));
+                        })
+                        .map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
+                    <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.semester} onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}>
+                      {getAvailableSemesters(formData.batch).map(s => <option key={s} value={s}>Semester {s}</option>)}
+                    </select>
                   </div>
                 </div>
-              </div>
-              <button onClick={() => setShowViewModal(false)} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
 
-            <div className="mb-6">
-              <h3 className="text-sm font-bold text-slate-700 mb-2">Assigned Centers</h3>
-              <div className="flex flex-wrap gap-2">
-                {selectedExamData.centers?.map(c => (
-                  <span key={c._id} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100">
-                    {c.name}
-                  </span>
-                ))}
-              </div>
-            </div>
+                <div className="relative">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Assign to Centers</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCenterDropdown(!showCenterDropdown)}
+                    className="w-full flex items-center justify-between rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50 text-left transition-all"
+                  >
+                    <span className={formData.centers.length === 0 ? "text-slate-500" : "text-slate-900 font-medium"}>
+                      {formData.centers.length === 0 ? "Select Centers..." : `${formData.centers.length} Centers Selected`}
+                    </span>
+                    <div className="text-slate-400 text-[10px] shrink-0">▼</div>
+                  </button>
+                  {showCenterDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                      <div className="p-2 space-y-1">
+                        {centers.map(center => {
+                          const isSelected = formData.centers.includes(center._id);
+                          return (
+                            <label key={center._id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleCenterToggle(center._id)}
+                                className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500 focus:ring-offset-0"
+                              />
+                              <span className="text-sm text-slate-700 font-medium">{center.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {formData.centers.length === 0 && !showCenterDropdown && <p className="text-xs text-red-500 mt-1">Please select at least one center.</p>}
+                </div>
 
-            <div>
-              <h3 className="text-sm font-bold text-slate-700 mb-3">Subject Schedule</h3>
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider">
-                      <th className="p-3 font-bold border-b border-slate-200">Date</th>
-                      <th className="p-3 font-bold border-b border-slate-200">Subject</th>
-                      <th className="p-3 font-bold border-b border-slate-200 text-center">Theory</th>
-                      <th className="p-3 font-bold border-b border-slate-200 text-center">Internal</th>
-                      <th className="p-3 font-bold border-b border-slate-200 text-center">Pass / Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedExamData.subjects?.sort((a, b) => new Date(a.date) - new Date(b.date)).map((sub, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 text-sm font-medium text-slate-700">
-                          {sub.date ? new Date(sub.date).toLocaleDateString() : 'TBD'}
-                        </td>
-                        <td className="p-3">
-                          <div className="font-bold text-slate-800 text-sm">{sub.subject?.name}</div>
-                          <div className="text-xs text-slate-500">{sub.subject?.code}</div>
-                        </td>
-                        <td className="p-3 text-sm text-center text-slate-600">{sub.theoryMark}</td>
-                        <td className="p-3 text-sm text-center text-slate-600">{sub.internalMark}</td>
-                        <td className="p-3 text-sm text-center font-medium">
-                          <span className="text-emerald-600">{sub.passMark}</span>
-                          <span className="text-slate-400 mx-1">/</span>
-                          <span className="text-slate-700">{sub.totalMark}</span>
-                        </td>
-                      </tr>
-                    ))}
-                    {(!selectedExamData.subjects || selectedExamData.subjects.length === 0) && (
-                      <tr>
-                        <td colSpan="5" className="p-6 text-center text-slate-500 text-sm italic">
-                          No subjects configured for this schedule.
-                        </td>
-                      </tr>
+                {formData.batch && formData.course && formData.semester && (
+                  <div className="mt-6 border-t border-slate-200 pt-6">
+                    <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <BookOpen size={16} className="text-brand-500" /> Subject Configurations
+                    </h3>
+
+                    {formData.subjects.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 border border-slate-200 border-dashed rounded-xl">
+                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <BookOpen size={24} className="text-slate-400" />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-700 mb-1">No Subjects Found</h4>
+                        <p className="text-xs text-slate-500 mt-2">
+                          There are no subjects assigned to this course and semester.{" "}
+                          <Link to="/dashboard/admin/courses" onClick={() => setShowModal(false)} className="text-brand-600 font-semibold hover:underline">
+                            Add Subjects
+                          </Link>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                        {formData.subjects.map((subConf, idx) => {
+                          const subjectDetails = subjects.find(s => String(s._id) === String(subConf.subject));
+                          if (!subjectDetails) return null;
+                          return (
+                            <div key={subConf.subject} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                              <div className="font-bold text-sm text-slate-800 mb-3 flex items-center justify-between">
+                                <span>{subjectDetails.name} ({subjectDetails.code})</span>
+                                <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase">{subjectDetails.type}</span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                                <div className="md:col-span-2">
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Exam Date</label>
+                                  <input type="date" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.date} onChange={(e) => handleSubjectChange(subConf.subject, 'date', e.target.value)} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Total Mark</label>
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.totalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'totalMark', Number(e.target.value))} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Pass Mark</label>
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.passMark} onChange={(e) => handleSubjectChange(subConf.subject, 'passMark', Number(e.target.value))} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">External</label>
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.externalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'externalMark', Number(e.target.value))} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Internal</label>
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.internalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'internalMark', Number(e.target.value))} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                  </tbody>
-                </table>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 border-t border-slate-100">
+                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
+                  <button
+                    type="submit"
+                    disabled={formData.centers.length === 0 || formData.subjects.length === 0}
+                    className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isEditing ? "Update Exam Schedule" : "Create Exam Schedule"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* View Exam Schedule Modal */}
+        {showViewModal && selectedExamData && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                    <Layers size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Exam Schedule: {selectedExamData.name}</h2>
+                    <div className="text-sm text-slate-500 font-medium flex gap-4 mt-1">
+                      <span className="flex items-center gap-1"><BookOpen size={14} /> {selectedExamData.course?.title} - Sem {selectedExamData.semester}</span>
+                      <span className="flex items-center gap-1"><MapPin size={14} /> {selectedExamData.centers?.length || 0} Centers</span>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setShowViewModal(false)} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-slate-700 mb-2">Assigned Centers</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedExamData.centers?.map(c => (
+                    <span key={c._id} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100">
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-slate-700 mb-3">Subject Schedule</h3>
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider">
+                        <th className="p-3 font-bold border-b border-slate-200">Date</th>
+                        <th className="p-3 font-bold border-b border-slate-200">Subject</th>
+                        <th className="p-3 font-bold border-b border-slate-200 text-center">Theory</th>
+                        <th className="p-3 font-bold border-b border-slate-200 text-center">Internal</th>
+                        <th className="p-3 font-bold border-b border-slate-200 text-center">Pass / Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedExamData.subjects?.sort((a, b) => new Date(a.date) - new Date(b.date)).map((sub, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-3 text-sm font-medium text-slate-700">
+                            {sub.date ? new Date(sub.date).toLocaleDateString() : 'TBD'}
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-800 text-sm">{sub.subject?.name}</div>
+                            <div className="text-xs text-slate-500">{sub.subject?.code}</div>
+                          </td>
+                          <td className="p-3 text-sm text-center text-slate-600">{sub.theoryMark}</td>
+                          <td className="p-3 text-sm text-center text-slate-600">{sub.internalMark}</td>
+                          <td className="p-3 text-sm text-center font-medium">
+                            <span className="text-emerald-600">{sub.passMark}</span>
+                            <span className="text-slate-400 mx-1">/</span>
+                            <span className="text-slate-700">{sub.totalMark}</span>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!selectedExamData.subjects || selectedExamData.subjects.length === 0) && (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-slate-500 text-sm italic">
+                            No subjects configured for this schedule.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Mark Modal */}
+        {/* Mark Modal */}
       </>)}
       {showMarkModal && isAdmin && (
         <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-100 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

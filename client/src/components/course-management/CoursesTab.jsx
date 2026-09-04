@@ -454,6 +454,17 @@ const CoursesTab = ({ courseType }) => {
       return;
     }
 
+    if (courseType === "Center Courses") {
+      const subjectCodes = formData.inlineSubjects
+        .map(sub => sub.code?.trim().toLowerCase())
+        .filter(code => code);
+      const uniqueCodes = new Set(subjectCodes);
+      if (uniqueCodes.size !== subjectCodes.length) {
+        toast.error("Subject codes must be unique within the course.");
+        return;
+      }
+    }
+
     const loadingToast = toast.loading("Saving course...");
     try {
       const data = new FormData();

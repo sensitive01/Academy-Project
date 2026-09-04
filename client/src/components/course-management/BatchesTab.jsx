@@ -1331,8 +1331,12 @@ const BatchesTab = () => {
                               if (legacyBatchCourseId && !batchCourseIds.includes(legacyBatchCourseId)) {
                                 batchCourseIds.push(legacyBatchCourseId);
                               }
-                              const subCourseId = sub.course?._id?.toString() || sub.course?.toString() || "";
-                              const matchesCourse = batchCourseIds.length === 0 || batchCourseIds.includes(subCourseId);
+                              const subCourseIds = (sub.courses || []).map(c => c._id?.toString() || c.toString());
+                              const legacySubCourseId = sub.course?._id?.toString() || sub.course?.toString();
+                              if (legacySubCourseId && !subCourseIds.includes(legacySubCourseId)) {
+                                subCourseIds.push(legacySubCourseId);
+                              }
+                              const matchesCourse = batchCourseIds.length === 0 || subCourseIds.some(cId => batchCourseIds.includes(cId));
                               const matchesSemester = sub.semester === sem.semesterNumber;
                               return matchesCourse && matchesSemester;
                             })}
