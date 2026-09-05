@@ -93,7 +93,7 @@ const DynamicSeal = ({ template }) => {
 
   const getTemplateSealText = (templateId) => {
     switch (templateId) {
-      case 'vocational_council': return { top: 'NATIONAL COUNCIL OF VOCATIONAL', bottom: 'AND RESEARCH TRAINING' };
+      case 'vocational_council': return { top: 'COUNCIL FOR VOCATIONAL', bottom: 'EDUCATIONAL AND SOCIAL WELFARE' };
       case 'dr_rg_academy': return { top: 'DR.R.G. ACADEMY', bottom: 'EDUCATIONAL TRUST' };
       case 'bglrgm': return { top: 'BGLRGM INSTITUTE OF', bottom: 'VOCATIONAL EDUCATION' };
       case 'rg_modern': return { top: 'RG MODERN COMMUNITY', bottom: 'COLLEGE' };
@@ -109,11 +109,12 @@ const DynamicSeal = ({ template }) => {
 
   if (template?.id === 'vocational_council' || !template) {
     return (
-      <div className="relative w-[105px] h-[105px] flex justify-center items-center">
+      <div className="relative w-[105px] h-[105px] flex justify-center items-center bg-white rounded-full overflow-hidden">
         <img
           src={newRedSeal}
           alt="National Council Seal"
-          className="w-full h-full object-contain drop-shadow-md"
+          className="w-full h-full object-contain scale-[1.02] mix-blend-multiply"
+          style={{ filter: 'contrast(1.1) brightness(1.05)' }}
         />
       </div>
     );
@@ -602,6 +603,12 @@ const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, ti
                       <tr>
                         <td className="border border-black px-4 py-2.5 text-[11px] font-medium leading-relaxed" colSpan="6" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle' }}>
                           <span className="font-bold">Note :</span> Any Correction found in this entry, should be brought to the Notice of the Controller of Examinations for Investigation.
+                        </td>
+                      </tr>
+                      {/* Row: Disclaimer */}
+                      <tr>
+                        <td className="border border-black px-4 py-2.5 text-[11px] font-medium leading-relaxed" colSpan="6" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle', color: '#333' }}>
+                          <span className="font-bold">Disclaimer:</span> This Semester Result is issued solely for the purpose of communicating the candidate's semester-wise academic performance and for reference purposes. It shall not be treated as an Official Statement of Marks, Mark Sheet, Certificate, or any other final academic credential. The Official Statement of Marks / Mark Sheet, wherever applicable, shall be issued separately by the Competent Examination Authority in accordance with the prescribed rules and procedures.
                         </td>
                       </tr>
                     </tbody>
