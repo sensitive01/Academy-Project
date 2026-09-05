@@ -607,8 +607,8 @@ const MarksheetModal = forwardRef(({ data, onClose, template, inline = false, ti
                       </tr>
                       {/* Row: Disclaimer */}
                       <tr>
-                        <td className="border border-black px-4 py-2.5 text-[11px] font-medium leading-relaxed" colSpan="6" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle', color: '#333' }}>
-                          <span className="font-bold">Disclaimer:</span> This Semester Result is issued solely for the purpose of communicating the candidate's semester-wise academic performance and for reference purposes. It shall not be treated as an Official Statement of Marks, Mark Sheet, Certificate, or any other final academic credential. The Official Statement of Marks / Mark Sheet, wherever applicable, shall be issued separately by the Competent Examination Authority in accordance with the prescribed rules and procedures.
+                        <td className="border border-black px-4 py-2.5 text-[11px] font-medium leading-relaxed text-justify" colSpan="6" style={{ fontFamily: 'Times New Roman, serif', verticalAlign: 'middle', color: '#333' }}>
+                          <span className="font-bold">DISCLAIMER:</span> This Semester Result is issued solely for the purpose of communicating the candidate's semester-wise academic performance and for reference purposes. It shall not be treated as an Official Statement of Marks, Mark Sheet, Certificate, or any other final academic credential. The Official Statement of Marks / Mark Sheet, wherever applicable, shall be issued separately by the Competent Examination Authority in accordance with the prescribed rules and procedures.
                         </td>
                       </tr>
                     </tbody>
