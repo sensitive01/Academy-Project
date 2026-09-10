@@ -161,6 +161,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     setLoading(true);
 
     try {
@@ -192,6 +193,7 @@ const Attendance = ({ employeeOnly = false, studentOnly = false, internOnly = fa
 
   const handleAdminSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     setLoading(true);
     try {
       const res = await api.post(

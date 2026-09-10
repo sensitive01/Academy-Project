@@ -1,30 +1,64 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   CheckSquare,
-  MoreHorizontal,
+  Users,
+  Search,
+  Calendar,
+  Building
 } from "lucide-react";
-import StudentFeesList from "../../components/payments/StudentFeesList";
+import api from "../../services/api";
 import PendingApprovalsList from "../../components/payments/PendingApprovalsList";
+import BatchFeesDetail from "./BatchFeesDetail";
+import CustomDataTable from "../../components/common/DataTable";
 
 const FeesCollection = () => {
-  const [activeTab, setActiveTab] = useState("course_fees");
+  const [activeTab, setActiveTab] = useState("fees_collection");
+  const [batches, setBatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedBatch, setSelectedBatch] = useState(null);
+
+  useEffect(() => {
+    if (activeTab === "fees_collection" && !selectedBatch) {
+      fetchBatches();
+    }
+  }, [activeTab, selectedBatch]);
+
+  const fetchBatches = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/batches");
+      setBatches(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = {
-    course_fees: { label: "Course Fees", icon: <FileText size={18} /> },
-    council_fees: { label: "Council Fees", icon: <FileText size={18} /> },
-    both_fees: { label: "Both Fees", icon: <FileText size={18} /> },
+    fees_collection: { label: "Fees Collection", icon: <FileText size={18} /> },
     approvals: { label: "Pending Approvals", icon: <CheckSquare size={18} /> },
-    others: { label: "Others", icon: <MoreHorizontal size={18} /> },
   };
+
+  if (selectedBatch) {
+    return <BatchFeesDetail batch={selectedBatch} onBack={() => setSelectedBatch(null)} />;
+  }
+
+  const filteredBatches = batches.filter(b => 
+    !search || 
+    b.name?.toLowerCase().includes(search.toLowerCase()) ||
+    b.batchId?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-500 max-w-full">
       {/* HEADER */}
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 relative z-10">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fees Collection</h1>
-          <p className="text-slate-500 text-sm font-medium mt-1">Manage and collect student course, council, and other fees.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fees Management</h1>
+          <p className="text-slate-500 text-sm font-medium mt-1">Manage batch-wise fee collections and pending approvals.</p>
         </div>
       </div>
 
@@ -51,11 +85,87 @@ const FeesCollection = () => {
 
       {/* CONTENT AREA */}
       <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
-        {activeTab === "course_fees" && <StudentFeesList feeType="Course" excludePaid={true} />}
-        {activeTab === "council_fees" && <StudentFeesList feeType="Council" excludePaid={true} />}
-        {activeTab === "both_fees" && <StudentFeesList feeType="Both" excludePaid={true} />}
         {activeTab === "approvals" && <PendingApprovalsList />}
-        {activeTab === "others" && <StudentFeesList feeType="Other" excludePaid={true} />}
+        
+        {activeTab === "fees_collection" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search batches by name or ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-sm font-medium"
+                />
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center items-center h-64 bg-white rounded-3xl border border-slate-100 shadow-sm">
+                <div className="text-slate-400 font-semibold animate-pulse">Loading batches...</div>
+              </div>
+            ) : filteredBatches.length === 0 ? (
+              <div className="flex flex-col justify-center items-center h-64 bg-white rounded-3xl border border-slate-100 shadow-sm gap-3">
+                <Building className="w-12 h-12 text-slate-300" />
+                <p className="text-slate-500 font-bold">No batches found</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <CustomDataTable
+                  columns={[
+                    {
+                      name: "S.No",
+                      selector: (row, index) => index + 1,
+                      sortable: true,
+                      width: "80px",
+                    },
+                    {
+                      name: "Batch Name",
+                      selector: row => row.name,
+                      sortable: true,
+                      cell: row => (
+                        <div className="font-bold text-brand-600 cursor-pointer hover:underline" onClick={() => setSelectedBatch(row)}>
+                          {row.name}
+                        </div>
+                      )
+                    },
+                    {
+                      name: "Batch ID",
+                      selector: row => row.batchId,
+                      sortable: true,
+                      cell: row => (
+                        <span className="px-2 py-1 bg-slate-50 text-slate-600 rounded-md text-[10px] font-bold border border-slate-200 whitespace-nowrap">
+                          {row.batchId}
+                        </span>
+                      )
+                    },
+                    {
+                      name: "Centers",
+                      selector: row => row.centers?.map(c => c.name).join(', ') || "No centers",
+                      sortable: true,
+                    },
+                    {
+                      name: "Students",
+                      selector: row => row.numberOfStudents || 0,
+                      sortable: true,
+                    },
+                    {
+                      name: "Period",
+                      selector: row => `${row.period?.startDate || "N/A"} to ${row.period?.endDate || "N/A"}`,
+                      sortable: true,
+                    }
+                  ]}
+                  data={filteredBatches}
+                  search={search}
+                  setSearch={setSearch}
+                  searchPlaceholder="Search batches..."
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

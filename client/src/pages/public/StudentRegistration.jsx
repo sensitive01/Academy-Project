@@ -317,14 +317,15 @@ const StudentRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     setSubmitAttempted(true);
+    setLoading(true);
 
     if (hasFeesStep && Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
       toast.error("Please select a course fee payment scheme!");
+      setLoading(false);
       return;
     }
-
-    setLoading(true);
     try {
       const educationBackground = [1, 2, 3].map((i) => ({
         examinationPassed: formData[`exam${i}`],
@@ -715,6 +716,15 @@ const StudentRegistration = () => {
                       <div className="h-1 w-16 bg-brand-700 mt-2 rounded-full"></div>
                     </div>
 
+                    {/* DETAILS ABOVE TABLE */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/60 p-6 rounded-2xl border border-slate-200/80">
+                      <FormInput label="Register No" name={`${prefix}RegNo`} value={formData[`${prefix}RegNo`]} onChange={handleChange} />
+                      <FormInput label="Year of Passing" name={`${prefix}Year`} value={formData[`${prefix}Year`]} onChange={handleChange} />
+                      <FormInput label="School / Institution" name={`${prefix}School`} value={formData[`${prefix}School`]} onChange={handleChange} />
+                      <FormInput label="Place of school" name={`${prefix}Place`} value={formData[`${prefix}Place`]} onChange={handleChange} />
+                      <FormInput label="Board of Examination" name={`${prefix}Board`} value={formData[`${prefix}Board`]} onChange={handleChange} />
+                    </div>
+
                     {/* Table */}
                     <div className="overflow-hidden border border-slate-200 rounded-2xl">
                       <table className="w-full text-sm">
@@ -802,15 +812,6 @@ const StudentRegistration = () => {
                           </tr>
                         </tbody>
                       </table>
-                    </div>
-
-                    {/* DETAILS BELOW TABLE */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormInput label="Register No" name={`${prefix}RegNo`} value={formData[`${prefix}RegNo`]} onChange={handleChange} />
-                      <FormInput label="Year of Passing" name={`${prefix}Year`} value={formData[`${prefix}Year`]} onChange={handleChange} />
-                      <FormInput label="School / Institution" name={`${prefix}School`} value={formData[`${prefix}School`]} onChange={handleChange} />
-                      <FormInput label="Place of school" name={`${prefix}Place`} value={formData[`${prefix}Place`]} onChange={handleChange} />
-                      <FormInput label="Board of Examination" name={`${prefix}Board`} value={formData[`${prefix}Board`]} onChange={handleChange} />
                     </div>
 
                   </div>
@@ -1274,17 +1275,23 @@ const StepHeader = ({ title, subtitle, icon }) => (
   </div>
 );
 
-const FormInput = ({ label, ...props }) => (
+const FormInput = ({ label, className = "", ...props }) => (
   <div className="group space-y-1">
-    <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <input {...props} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700 focus:shadow-[0_20px_40px_-20px_rgba(185,28,28,0.1)]" />
+    {label && <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>}
+    <input
+      {...props}
+      className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl outline-none transition-all text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-brand-700 focus:ring-2 focus:ring-brand-700/10 shadow-sm ${className}`}
+    />
   </div>
 );
 
-const SelectBox = ({ label, options, isObjectOptions, ...props }) => (
+const SelectBox = ({ label, options, isObjectOptions, className = "", ...props }) => (
   <div className="group space-y-1">
-    <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <select {...props} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 disabled:bg-slate-100 disabled:text-slate-500">
+    {label && <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>}
+    <select
+      {...props}
+      className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl outline-none transition-all text-xs font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 focus:ring-2 focus:ring-brand-700/10 shadow-sm disabled:bg-slate-100 disabled:text-slate-500 ${className}`}
+    >
       <option value="">Select Option</option>
       {options.map((opt, i) => (
         <option key={i} value={isObjectOptions ? opt.value : opt}>{isObjectOptions ? opt.label : opt}</option>

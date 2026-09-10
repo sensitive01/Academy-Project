@@ -55,6 +55,7 @@ import api from "../../services/api";
 import Loading from "../../components/common/Loading";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import TakeAttendanceModal from "../../components/modals/TakeAttendanceModal";
+import BulkEditPreviewModal from "../../components/modals/BulkEditPreviewModal";
 import ReactDOM from "react-dom";
 import toast from "react-hot-toast";
 import ParentManagement from "../admin/ParentManagement";
@@ -320,9 +321,27 @@ const Students = () => {
 
   const formatDOB = (dateStr) => {
     if (!dateStr) return "-";
+    const s = String(dateStr).trim();
+    // Excel serial number
+    if (/^\d{5}$/.test(s)) {
+      const excelEpoch = new Date(1899, 11, 30);
+      const d = new Date(excelEpoch.getTime() + Number(s) * 86400000);
+      if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}/${d.getFullYear()}`;
+      }
+    }
+    // DD/MM/YYYY or DD-MM-YYYY
+    if (/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.test(s)) {
+      const [, dd, mm, yyyy] = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+      return `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;
+    }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
   };
   // New Filter States
   const [filterType, setFilterType] = useState([]);
@@ -369,6 +388,8 @@ const Students = () => {
   });
   const [activePreviewTab, setActivePreviewTab] = useState('valid');
   const [uploadProgress, setUploadProgress] = useState({ isUploading: false, current: 0, total: 0 });
+  const bulkEditFileInputRef = useRef(null);
+  const [bulkEditPreview, setBulkEditPreview] = useState({ isOpen: false, data: null, isSubmitting: false });
 
   useEffect(() => {
     sessionStorage.setItem("studentsActiveTab", activeTab);
@@ -510,7 +531,8 @@ const Students = () => {
           duplicateRecords: res.data.duplicateRecords,
           invalidRecords: res.data.invalidRecords,
           isLoading: false,
-          selectedDuplicates: []
+          selectedDuplicates: [],
+          originalFile: file
         }));
         setActivePreviewTab('valid');
       } catch (error) {
@@ -525,6 +547,8 @@ const Students = () => {
     const recordsToProcess = [
       ...previewModal.validRecords
     ];
+    
+    const currentFile = previewModal.originalFile;
 
     if (recordsToProcess.length === 0) {
       toast.error("No records selected to upload.");
@@ -536,7 +560,14 @@ const Students = () => {
     setUploadProgress({ isUploading: true, current: 0, total, statusText: "Uploading Data..." });
 
     try {
-      let finalResult = { totalProcessed: 0, successCount: 0, skippedRecords: [] };
+    // Duplicates that were NOT moved to valid are skipped
+    const skippedDuplicates = previewModal.duplicateRecords.map(d => ({
+      name: d["Name"] || d.studentNameEnglish || "Unknown",
+      studentId: d["Student ID"] || d.studentId || "",
+      reason: d.reason || "Duplicate entry"
+    }));
+
+    let finalResult = { totalProcessed: 0, successCount: 0, skippedRecords: [...skippedDuplicates] };
       const chunkSize = 10;
 
       for (let i = 0; i < total; i += chunkSize) {
@@ -552,13 +583,71 @@ const Students = () => {
         setUploadProgress({ isUploading: true, current: Math.min(i + chunkSize, total), total, statusText: "Uploading Data..." });
       }
 
-      setPreviewModal({ isOpen: false, validRecords: [], duplicateRecords: [], invalidRecords: [], isLoading: false, selectedDuplicates: [] });
+      setPreviewModal({ isOpen: false, validRecords: [], duplicateRecords: [], invalidRecords: [], isLoading: false, selectedDuplicates: [], originalFile: null });
       setUploadProgress({ isUploading: false, current: 0, total: 0, statusText: "" });
       setBulkUploadResult({ isOpen: true, result: finalResult, isLoading: false });
       fetchStudents();
+
+      try {
+        if (currentFile) {
+          // Generate new Excel file with Upload Status and Failure Reason
+          const updatedRecords = recordsToProcess.map(record => {
+            const sid = record["Student ID"] || record.studentId || "";
+            const isSkipped = finalResult.skippedRecords.find(r => r.studentId === sid);
+            return {
+              ...record,
+              "Upload Status": isSkipped ? "Failed" : "Success",
+              "Failure Reason": isSkipped ? isSkipped.reason : ""
+            };
+          });
+
+          const skippedDups = previewModal.duplicateRecords.map(d => ({
+            ...d,
+            "Upload Status": "Failed",
+            "Failure Reason": d.reason || "Duplicate entry"
+          }));
+
+          const finalExcelData = [...updatedRecords, ...skippedDups];
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.json_to_sheet(finalExcelData);
+          XLSX.utils.book_append_sheet(wb, ws, "Upload Result");
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+          const newFile = new File([excelBuffer], currentFile.name, { type: currentFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+          const formData = new FormData();
+          const totalInFile = total + skippedDuplicates.length;
+          const totalSkipped = finalResult.skippedRecords.length;
+          formData.append('file', newFile);
+          formData.append('module', 'Students');
+          formData.append('totalRecords', totalInFile);
+          formData.append('successfulRecords', finalResult.successCount);
+          formData.append('failedRecords', totalSkipped);
+          formData.append('status', finalResult.successCount === totalInFile ? 'Success' : (finalResult.successCount === 0 ? 'Failed' : 'Partial Success'));
+          formData.append('summary', `Uploaded ${finalResult.successCount} of ${totalInFile} students. Skipped: ${totalSkipped} (duplicates/errors).`);
+          await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        }
+      } catch (err) {
+        console.error("Failed to log bulk upload history", err);
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Error uploading records.");
       setUploadProgress({ isUploading: false, current: 0, total: 0, statusText: "" });
+      
+      try {
+        if (currentFile) {
+          const formData = new FormData();
+          formData.append('file', currentFile);
+          formData.append('module', 'Students');
+          formData.append('totalRecords', total);
+          formData.append('successfulRecords', 0);
+          formData.append('failedRecords', total);
+          formData.append('status', 'Failed');
+          formData.append('summary', `Failed to upload students. Error: ${error.response?.data?.message || error.message}`);
+          await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        }
+      } catch (err) {
+        console.error("Failed to log failed bulk upload history", err);
+      }
     }
   };
 
@@ -687,12 +776,200 @@ const Students = () => {
       if (payload.center && typeof payload.center === "object") payload.center = payload.center._id;
       const { data } = await api.put(`/students/${payload._id}`, payload);
       setStudents((prev) => prev.map((s) => (s._id === payload._id ? data.student : s)));
-      setSelectedStudent(data.student);
+      setSelectedStudent(null);
       setStudentMode("view");
       toast.success("Student updated successfully!");
+      const container = document.getElementById("main-scroll-container");
+      if (container) container.scrollTo({ top: 0, behavior: "smooth" });
+      else window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       toast.error(err.response?.data?.message || "Update failed");
       throw err;
+    }
+  };
+
+  // ─── EXPORT SELECTED STUDENTS ──────────────────────────────────────────────
+  const handleExportSelected = () => {
+    const rows = selectedStudents.map(s => ({
+      // ── Internal (keep hidden for bulk-edit re-upload)
+      "_mongoId": s._id,
+
+      // ── Basic Identity
+      "Student ID":                  s.studentId || "",
+      "Name (English)":              s.studentNameEnglish || s.user?.name || "",
+      // "Name (Mother Tongue)":        s.studentNameMotherTongue || "",
+      "Father Name":                 s.fatherName || "",
+      "DOB":                         s.dob ? (() => {
+        const d = new Date(s.dob);
+        if (isNaN(d)) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      })() : "",
+      "Age":                         s.age || "",
+      "Gender":                      s.gender || "",
+      "Nationality":                 s.nationality || "",
+      "Religion":                    s.religion || "",
+      "Community":                   s.community || "",
+      "Marital Status":              s.maritalStatus || "",
+      "Year":                        s.year || "",
+      "Department":                  s.department || "",
+      "Status":                      s.status || "",
+
+      // ── IDs
+      "Aadhar No":                   s.aadharNo || "",
+      "KCET Reg No":                 s.kcetRegNo || "",
+      "NEET Reg No":                 s.neetRegNo || "",
+      "APAAR ID":                    s.apaarId || "",
+      "DEB ID":                      s.debId || "",
+      "ABC ID":                      s.abcId || "",
+
+      // ── Contact
+      "Email":                       s.email || s.user?.email || "",
+      "Phone":                       s.phone || "",
+      "WhatsApp":                    s.whatsapp || "",
+      "English Fluency (Fluent/Intermediate/Basic)":  s.englishFluency || "",
+      "Languages Known":             (s.languagesKnown || []).join(", "),
+
+      // ── Address
+      "Address Village":             s.address?.village || "",
+      "Address Post":                s.address?.post || "",
+      "Address Taluk":               s.address?.taluk || "",
+      "Address District":            s.address?.district || "",
+      "Address PIN":                 s.address?.pin || "",
+
+      // ── Bank Details
+      "Bank Account Holder":         s.bankDetails?.accountHolderName || "",
+      "Bank Account Number":         s.bankDetails?.accountNumber || "",
+      "Bank IFSC Code":              s.bankDetails?.ifscCode || "",
+      "Bank Name & Branch":          s.bankDetails?.bankNameBranch || "",
+
+      // ── SSLC Details
+      "SSLC Register No":            s.sslcDetails?.registerNo || "",
+      "SSLC Year of Passing":        s.sslcDetails?.yearOfPassing || "",
+      "SSLC School Name":            s.sslcDetails?.schoolName || "",
+      "SSLC Place of School":        s.sslcDetails?.placeOfSchool || "",
+      "SSLC Board of Examination":   s.sslcDetails?.boardOfExamination || "",
+      "SSLC Percentage":             s.sslcDetails?.percentage || "",
+
+      // ── HSC Details
+      "HSC Register No":             s.hscDetails?.registerNo || "",
+      "HSC Year of Passing":         s.hscDetails?.yearOfPassing || "",
+      "HSC School Name":             s.hscDetails?.schoolName || "",
+      "HSC Place of School":         s.hscDetails?.placeOfSchool || "",
+      "HSC Board of Examination":    s.hscDetails?.boardOfExamination || "",
+      "HSC Percentage":              s.hscDetails?.percentage || "",
+
+      // ── Education Background (serialized, multi-record)
+      // "Education Background (JSON)": s.educationBackground?.length
+      //   ? JSON.stringify(s.educationBackground.map(e => ({
+      //       exam: e.examinationPassed,
+      //       institute: e.instituteName,
+      //       group: e.group,
+      //       year: e.yearOfPassing,
+      //       marks: e.marksPercentage,
+      //       remarks: e.remarks
+      //     })))
+      //   : "",
+
+      // ── Family Background
+      // "Family Background (JSON)":    s.familyBackground?.length
+      //   ? JSON.stringify(s.familyBackground.map(f => ({
+      //       relationship: f.relationship,
+      //       name: f.name,
+      //       occupation: f.occupation,
+      //       phone: f.phone
+      //     })))
+      //   : "",
+
+      // ── References
+      // "References (JSON)":           s.references?.length
+      //   ? JSON.stringify(s.references.map(r => ({ name: r.name, mobile: r.mobile })))
+      //   : "",
+
+      // ── Enrollment (primary)
+      // Names are for reference only. Edit the ID columns to change enrollment.
+      "Center ID":                   s.center?.centerId || "",
+      "Center Name":                 s.center?.name || "",
+      "Batch ID":                   s.enrolledCourses?.[0]?.batch?.batchId || "",
+      "Batch Name":                  s.enrolledCourses?.[0]?.batch?.name || "",
+      "Course ID":                   s.enrolledCourses?.[0]?.course?.courseId || "",
+      "Course Name":                 s.enrolledCourses?.[0]?.course?.title || "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto-width columns
+    const colWidths = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 18) }));
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Students");
+    XLSX.writeFile(wb, `Students_Selected_${Date.now()}.xlsx`);
+    toast.success(`Exported ${rows.length} students to Excel!`);
+  };
+
+  // ─── BULK EDIT UPLOAD ────────────────────────────────────────────────────────
+  const handleBulkEditFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = "";
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (!rawRows.length) { toast.error("No data found in file."); return; }
+
+      // Convert any date objects or Excel serial numbers in DOB to DD/MM/YYYY
+      const rows = rawRows.map(row => {
+        const updated = { ...row };
+        const dobVal = updated["DOB"];
+        if (dobVal) {
+          if (dobVal instanceof Date && !isNaN(dobVal.getTime())) {
+            const d = new Date(dobVal.getTime() + 12 * 60 * 60 * 1000);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            updated["DOB"] = `${day}/${month}/${year}`;
+          } else if (typeof dobVal === 'number' || /^\d{5}$/.test(String(dobVal).trim())) {
+            const num = Number(dobVal);
+            const excelEpoch = new Date(1899, 11, 30);
+            const d = new Date(excelEpoch.getTime() + num * 86400000);
+            if (!isNaN(d.getTime())) {
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = d.getFullYear();
+              updated["DOB"] = `${day}/${month}/${year}`;
+            }
+          }
+        }
+        return updated;
+      });
+
+      toast.loading("Validating rows...", { id: "bulk-edit-validate" });
+      const res = await api.post("/students/bulk-edit", { students: rows });
+      toast.dismiss("bulk-edit-validate");
+      setBulkEditPreview({ isOpen: true, data: res.data, isSubmitting: false });
+    } catch (err) {
+      toast.dismiss("bulk-edit-validate");
+      toast.error(err.response?.data?.message || "Failed to parse file.");
+    }
+  };
+
+  const handleBulkEditConfirm = async (recordsToSave) => {
+    const listToSave = recordsToSave || bulkEditPreview.data?.valid;
+    if (!listToSave?.length) return;
+    setBulkEditPreview(prev => ({ ...prev, isSubmitting: true }));
+    try {
+      const res = await api.post("/students/bulk-edit-confirm", { students: listToSave });
+      toast.success(`${res.data.updatedCount} students updated successfully!`);
+      setBulkEditPreview({ isOpen: false, data: null, isSubmitting: false });
+      setClearSelectedRows(c => !c);
+      setSelectedStudents([]);
+      fetchStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Bulk edit failed.");
+      setBulkEditPreview(prev => ({ ...prev, isSubmitting: false }));
     }
   };
 
@@ -1020,9 +1297,36 @@ const Students = () => {
 
             {activePreviewTab === 'invalid' && (
               <div>
-                <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex gap-2 items-start">
-                  <XCircle size={16} className="mt-0.5 shrink-0" />
-                  <p>These records cannot be uploaded due to missing data or invalid references. Please fix them in your spreadsheet and re-upload.</p>
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl text-xs flex gap-2 items-start justify-between">
+                  <div className="flex gap-2 items-start">
+                    <XCircle size={16} className="mt-0.5 shrink-0" />
+                    <p>These records cannot be uploaded due to missing data or invalid references. Please fix them in your spreadsheet and re-upload.</p>
+                  </div>
+                  {previewModal.invalidRecords.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const exportData = previewModal.invalidRecords.map((r, i) => ({
+                          'S.No': i + 1,
+                          'Name': r['Name'] || '-',
+                          'Student ID': r['Student ID'] || '-',
+                          'Email': r['Email'] || '-',
+                          'DOB': r['DOB'] || '-',
+                          'Center ID': r['Center ID'] || '-',
+                          'Course ID': r['Course ID'] || '-',
+                          'Batch ID': r['Batch ID'] || '-',
+                          'Year': r['Year'] || '-',
+                          'Reason': r.reason || '-'
+                        }));
+                        const ws = XLSX.utils.json_to_sheet(exportData);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, 'Invalid Records');
+                        XLSX.writeFile(wb, 'Invalid_Student_Records.xlsx');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-colors"
+                    >
+                      <Download size={13} /> Download
+                    </button>
+                  )}
                 </div>
                 <div className="w-full">
                   {previewModal.invalidRecords.length === 0 ? (
@@ -1379,12 +1683,22 @@ const Students = () => {
               tableHeaderActions={
                 selectedStudents.length > 0 ? (
                   <div className="flex gap-3 animate-in fade-in zoom-in-95 duration-200">
+                   
+
                     <button
-                      onClick={() => setConfirmBulkDelete(true)}
-                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-red-600 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 cursor-pointer"
+                      onClick={handleExportSelected}
+                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl hover:bg-emerald-100 transition-all shadow-sm active:scale-95 cursor-pointer"
                     >
-                      <Trash2 size={18} /> Delete Selected ({selectedStudents.length})
+                      <Download size={18} /> Export Selected
                     </button>
+
+                    <button
+                      onClick={() => bulkEditFileInputRef.current?.click()}
+                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 transition-all shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <UploadCloud size={18} /> Bulk Edit Upload
+                    </button>
+                    <input type="file" accept=".xlsx,.xls" ref={bulkEditFileInputRef} onChange={handleBulkEditFileChange} className="hidden" />
 
                     <div className="relative group">
                       <button className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer">
@@ -1411,6 +1725,13 @@ const Students = () => {
                         </button>
                       </div>
                     </div>
+
+                     <button
+                      onClick={() => setConfirmBulkDelete(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-red-600 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 cursor-pointer"
+                    >
+                      <Trash2 size={18} /> Delete Selected ({selectedStudents.length})
+                    </button>
 
                     <button
                       onClick={() => {
@@ -1450,6 +1771,13 @@ const Students = () => {
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-brand-700 hover:bg-brand-50 transition-colors text-left"
                         >
                           <UploadCloud size={16} /> Upload Excel/CSV
+                        </button>
+                        <div className="h-px bg-slate-50 w-full"></div>
+                        <button
+                          onClick={() => navigate('/dashboard/bulk-history', { state: { module: 'Students' } })}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        >
+                          <Clock size={16} /> View History
                         </button>
                         <input
                           type="file"
@@ -1508,6 +1836,7 @@ const Students = () => {
 
             <form onSubmit={async (e) => {
               e.preventDefault();
+      if (loading) return; // prevent double submission
               try {
                 if (promoteConfig.isBulk) {
                   const studentIds = selectedStudents.map(s => s._id);
@@ -1836,6 +2165,15 @@ const Students = () => {
           </div>
         </div>,
         document.body
+      )}
+
+      {bulkEditPreview.isOpen && (
+        <BulkEditPreviewModal
+          previewData={bulkEditPreview.data}
+          isSubmitting={bulkEditPreview.isSubmitting}
+          onClose={() => setBulkEditPreview({ isOpen: false, data: null, isSubmitting: false })}
+          onConfirm={handleBulkEditConfirm}
+        />
       )}
     </div>
   );

@@ -73,6 +73,7 @@ const ParentManagement = () => {
   // Handle parent creation
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return; // prevent double submission
     setSubmitting(true);
     try {
       await api.post("/auth/register-parent", formData);

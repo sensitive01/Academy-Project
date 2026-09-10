@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Plus, ChevronDown, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Plus, ChevronDown, Download, FileSpreadsheet, FileText, X } from "lucide-react";
 import Loading from "../../components/common/Loading";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -11,9 +11,11 @@ import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
+import { useNavigate } from "react-router-dom";
 
 const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState("");
@@ -58,6 +60,10 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const fileInputRef = useRef(null);
+
+  const [showBulkPreview, setShowBulkPreview] = useState(false);
+  const [bulkPreviewData, setBulkPreviewData] = useState([]);
+  const [bulkPreviewFile, setBulkPreviewFile] = useState(null);
 
   const [filterType, setFilterType] = useState([]);
   const [filterCenter, setFilterCenter] = useState([]);
@@ -354,12 +360,14 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
             return;
           }
 
-          const res = await api.post("/payroll/bulk-adjustment", { adjustments });
-          toast.success(res.data.message || "Bulk upload successful", { id: loadToast });
-          await fetchPayrolls();
+          toast.dismiss(loadToast);
+          setBulkPreviewData(adjustments);
+          setBulkPreviewFile(file);
+          setShowBulkPreview(true);
+
         } catch (err) {
           console.error("Bulk upload processing error:", err);
-          toast.error("Failed to process bulk upload.", { id: loadToast });
+          toast.error("Failed to parse bulk upload data.", { id: loadToast });
         }
       };
       reader.readAsBinaryString(file);
@@ -368,6 +376,50 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const confirmBulkUpload = async () => {
+    const loadToast = toast.loading("Processing bulk upload...");
+    try {
+      const res = await api.post("/payroll/bulk-adjustment", { adjustments: bulkPreviewData });
+      toast.success(res.data.message || "Bulk upload successful", { id: loadToast });
+      await fetchPayrolls();
+
+      try {
+        const formData = new FormData();
+        formData.append('file', bulkPreviewFile);
+        formData.append('module', 'Payroll');
+        formData.append('totalRecords', bulkPreviewData.length);
+        formData.append('successfulRecords', bulkPreviewData.length);
+        formData.append('failedRecords', 0);
+        formData.append('status', 'Success');
+        formData.append('summary', `Successfully uploaded ${bulkPreviewData.length} payroll adjustments.`);
+        await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } catch (err) {
+        console.error("Failed to log bulk upload history", err);
+      }
+
+      setShowBulkPreview(false);
+      setBulkPreviewData([]);
+      setBulkPreviewFile(null);
+    } catch (err) {
+      console.error("Bulk upload processing error:", err);
+      toast.error("Failed to process bulk upload.", { id: loadToast });
+
+      try {
+        const formData = new FormData();
+        formData.append('file', bulkPreviewFile);
+        formData.append('module', 'Payroll');
+        formData.append('totalRecords', 0);
+        formData.append('successfulRecords', 0);
+        formData.append('failedRecords', 1);
+        formData.append('status', 'Failed');
+        formData.append('summary', `Failed to upload payroll adjustments. Error: ${err.response?.data?.message || err.message}`);
+        await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } catch (historyErr) {
+        console.error("Failed to log failed bulk upload history", historyErr);
       }
     }
   };
@@ -890,6 +942,13 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               <Download size={18} className="text-blue-600" />
               Template
             </button>
+            <button
+              onClick={() => navigate('/dashboard/bulk-history', { state: { module: 'Payroll' } })}
+              className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200"
+            >
+              <FileText size={18} className="text-slate-600" />
+              View History
+            </button>
 
           </div>
         </div>
@@ -1267,6 +1326,80 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         </div>,
         document.body
       )}
+      {/* BULK PREVIEW MODAL */}
+      {showBulkPreview && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Bulk Upload Preview</h3>
+                <p className="text-sm text-gray-500 mt-1">Review the parsed data before confirming</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBulkPreview(false);
+                  setBulkPreviewData([]);
+                  setBulkPreviewFile(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-auto bg-gray-50/50 flex-1">
+              <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-gray-100/80 text-gray-600 uppercase text-[10px] font-bold tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3 text-center">Days/P/A</th>
+                      <th className="px-4 py-3 text-right">Allowance</th>
+                      <th className="px-4 py-3">Allowance Reason</th>
+                      <th className="px-4 py-3 text-right">Deduction</th>
+                      <th className="px-4 py-3">Deduction Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bulkPreviewData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-gray-800">{row.employeeId}</td>
+                        <td className="px-4 py-3 text-center">
+                          {row.totalDays !== undefined ? `${row.totalDays} / ${row.present} / ${row.absent}` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-blue-600 font-medium">{row.allowance > 0 ? `₹${row.allowance}` : '-'}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{row.allowanceReason || '-'}</td>
+                        <td className="px-4 py-3 text-right text-red-500 font-medium">{row.deduction > 0 ? `₹${row.deduction}` : '-'}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{row.deductionReason || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-white flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowBulkPreview(false);
+                  setBulkPreviewData([]);
+                  setBulkPreviewFile(null);
+                }}
+                className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBulkUpload}
+                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-md shadow-emerald-200"
+              >
+                Confirm & Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

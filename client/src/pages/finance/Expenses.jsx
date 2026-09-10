@@ -28,11 +28,12 @@ import { saveAs } from "file-saver";
 
 const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const [expenses, setExpenses] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchExpense, setSearchExpense] = useState("");
-  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, id: null });
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, action: null, id: null });
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [fromDate, setFromDate] = useState("");
@@ -46,8 +47,11 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
       setLoading(true);
       const res = await api.get("/expenses");
       setExpenses(res.data?.data || []);
+      
+      const empRes = await api.get("/employees");
+      setEmployees(empRes.data || []);
     } catch {
-      toast.error("Failed to load expenses");
+      toast.error("Failed to load expenses or employees");
     } finally {
       setLoading(false);
     }
@@ -95,9 +99,56 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
     }
   };
 
+  /* ================= CONFIRMATION PROPS ================= */
+  const getConfirmModalProps = () => {
+    switch (confirmConfig.action) {
+      case 'approve':
+        return {
+          title: "Approve Expense",
+          message: "Are you sure you want to approve this expense?",
+          confirmText: "Approve",
+          type: "success",
+          onConfirm: () => handleStatusUpdate(confirmConfig.id, "approved")
+        };
+      case 'reject':
+        return {
+          title: "Reject Expense",
+          message: "Are you sure you want to reject this expense? This cannot be undone.",
+          confirmText: "Reject",
+          type: "danger",
+          onConfirm: () => handleStatusUpdate(confirmConfig.id, "rejected")
+        };
+      case 'reimburse':
+        return {
+          title: "Reimburse Expense",
+          message: "Are you sure you want to mark this expense as reimbursed? This will record an outward payment.",
+          confirmText: "Reimburse",
+          type: "info",
+          onConfirm: () => handleReimburse(confirmConfig.id)
+        };
+      case 'pay':
+        return {
+          title: "Mark as Paid",
+          message: "Are you sure you want to mark this expense as Paid? This will record a direct outward payment.",
+          confirmText: "Mark Paid",
+          type: "info",
+          onConfirm: () => handlePayDirect(confirmConfig.id)
+        };
+      case 'delete':
+      default:
+        return {
+          title: "Delete Expense Claim",
+          message: "Are you sure you want to delete this expense record? This action cannot be reversed.",
+          confirmText: "Confirm Delete",
+          type: "danger",
+          onConfirm: confirmExpenseDelete
+        };
+    }
+  };
+
   /* ================= DELETE ================= */
   const handleDelete = (id) => {
-    setConfirmConfig({ isOpen: true, id });
+    setConfirmConfig({ isOpen: true, action: 'delete', id });
   };
 
   const confirmExpenseDelete = async () => {
@@ -112,7 +163,7 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
     } catch (err) {
       toast.error(err.response?.data?.message || "Delete failed");
     } finally {
-      setConfirmConfig({ isOpen: false, id: null });
+      setConfirmConfig({ isOpen: false, action: null, id: null });
     }
   };
 
@@ -137,6 +188,19 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
   const columns = [
     { name: 'S.No', selector: (row, i) => i + 1, width: '70px', center: true },
     { name: 'Employee', selector: row => row.submittedBy?.name || "Unknown", sortable: true, cell: row => <span className="font-medium text-gray-800">{row.submittedBy?.name || "Unknown"}</span> },
+    { 
+      name: 'Center', 
+      selector: row => {
+        const emp = employees.find(e => (e.user?._id || e.user) === row.submittedBy?._id);
+        return emp?.center?.name || emp?.center?.centerName || (typeof emp?.center === 'string' ? emp.center : "-");
+      }, 
+      sortable: true, 
+      cell: row => {
+        const emp = employees.find(e => (e.user?._id || e.user) === row.submittedBy?._id);
+        const centerName = emp?.center?.name || emp?.center?.centerName || (typeof emp?.center === 'string' ? emp.center : "-");
+        return <span className="text-gray-600 font-medium">{centerName}</span>;
+      } 
+    },
     { name: 'Category', selector: row => row.category, sortable: true, cell: row => <span className="text-gray-600">{row.category}</span> },
     { name: 'Amount', selector: row => row.amount, sortable: true, cell: row => <span className="font-bold text-gray-800">₹ {row.amount?.toLocaleString("en-IN")}</span> },
     { name: 'Date', selector: row => row.date, sortable: true, cell: row => <span className="text-gray-600 font-mono">{new Date(row.date).toLocaleDateString("en-IN")}</span> },
@@ -154,17 +218,17 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
           </button>
           
           {openMenuId === row._id && (
-            <div className="absolute right-full top-auto bottom-0 mr-2 w-48 whitespace-nowrap bg-white border border-gray-100 rounded-xl shadow-xl z-[9999] text-left overflow-hidden action-menu-content">
+            <div className="absolute right-8 top-0 mt-0 w-48 whitespace-nowrap bg-white border border-gray-100 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.15)] z-[9999] text-left overflow-hidden action-menu-content">
               {user.role === "admin" && row.status === "pending" && (
                 <>
-                  <button onClick={() => handleStatusUpdate(row._id, "approved")} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-green-600 hover:bg-green-50 transition"><CheckCircle size={16} /> Approve</button>
-                  <button onClick={() => handleStatusUpdate(row._id, "rejected")} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition"><XCircle size={16} /> Reject</button>
+                  <button onClick={() => { setConfirmConfig({ isOpen: true, action: 'approve', id: row._id }); setOpenMenuId(null); }} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-green-600 hover:bg-green-50 transition"><CheckCircle size={16} /> Approve</button>
+                  <button onClick={() => { setConfirmConfig({ isOpen: true, action: 'reject', id: row._id }); setOpenMenuId(null); }} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition"><XCircle size={16} /> Reject</button>
                 </>
               )}
               {user.role === "admin" && row.status === "approved" && (
                 <>
-                  <button onClick={() => handleReimburse(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition"><Banknote size={16} /> Reimburse</button>
-                  <button onClick={() => handlePayDirect(row._id)} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition"><Banknote size={16} /> Paid</button>
+                  <button onClick={() => { setConfirmConfig({ isOpen: true, action: 'reimburse', id: row._id }); setOpenMenuId(null); }} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition"><Banknote size={16} /> Reimburse</button>
+                  <button onClick={() => { setConfirmConfig({ isOpen: true, action: 'pay', id: row._id }); setOpenMenuId(null); }} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition"><Banknote size={16} /> Paid</button>
                 </>
               )}
               {["reimbursed", "paid"].includes(row.status) && (
@@ -356,12 +420,8 @@ const Expenses = ({ hideHeader = false, categoryFilter = null }) => {
 
       <ConfirmationModal
         isOpen={confirmConfig.isOpen}
-        title="Delete Expense Claim"
-        message="Are you sure you want to delete this expense record? This action cannot be reversed."
-        confirmText="Confirm Delete"
-        onConfirm={confirmExpenseDelete}
-        onClose={() => setConfirmConfig({ isOpen: false, id: null })}
-        type="danger"
+        {...getConfirmModalProps()}
+        onClose={() => setConfirmConfig({ isOpen: false, action: null, id: null })}
       />
 
       {/* EXPORT MODAL */}

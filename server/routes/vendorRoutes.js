@@ -21,6 +21,7 @@ router.post("/", protect, async (req, res) => {
       return res.status(403).json({ message: "Only admin can register a vendor" });
     }
 
+    /*
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists with this email" });
@@ -32,9 +33,10 @@ router.post("/", protect, async (req, res) => {
       password: password || "Vendor@123",
       role: roleLower,
     });
+    */
 
     const vendor = await Vendor.create({
-      user: user._id,
+      // user: user._id,
       companyName,
       contactPerson,
       mobile,
@@ -43,8 +45,8 @@ router.post("/", protect, async (req, res) => {
       website
     });
 
-    user.vendorProfile = vendor._id;
-    await user.save();
+    // user.vendorProfile = vendor._id;
+    // await user.save();
 
     res.status(201).json({ message: "Vendor created successfully", vendor });
   } catch (err) {
@@ -166,12 +168,14 @@ router.put("/:id", protect, async (req, res) => {
     await vendor.save();
 
     // Update associated User
+    /*
     const user = await User.findById(vendor.user);
     if (user) {
         user.name = name || user.name;
         user.email = email || user.email;
         await user.save();
     }
+    */
 
     res.json({ message: "Vendor updated successfully", vendor });
   } catch (err) {
@@ -236,12 +240,36 @@ router.delete("/:id", protect, async (req, res) => {
     }
 
     // Remove user associated with vendor
-    await User.findByIdAndDelete(vendor.user);
+    /*
+    if (vendor.user) {
+      await User.findByIdAndDelete(vendor.user);
+    }
+    */
     
     // Remove vendor profile
     await Vendor.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Vendor deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ==========================================
+// ADMIN FETCHING VENDOR'S STUDENTS
+// ==========================================
+router.get("/:id/students", protect, async (req, res) => {
+  try {
+    const role = req.user.role?.toLowerCase();
+    if (role !== 'admin' && role !== 'sub-admin') {
+      return res.status(403).json({ message: "Only admin and sub-admin can access this endpoint" });
+    }
+
+    const students = await Student.find({
+      "internships.vendor": req.params.id
+    }).populate("user", "name email");
+
+    res.json(students);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

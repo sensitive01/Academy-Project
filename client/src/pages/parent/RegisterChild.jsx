@@ -86,6 +86,7 @@ const RegisterChild = () => {
 
 const handleSubmit = async (e) => {
   e.preventDefault();
+    if (loading) return; // prevent double submission
 
   if (!formData.email || formData.email.trim() === "") {
     toast.error("Email is required");
@@ -358,153 +359,138 @@ const handleSubmit = async (e) => {
         </div>
 
         {/* SSLC SECTION */}
-
-        <h3 className="font-semibold mb-2">Student SSLC Details</h3>
-        <div className="flex gap-8 mb-6">
-        {/* SSLC SUBJECT TABLE */}
-
-        <table className="border border-gray-400 text-sm">
-        <thead className="bg-gray-100">
-        <tr>
-        <th className="border p-2">S.No</th>
-        <th className="border p-2">Subject</th>
-        <th className="border p-2">Total Mark</th>
-        <th className="border p-2">Secured Mark</th>
-        </tr>
-        </thead>
-
-        <tbody>
-        {[1,2,3,4,5,6].map((i)=>(
-        <tr key={i}>
-        <td className="border p-2">{i}</td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name={`sslcSubject${i}`} value={formData[`sslcSubject${i}`] || ""} onChange={handleChange}/>
-        </td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name={`sslcTotal${i}`} value={formData[`sslcTotal${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name={`sslcMark${i}`} value={formData[`sslcMark${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-        </tr>
-        ))}
-
-        <tr>
-        <td colSpan="2" className="border p-2 font-semibold">Total</td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name="sslcTotalMarks" value={formData.sslcTotalMarks || ""} onChange={handleChange}/>
-        </td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name="sslcSecuredMarks" value={formData.sslcSecuredMarks || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-        </tr>
-
-        <tr>
-        <td colSpan="2" className="border p-2 font-semibold">
-        Percentage / Class
-        </td>
-
-        <td colSpan="2" className="border p-2">
-        <input autoComplete="off" name="sslcPercentage" value={formData.sslcPercentage || ""} onChange={handleChange} className="w-full outline-none" />
-        </td>
-        </tr>
-
-        </tbody>
-        </table>
-
-        {/* SSLC TEXTBOXES */}
-
-        <div className="flex flex-col gap-3">
-        <Input autoComplete="off" label="Registered No" name="sslcRegNo" value={formData.sslcRegNo} onChange={handleChange} />
-        <Input autoComplete="off" label="Year of Passing" name="sslcYear" value={formData.sslcYear} onChange={handleChange} />
-        <Input autoComplete="off" label="School Name" name="sslcSchool" value={formData.sslcSchool} onChange={handleChange} />
-        <Input autoComplete="off" label="Place of School" name="sslcPlace" value={formData.sslcPlace} onChange={handleChange} />
-        <Input autoComplete="off" label="Board of Examination" name="sslcBoard" value={formData.sslcBoard} onChange={handleChange} />
+        <h3 className="font-semibold mb-3">Student SSLC Details</h3>
+        
+        {/* SSLC TEXTBOXES ABOVE TABLE */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+          <Input autoComplete="off" label="Registered No" name="sslcRegNo" value={formData.sslcRegNo} onChange={handleChange} />
+          <Input autoComplete="off" label="Year of Passing" name="sslcYear" value={formData.sslcYear} onChange={handleChange} />
+          <Input autoComplete="off" label="School Name" name="sslcSchool" value={formData.sslcSchool} onChange={handleChange} />
+          <Input autoComplete="off" label="Place of School" name="sslcPlace" value={formData.sslcPlace} onChange={handleChange} />
+          <Input autoComplete="off" label="Board of Examination" name="sslcBoard" value={formData.sslcBoard} onChange={handleChange} />
         </div>
+
+        {/* SSLC SUBJECT TABLE */}
+        <div className="mb-6 overflow-x-auto">
+          <table className="border border-gray-400 text-sm w-full">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2">S.No</th>
+                <th className="border p-2">Subject</th>
+                <th className="border p-2">Total Mark</th>
+                <th className="border p-2">Secured Mark</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {[1,2,3,4,5,6].map((i)=>(
+                <tr key={i}>
+                  <td className="border p-2 text-center">{i}</td>
+                  <td className="border p-2">
+                    <input autoComplete="off" name={`sslcSubject${i}`} value={formData[`sslcSubject${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
+                  </td>
+                  <td className="border p-2">
+                    <input autoComplete="off" name={`sslcTotal${i}`} value={formData[`sslcTotal${i}`] || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                  </td>
+                  <td className="border p-2">
+                    <input autoComplete="off" name={`sslcMark${i}`} value={formData[`sslcMark${i}`] || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                  </td>
+                </tr>
+              ))}
+
+              <tr>
+                <td colSpan="2" className="border p-2 font-semibold text-right">Total</td>
+                <td className="border p-2">
+                  <input autoComplete="off" name="sslcTotalMarks" value={formData.sslcTotalMarks || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                </td>
+                <td className="border p-2">
+                  <input autoComplete="off" name="sslcSecuredMarks" value={formData.sslcSecuredMarks || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                </td>
+              </tr>
+
+              <tr>
+                <td colSpan="2" className="border p-2 font-semibold text-right">
+                  Percentage / Class
+                </td>
+                <td colSpan="2" className="border p-2">
+                  <input autoComplete="off" name="sslcPercentage" value={formData.sslcPercentage || ""} onChange={handleChange} className="w-full outline-none text-center" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         {/* HSC SECTION */}
-        <h3 className="font-semibold mb-2">Student HSC / PU Details</h3>
-        <div className="flex gap-8">
+        <h3 className="font-semibold mb-3">Student HSC / PU Details</h3>
+
+        {/* HSC TEXTBOXES ABOVE TABLE */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+          <Input label="Registered No" name="hscRegNo" value={formData.hscRegNo} onChange={handleChange} />
+          <Input label="Year of Passing" name="hscYear" value={formData.hscYear} onChange={handleChange} />
+          <Input label="School Name" name="hscSchool" value={formData.hscSchool} onChange={handleChange} />
+          <Input label="Place of School" name="hscPlace" value={formData.hscPlace} onChange={handleChange} />
+          <Input label="Board of Examination" name="hscBoard" value={formData.hscBoard} onChange={handleChange} />
+        </div>
+
         {/* HSC SUBJECT TABLE */}
+        <div className="mb-6 overflow-x-auto">
+          <table className="border border-gray-400 text-sm w-full">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2">S.No</th>
+                <th className="border p-2">Subject</th>
+                <th className="border p-2">Total Mark</th>
+                <th className="border p-2">Secured Mark</th>
+              </tr>
+            </thead>
 
-        <table className="border border-gray-400 text-sm">
-        <thead className="bg-gray-100">
-        <tr>
-        <th className="border p-2">S.No</th>
-        <th className="border p-2">Subject</th>
-        <th className="border p-2">Total Mark</th>
-        <th className="border p-2">Secured Mark</th>
-        </tr>
-        </thead>
+            <tbody>
+              {[1,2,3,4,5,6,7].map((i)=>(
+                <tr key={i}>
+                  <td className="border p-2 text-center">{i}</td>
+                  <td className="border p-2">
+                    <input autoComplete="off" name={`hscSubject${i}`} value={formData[`hscSubject${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
+                  </td>
+                  <td className="border p-2">
+                    <input autoComplete="off" name={`hscTotal${i}`} value={formData[`hscTotal${i}`] || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                  </td>
+                  <td className="border p-2">
+                    <input autoComplete="off" name={`hscMark${i}`} value={formData[`hscMark${i}`] || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan="2" className="border p-2 font-semibold text-right">Total</td>
+                <td className="border p-2">
+                  <input autoComplete="off" name="hscTotalMarks" value={formData.hscTotalMarks || ""} onChange={handleChange} className="w-full outline-none text-center"/>
+                </td>
+                <td className="border p-2">
+                  <input autoComplete="off"
+                    name="hscSecuredMarks"
+                    value={formData.hscSecuredMarks || ""} onChange={handleChange}
+                    className="w-full outline-none text-center"
+                  />
+                </td>
+              </tr>
 
-        <tbody>
-        {[1,2,3,4,5,6,7].map((i)=>(
-        <tr key={i}>
-        <td className="border p-2">{i}</td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name={`hscSubject${i}`} value={formData[`hscSubject${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name={`hscTotal${i}`} value={formData[`hscTotal${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-        <td className="border p-2">
-        <input autoComplete="off" name={`hscMark${i}`} value={formData[`hscMark${i}`] || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-        </tr>
-        ))}
-        <tr>
-        <td colSpan="2" className="border p-2 font-semibold">Total</td>
-
-        <td className="border p-2">
-        <input autoComplete="off" name="hscTotalMarks" value={formData.hscTotalMarks || ""} onChange={handleChange} className="w-full outline-none"/>
-        </td>
-
-        <td className="border p-2">
-        <input autoComplete="off"
-        name="hscSecuredMarks"
-        value={formData.hscSecuredMarks || ""} onChange={handleChange}
-        className="w-full outline-none"
-        />
-        </td>
-        </tr>
-
-        <tr>
-        <td colSpan="2" className="border p-2 font-semibold">
-        Percentage / Class
-        </td>
-
-        <td colSpan="2" className="border p-2">
-        <input autoComplete="off"
-        name="hscPercentage"
-        value={formData.hscPercentage || ""} 
-        onChange={handleChange}
-        className="w-full outline-none"
-        />
-        </td>
-        </tr>
-        </tbody>
-        </table>
-
-        {/* HSC TEXTBOXES */}
-
-        <div className="flex flex-col gap-3">
-        <Input label="Registered No" name="hscRegNo" value={formData.hscRegNo} onChange={handleChange} />
-        <Input label="Year of Passing" name="hscYear" value={formData.hscYear} onChange={handleChange} />
-        <Input label="School Name" name="hscSchool" value={formData.hscSchool} onChange={handleChange} />
-        <Input label="Place of School" name="hscPlace" value={formData.hscPlace} onChange={handleChange} />
-        <Input label="Board of Examination" name="hscBoard" value={formData.hscBoard} onChange={handleChange} />
+              <tr>
+                <td colSpan="2" className="border p-2 font-semibold text-right">
+                  Percentage / Class
+                </td>
+                <td colSpan="2" className="border p-2">
+                  <input autoComplete="off"
+                    name="hscPercentage"
+                    value={formData.hscPercentage || ""} 
+                    onChange={handleChange}
+                    className="w-full outline-none text-center"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        </div>
-        </div>
-        )}
+      </div>
+    )}
 
         {step === 3 && (
 <div>

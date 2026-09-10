@@ -4,6 +4,7 @@ import api from "../../services/api";
 import toast from "react-hot-toast";
 import ReactDOM from "react-dom";
 import { useAuth } from "../../context/AuthContext";
+import Select from "react-select";
 
 const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => {
   const [title, setTitle] = useState("");
@@ -69,6 +70,7 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
   /* ================= SUBMIT ================= */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
 
     if (!title.trim() || !category.trim()) {
       toast.error("Title and Category are required");
@@ -175,18 +177,60 @@ const AddExpenseModal = ({ isOpen, onClose, onAdded, defaultCategory = "" }) => 
 
           {/* Assign to Employee (Admin/Finance Only) */}
           {isPrivileged && (
-            <select
-              value={submittedBy}
-              onChange={(e) => setSubmittedBy(e.target.value)}
-              className="border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-              <option value="">-- Assign to Employee --</option>
-              {employees.map((emp) => (
-                <option key={emp.user?._id || emp._id} value={emp.user?._id || emp.user}>
-                  {emp.firstName} {emp.lastName} ({emp.department})
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-col gap-1">
+              <Select
+                options={[
+                  { value: user?._id || user?.id, label: `${user?.name || 'Admin'} (Self)` },
+                  ...employees.map((emp) => ({
+                    value: emp.user?._id || emp.user,
+                    label: `${emp.firstName} ${emp.lastName} (${emp.department})`
+                  }))
+                ]}
+                value={
+                  submittedBy
+                    ? {
+                        value: submittedBy,
+                        label: (() => {
+                          if (submittedBy === (user?._id || user?.id)) return `${user?.name || 'Admin'} (Self)`;
+                          const emp = employees.find(e => (e.user?._id || e.user) === submittedBy);
+                          return emp ? `${emp.firstName} ${emp.lastName} (${emp.department})` : "";
+                        })()
+                      }
+                    : null
+                }
+                onChange={(option) => setSubmittedBy(option ? option.value : "")}
+                placeholder="-- Search Employee --"
+                isClearable
+                isSearchable
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderRadius: "0.5rem",
+                    borderColor: "#e2e8f0",
+                    minHeight: "42px",
+                    "&:hover": { borderColor: "#ef4444" },
+                    boxShadow: "none"
+                  })
+                }}
+              />
+              {submittedBy && (() => {
+                const emp = employees.find(e => (e.user?._id || e.user) === submittedBy);
+                if (emp && emp.center) {
+                  const centerName = emp.center.name || emp.center.centerName || (typeof emp.center === 'string' ? emp.center : "Assigned");
+                  return (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={`Center: ${centerName}`}
+                        disabled
+                        className="w-full border px-3 py-2 rounded-lg bg-slate-50 text-slate-500 font-semibold cursor-not-allowed"
+                      />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
           )}
 
           {/* Amount */}

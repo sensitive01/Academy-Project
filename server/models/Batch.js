@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-
 const batchSchema = new mongoose.Schema(
   {
     name: {
@@ -28,9 +27,16 @@ const batchSchema = new mongoose.Schema(
       required: true,
     },
     period: {
-      startDate: { type: String, required: true },
-      endDate: { type: String, required: true }
+      startDate: { type: String, required: false },
+      endDate: { type: String, required: false }
     },
+    periods: [
+      {
+        year: { type: Number, required: true },
+        startDate: { type: String, required: false },
+        endDate: { type: String, required: false }
+      }
+    ],
     numberOfStudents: {
       type: Number,
       default: 0,

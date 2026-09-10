@@ -10,7 +10,7 @@ const Mark = require("../models/Mark");
 //////////////////////////////////////////////////////
 router.post("/", protect, async (req, res) => {
   try {
-    const { name, batchId, courses, centers, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
+    const { name, batchId, courses, centers, numberOfSemesters, period, periods, numberOfStudents, semesters, certificateDate } = req.body;
 
     const exists = await Batch.findOne({ centers: { $in: centers }, courses: { $in: courses }, $or: [{ name }, { batchId }] });
     if (exists) {
@@ -24,6 +24,7 @@ router.post("/", protect, async (req, res) => {
       centers,
       numberOfSemesters,
       period,
+      periods,
       numberOfStudents,
       semesters,
       certificateDate
@@ -173,7 +174,7 @@ router.get("/:id/progress-students", protect, async (req, res) => {
 //////////////////////////////////////////////////////
 router.put("/:id", protect, async (req, res) => {
   try {
-    const { name, batchId, courses, centers, numberOfSemesters, period, numberOfStudents, semesters, certificateDate } = req.body;
+    const { name, batchId, courses, centers, numberOfSemesters, period, periods, numberOfStudents, semesters, certificateDate } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
@@ -186,6 +187,7 @@ router.put("/:id", protect, async (req, res) => {
     if (centers) batch.centers = centers;
     if (numberOfSemesters !== undefined) batch.numberOfSemesters = numberOfSemesters;
     if (period) batch.period = period;
+    if (periods) batch.periods = periods;
     if (numberOfStudents !== undefined) batch.numberOfStudents = numberOfStudents;
     if (semesters) batch.semesters = semesters;
     if (certificateDate !== undefined) batch.certificateDate = certificateDate;

@@ -20,6 +20,7 @@ const Reminders = () => {
   const [reminders, setReminders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
 
   // Form state
@@ -44,8 +45,9 @@ const Reminders = () => {
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) return; // prevent double submission
     if (!title.trim()) return;
-
+    setIsSaving(true);
     try {
       const payload = { title, description };
       if (dueDate) payload.dueDate = dueDate;
@@ -60,6 +62,8 @@ const Reminders = () => {
       setIsAdding(false);
     } catch (error) {
       console.error("Error adding reminder", error);
+    } finally {
+      setIsSaving(false);
     }
   };
 

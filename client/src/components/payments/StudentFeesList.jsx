@@ -12,7 +12,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
 
-const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
+const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const [fees, setFees] = useState([]);
   const [students, setStudents] = useState([]);
   const [centers, setCenters] = useState([]);
@@ -28,32 +28,91 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
   const [selectedCenter, setSelectedCenter] = useState("all");
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedBatch, setSelectedBatch] = useState("all");
+  const [selectedBatchYear, setSelectedBatchYear] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
 
-  const getAmountForMonth = (row, targetMonthName) => {
-    const monthMap = {
-      "July": 6, "August": 7, "September": 8, "October": 9, "November": 10, "December": 11,
-      "January": 0, "February": 1, "March": 2, "April": 3, "May": 4, "June": 5
-    };
-    const targetMonthIndex = monthMap[targetMonthName];
+  const getDynamicMonths = () => {
+    let currentStartDate = "";
+    let currentEndDate = "";
 
+    if (batchObj && batchObj.periods && batchObj.periods.length > 0) {
+      const currentPeriod = batchObj.periods.find(p => p.year === selectedBatchYear) || batchObj.periods[0];
+      if (currentPeriod) {
+        currentStartDate = currentPeriod.startDate;
+        currentEndDate = currentPeriod.endDate;
+      }
+    } else if (batchObj && batchObj.period?.startDate && batchObj.period?.endDate) {
+      currentStartDate = batchObj.period.startDate;
+      currentEndDate = batchObj.period.endDate;
+    }
+
+    if (!currentStartDate || !currentEndDate) {
+      const monthNames = ["July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June"];
+      const monthMap = { "July": 6, "August": 7, "September": 8, "October": 9, "November": 10, "December": 11, "January": 0, "February": 1, "March": 2, "April": 3, "May": 4, "June": 5 };
+      return monthNames.map(m => ({ label: m, month: monthMap[m], year: null }));
+    }
+
+    const startParts = currentStartDate.split('-');
+    const endParts = currentEndDate.split('-');
+    if (startParts.length < 2 || endParts.length < 2) return [];
+
+    let currentYear = parseInt(startParts[0]);
+    let currentMonth = parseInt(startParts[1]) - 1;
+    const endYear = parseInt(endParts[0]);
+    const endMonth = parseInt(endParts[1]) - 1;
+    
+    const columns = [];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    let safety = 0;
+    while ((currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) && safety < 60) {
+      columns.push({
+        label: `${monthNames[currentMonth]} '${String(currentYear).slice(2)}`,
+        month: currentMonth,
+        year: currentYear
+      });
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      safety++;
+    }
+    return columns;
+  };
+
+  const dynamicMonths = getDynamicMonths();
+
+  const getAmountForMonth = (row, targetMonth) => {
     let totalForMonth = 0;
 
     if (row.payments && row.payments.length > 0) {
       row.payments.forEach(p => {
         if (p.status === 'Approved' && p.paidAt) {
           const pDate = new Date(p.paidAt);
-          if (pDate.getMonth() === targetMonthIndex) {
-            totalForMonth += p.amount;
+          if (pDate.getMonth() === targetMonth.month) {
+            if (targetMonth.year !== null) {
+              if (pDate.getFullYear() === targetMonth.year) {
+                totalForMonth += p.amount;
+              }
+            } else {
+              totalForMonth += p.amount;
+            }
           }
         }
       });
     } else if (row.status === 'paid') {
       const pDate = row.paidAt ? new Date(row.paidAt) : new Date(row.createdAt);
-      if (pDate.getMonth() === targetMonthIndex) {
-        totalForMonth = row.amount;
+      if (pDate.getMonth() === targetMonth.month) {
+        if (targetMonth.year !== null) {
+          if (pDate.getFullYear() === targetMonth.year) {
+            totalForMonth = row.amount;
+          }
+        } else {
+          totalForMonth = row.amount;
+        }
       }
     }
 
@@ -163,9 +222,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
     try {
       setLoading(true);
       const res = await api.get("/student-fees");
-      // Filter by feeType prop
+      // Filter by feeType prop and batchObj
       let filteredData = res.data.filter(f => {
         if (!f.student) return false;
+        if (batchObj && f.batch?._id !== batchObj._id) return false;
         if (feeType === 'All') return true;
         if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
         if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
@@ -527,8 +587,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         };
 
         if (feeType !== 'Exam') {
-          ["July", "August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June"].forEach(month => {
-            exportRow[month] = getAmountForMonth(f, month);
+          dynamicMonths.forEach(m => {
+            exportRow[m.label] = getAmountForMonth(f, m);
           });
         }
 
@@ -549,7 +609,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
       
       const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Total Fee"];
       if (feeType !== 'Exam') {
-        tableColumn.push("July", "August", "Sept", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "June");
+        dynamicMonths.forEach(m => tableColumn.push(m.label));
       }
       tableColumn.push("Balance", "Status");
       
@@ -568,20 +628,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
         ];
         
         if (feeType !== 'Exam') {
-          rowData.push(
-            getAmountForMonth(f, "July"),
-            getAmountForMonth(f, "August"),
-            getAmountForMonth(f, "September"),
-            getAmountForMonth(f, "October"),
-            getAmountForMonth(f, "November"),
-            getAmountForMonth(f, "December"),
-            getAmountForMonth(f, "January"),
-            getAmountForMonth(f, "February"),
-            getAmountForMonth(f, "March"),
-            getAmountForMonth(f, "April"),
-            getAmountForMonth(f, "May"),
-            getAmountForMonth(f, "June")
-          );
+          dynamicMonths.forEach(m => {
+            rowData.push(getAmountForMonth(f, m));
+          });
         }
         
         rowData.push(
@@ -605,15 +654,12 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
     }
   };
 
-  const monthColumns = [
-    "July", "August", "September", "October", "November", "December",
-    "January", "February", "March", "April", "May", "June"
-  ].map(monthName => ({
-    name: monthName,
+  const monthColumns = dynamicMonths.map(targetMonth => ({
+    name: targetMonth.label,
     width: "90px",
-    selector: row => getAmountForMonth(row, monthName),
+    selector: row => getAmountForMonth(row, targetMonth),
     cell: row => {
-      const amt = getAmountForMonth(row, monthName);
+      const amt = getAmountForMonth(row, targetMonth);
       return amt > 0 ? (
         <span className="font-bold text-slate-800">₹{amt.toLocaleString('en-IN')}</span>
       ) : (
@@ -975,16 +1021,30 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid }) => {
               ))}
             </select>
 
-            <select
-              value={selectedBatch}
-              onChange={(e) => setSelectedBatch(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
-            >
-              <option value="all">All Batches</option>
-              {Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values()).map(b => (
-                <option key={b.value} value={b.value}>{b.label}</option>
-              ))}
-            </select>
+            {!batchObj && (
+              <select
+                value={selectedBatch}
+                onChange={(e) => setSelectedBatch(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+              >
+                <option value="all">All Batches</option>
+                {Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values()).map(b => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
+                ))}
+              </select>
+            )}
+
+            {batchObj && batchObj.periods && batchObj.periods.length > 1 && (
+              <select
+                value={selectedBatchYear}
+                onChange={(e) => setSelectedBatchYear(Number(e.target.value))}
+                className="px-3 py-2 bg-brand-50 border border-brand-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500 text-brand-700 shadow-sm cursor-pointer hover:bg-brand-100 transition-colors"
+              >
+                {batchObj.periods.map(p => (
+                  <option key={p.year} value={p.year}>Year {p.year}</option>
+                ))}
+              </select>
+            )}
 
             {!paidOnly && (
               <select

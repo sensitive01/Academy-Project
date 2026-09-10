@@ -127,7 +127,7 @@ const CustomDataTable = ({
         </div>
       )}
       
-      <div className="flex-1 w-full relative overflow-x-auto z-10">
+      <div className="flex-1 w-full relative overflow-auto z-10 min-h-0">
         <DataTable
           columns={columns}
           data={data}

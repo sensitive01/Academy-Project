@@ -36,6 +36,7 @@ import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import Settings from "./pages/dashboard/Settings";
 import Students from "./pages/students/Students";
 import VendorManagement from "./pages/admin/VendorManagement";
+import VendorStudents from "./pages/admin/VendorStudents";
 import EnquiryManagement from "./pages/admin/EnquiryManagement";
 import Reminders from "./pages/dashboard/Reminders";
 import VendorDashboard from "./pages/dashboard/VendorDashboard";
@@ -56,6 +57,7 @@ import FeesCollection from "./pages/finance/FeesCollection";
 import MyCourses from "./pages/lms/MyCourses";
 import Subscription from "./pages/dashboard/Subscription";
 import Notifications from "./pages/dashboard/Notifications";
+import BulkUploadHistoryPage from "./pages/admin/BulkUploadHistoryPage";
 
 // Leave
 import LeaveRequestList from "./components/leave/LeaveRequestList";
@@ -304,6 +306,7 @@ function App() {
             <Route path="admin/logins" element={<AdminLogins />} />
             <Route path="admin/parents" element={<ParentManagement />} />
             <Route path="admin/vendors" element={<VendorManagement />} />
+            <Route path="admin/vendors/:id/students" element={<VendorStudents />} />
             <Route path="admin/enquiries" element={<EnquiryManagement />} />
             <Route path="vendor" element={<VendorDashboard />} />
             <Route path="vendor/attendance" element={<VendorAttendance />} />
@@ -329,6 +332,7 @@ function App() {
 
             {/* Notifications */}
             <Route path="notifications" element={<Notifications />} />
+            <Route path="bulk-history" element={<BulkUploadHistoryPage />} />
             
             {/* Reminders */}
             <Route path="reminders" element={<Reminders />} />

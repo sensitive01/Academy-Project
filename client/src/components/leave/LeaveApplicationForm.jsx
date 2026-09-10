@@ -51,6 +51,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return; // prevent double submission
 
     const userId = localStorage.getItem("id");
     if (!userId)

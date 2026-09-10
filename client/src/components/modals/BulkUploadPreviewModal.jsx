@@ -16,19 +16,27 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
   const [selectedTemplate, setSelectedTemplate] = useState('rg_modern');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'invalid', 'missing'
+  const [focusedCell, setFocusedCell] = useState(null);
 
   const processedData = React.useMemo(() => {
-    if (!validateRow) return { all: previewData.map((r, i) => ({ ...r, _originalIndex: i, _errors: {} })), invalid: [], missingMarks: [] };
+    if (!validateRow) return { all: previewData.map((r, i) => ({ ...r, _originalIndex: i, _errors: {} })), invalid: [], displayInvalid: [], missingMarks: [] };
 
     const all = [];
     const invalid = [];
+    const displayInvalid = [];
     const missingMarks = [];
 
     previewData.forEach((row, idx) => {
       const { isValid, errors } = validateRow(row);
       const rowWithMeta = { ...row, _originalIndex: idx, _errors: errors };
       all.push(rowWithMeta);
-      if (!isValid) invalid.push(rowWithMeta);
+      
+      if (!isValid) {
+        invalid.push(rowWithMeta);
+        displayInvalid.push(rowWithMeta);
+      } else if (activeTab === 'invalid' && focusedCell?.row === idx) {
+        displayInvalid.push(rowWithMeta);
+      }
 
       const hasMissingMark = Object.keys(row).some(key => {
         if (key.match(/Subject \d+ (Mark|Internal|Theory|Practical)/i)) {
@@ -43,10 +51,10 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
       }
     });
 
-    return { all, invalid, missingMarks };
-  }, [previewData, validateRow]);
+    return { all, invalid, displayInvalid, missingMarks };
+  }, [previewData, validateRow, activeTab, focusedCell]);
 
-  const currentDisplayData = activeTab === 'all' ? processedData.all : activeTab === 'invalid' ? processedData.invalid : activeTab === 'missingMarks' ? processedData.missingMarks : processedData.all;
+  const currentDisplayData = activeTab === 'all' ? processedData.all : activeTab === 'invalid' ? processedData.displayInvalid : activeTab === 'missingMarks' ? processedData.missingMarks : processedData.all;
 
   const headers = data.length > 0 ? Object.keys(data[0]).filter(k => k !== '_originalIndex' && k !== '_errors') : [];
 
@@ -134,7 +142,7 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
           >
             All Records ({processedData.all.length})
           </button>
-          {processedData.invalid.length > 0 && (
+          {processedData.displayInvalid.length > 0 && (
             <button
               onClick={() => setActiveTab('invalid')}
               className={`pb-3 px-2 font-bold text-sm transition-all border-b-2 flex items-center gap-2 ${activeTab === 'invalid'
@@ -143,7 +151,7 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
                 }`}
             >
               Needs Correction ({processedData.invalid.length})
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              {processedData.invalid.length > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
             </button>
           )}
           {processedData.missingMarks.length > 0 && (
@@ -227,6 +235,12 @@ const BulkUploadPreviewModal = ({ data, exams = [], missingStudentsData = [], on
                           type="text"
                           value={row[h] !== undefined && row[h] !== null ? row[h] : ''}
                           onChange={(e) => handleEditCell(row._originalIndex, h, e.target.value)}
+                          onFocus={() => setFocusedCell({ row: row._originalIndex, col: h })}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setFocusedCell(prev => (prev?.row === row._originalIndex && prev?.col === h) ? null : prev);
+                            }, 200);
+                          }}
                           disabled={isSubmitting}
                           className={`w-full bg-transparent border-b ${row._errors && row._errors[h] ? 'border-red-500 text-red-600 font-bold bg-red-50' : 'border-transparent hover:border-slate-300'} focus:border-brand-500 focus:ring-0 px-1 py-1 transition-colors min-w-[80px] disabled:opacity-50`}
                           title={row._errors && row._errors[h] ? row._errors[h] : ''}

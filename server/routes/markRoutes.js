@@ -425,6 +425,7 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
         }
 
         let processedAny = false;
+        const initialErrorCount = results.errors.length;
 
         const processSubject = async (codeKey, markKey, internalKey) => {
           if (!row[codeKey]) return false;
@@ -480,7 +481,6 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
             if (batchDoc) existing.batch = batchDoc._id;
             if (rowExamDoc) existing.exam = rowExamDoc._id;
             await existing.save();
-            results.success += 1;
           } else {
             const newMarkData = {
               student: studentDoc._id,
@@ -495,26 +495,40 @@ router.post('/bulk', protect, isAdmin, async (req, res) => {
             };
             if (rowExamDoc) newMarkData.exam = rowExamDoc._id;
             await Mark.create(newMarkData);
-            results.success += 1;
           }
           return true;
         };
 
-        // Check for old format
+        let rowHasError = false;
+        
+        // Wrap processSubject to track row errors
+        const wrappedProcessSubject = async (...args) => {
+          const res = await processSubject(...args);
+          return res; // just run it
+        };
+
         if (row['Subject Code']) {
-          await processSubject('Subject Code', 'Mark', 'Internal Mark');
+          await wrappedProcessSubject('Subject Code', 'Mark', 'Internal Mark');
           processedAny = true;
         }
 
         // Check for new multiple-subject format (up to 20 subjects per row)
         for (let j = 1; j <= 20; j++) {
-          const found = await processSubject(`Subject ${j} Code`, `Subject ${j} Mark`, `Subject ${j} Internal`);
+          const found = await wrappedProcessSubject(`Subject ${j} Code`, `Subject ${j} Mark`, `Subject ${j} Internal`);
           if (found) processedAny = true;
         }
 
         if (!processedAny) {
           // All subject cells were blank for this student — skip silently
           continue;
+        }
+
+        // Check if there was any error pushed to results.errors for this row
+        const currentErrorCount = results.errors.length;
+        if (currentErrorCount > initialErrorCount) {
+          // It's already counted in results.failed inside processSubject
+        } else {
+          results.success += 1;
         }
 
       } catch (err) {

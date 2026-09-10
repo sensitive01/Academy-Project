@@ -3,10 +3,12 @@ import api from "../../services/api";
 import { toast } from "react-hot-toast";
 import { Plus, Briefcase, Mail, Phone, MapPin, Building, Globe, MoreVertical, Edit, Trash2, Ban, UserCheck, X } from "lucide-react";
 import ReactDOM from "react-dom";
+import { useNavigate } from "react-router-dom";
 import Loading from "../../components/common/Loading";
 import CustomDataTable from "../../components/common/DataTable";
 
 const VendorManagement = () => {
+  const navigate = useNavigate();
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -53,9 +55,9 @@ const VendorManagement = () => {
 
   const openAddModal = () => {
     setFormData({
-      name: "",
+      // name: "",
       email: "",
-      password: "",
+      // password: "",
       companyName: "",
       contactPerson: "",
       mobile: "",
@@ -72,9 +74,9 @@ const VendorManagement = () => {
 
   const openEditModal = (vendor) => {
     setFormData({
-      name: vendor.user?.name || "",
+      // name: vendor.user?.name || "",
       email: vendor.email || "",
-      password: "",
+      // password: "",
       companyName: vendor.companyName || "",
       contactPerson: vendor.contactPerson || "",
       mobile: vendor.mobile || "",
@@ -131,9 +133,9 @@ const VendorManagement = () => {
     e.preventDefault();
     try {
       const payload = {
-        name: formData.name,
+        // name: formData.name,
         email: formData.email,
-        password: formData.password,
+        // password: formData.password,
         companyName: formData.companyName,
         contactPerson: formData.contactPerson,
         mobile: formData.mobile,
@@ -181,12 +183,15 @@ const VendorManagement = () => {
       selector: row => row.companyName,
       sortable: true,
       cell: row => (
-        <div className="flex items-center gap-3 py-2">
-          <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-xs shrink-0">
+        <div 
+          className="flex items-center gap-3 py-2 cursor-pointer group"
+          onClick={() => navigate(`/dashboard/admin/vendors/${row._id}/students`)}
+        >
+          <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-brand-100 transition-colors">
             {row.companyName?.charAt(0)}
           </div>
           <div>
-            <div className="font-bold text-slate-900">{row.companyName}</div>
+            <div className="font-bold text-slate-900 group-hover:text-brand-600 transition-colors">{row.companyName}</div>
             <div className="text-[10px] text-slate-500 truncate max-w-[150px]">{row.website}</div>
           </div>
         </div>
@@ -330,7 +335,7 @@ const VendorManagement = () => {
             <form onSubmit={handleSubmit} className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
-                <div className="space-y-4">
+                {/* <div className="space-y-4">
                     <h3 className="text-xs font-black text-brand-600 uppercase tracking-[0.2em] mb-4">Account Access</h3>
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">User Full Name *</label>
@@ -365,7 +370,7 @@ const VendorManagement = () => {
                             onChange={handleInputChange}
                         />
                     </div>
-                </div>
+                </div> */}
 
                 <div className="space-y-4">
                     <h3 className="text-xs font-black text-brand-600 uppercase tracking-[0.2em] mb-4">Company Profile</h3>
@@ -387,6 +392,16 @@ const VendorManagement = () => {
                             name="contactPerson"
                             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium"
                             value={formData.contactPerson}
+                            onChange={handleInputChange}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Contact Email</label>
+                        <input
+                            type="email"
+                            name="email"
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium"
+                            value={formData.email}
                             onChange={handleInputChange}
                         />
                     </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import api from "../../services/api";
 import toast from "react-hot-toast";
-import { UploadCloud, Download, CheckCircle, Save, ArrowLeft, Edit2, RefreshCw } from "lucide-react";
+import { UploadCloud, Download, CheckCircle, Save, ArrowLeft, Edit2, RefreshCw, Clock, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -24,6 +24,8 @@ const BulkAttendance = () => {
   const [previewData, setPreviewData] = useState([]);
   const [studentsMap, setStudentsMap] = useState({});
   const [employees, setEmployees] = useState([]);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [errorDetails, setErrorDetails] = useState([]);
 
   const formatDateLocal = (dateVal) => {
     if (!dateVal) return "";
@@ -218,6 +220,8 @@ const BulkAttendance = () => {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    setUploadedFile(file);
 
     setLoading(true);
     const reader = new FileReader();
@@ -650,9 +654,58 @@ const BulkAttendance = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success(res.data.message || "Bulk upload successful!");
+
+      try {
+        if (uploadedFile) {
+          // Generate new Excel with Upload Status column
+          const updatedRows = recordsToSave.map(r => ({
+            "User ID": r.userId,
+            "Date": r.date,
+            "Login Time": r.loginTime,
+            "Logout Time": r.logoutTime,
+            "Action": r.isDelete ? 'Delete' : 'Upsert',
+            "Upload Status": "Success",
+            "Failure Reason": ""
+          }));
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.json_to_sheet(updatedRows);
+          XLSX.utils.book_append_sheet(wb, ws, "Upload Result");
+          const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+          const newFile = new File([excelBuffer], uploadedFile.name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+          const formData = new FormData();
+          formData.append('file', newFile);
+          formData.append('module', 'Attendance');
+          formData.append('totalRecords', recordsToSave.length);
+          formData.append('successfulRecords', recordsToSave.length);
+          formData.append('failedRecords', 0);
+          formData.append('status', 'Success');
+          formData.append('summary', `Successfully uploaded ${recordsToSave.length} attendance records.`);
+          await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        }
+      } catch (err) {
+        console.error("Failed to log bulk upload history", err);
+      }
+
       navigate("/dashboard/students", { state: { activeTab: "student_attendance" } });
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save bulk data");
+
+      try {
+        if (uploadedFile) {
+          const formData = new FormData();
+          formData.append('file', uploadedFile);
+          formData.append('module', 'Attendance');
+          formData.append('totalRecords', recordsToSave.length);
+          formData.append('successfulRecords', 0);
+          formData.append('failedRecords', recordsToSave.length);
+          formData.append('status', 'Failed');
+          formData.append('summary', `Failed to upload attendance records. Error: ${err.response?.data?.message || err.message}`);
+          await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        }
+      } catch (historyErr) {
+        console.error("Failed to log failed bulk upload history", historyErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -765,6 +818,12 @@ const BulkAttendance = () => {
             <p className="text-slate-500 text-sm font-medium">Export template, add records, and bulk upload.</p>
           </div>
         </div>
+        <button
+          onClick={() => navigate('/dashboard/bulk-history', { state: { module: 'Attendance' } })}
+          className="flex items-center gap-2 px-5 py-2.5 font-bold text-slate-700 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+        >
+          <Clock size={18} /> View History
+        </button>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-h-[600px]">
@@ -1048,6 +1107,7 @@ const BulkAttendance = () => {
           )}
         </div>
       </div>
+
     </div>
   );
 };

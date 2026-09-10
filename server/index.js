@@ -40,6 +40,7 @@ const searchRoutes = require("./routes/searchRoutes");
 const reminderRoutes = require("./routes/reminderRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
 const hallTicketRoutes = require("./routes/hallTicketRoutes");
+const bulkUploadHistoryRoutes = require("./routes/bulkUploadHistoryRoutes");
 dotenv.config();
 connectDB().then(async () => {
   const Batch = require('./models/Batch');
@@ -98,6 +99,7 @@ app.use("/api/otp", otpRoutes);
 app.use("/api/batches", batchRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/exams", examRoutes);
+app.use("/api/bulk-upload-history", bulkUploadHistoryRoutes);
 app.use("/api/marks", markRoutes);
 app.use("/api/exam-fees", examFeeRoutes);
 app.use("/api/student-fees", studentFeeRoutes);

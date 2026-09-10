@@ -1,4 +1,5 @@
 import React from "react";
+import ReactDOM from "react-dom";
 import { AlertTriangle, Info, CheckCircle, XCircle, X } from "lucide-react";
 
 /**
@@ -49,8 +50,8 @@ const ConfirmationModal = ({
 
   const config = typeConfigs[type] || typeConfigs.info;
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 isolate">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 isolate">
       {/* Backdrop with sophisticated blur and fade */}
       <div 
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-all duration-500 animate-in fade-in"
@@ -107,7 +108,8 @@ const ConfirmationModal = ({
         {/* Bottom Decorative Edge */}
         <div className={`h-1.5 w-full ${config.bg.replace('bg-', 'bg-')}`} />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

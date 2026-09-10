@@ -25,6 +25,8 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
       center: student?.center?._id || student?.center || "",
       course: typeof currentCourse === 'object' ? currentCourse?._id || "" : currentCourse || "",
       batch: typeof currentBatch === 'object' ? currentBatch?._id || "" : currentBatch || "",
+      maritalStatus: clone.maritalStatus || "",
+      abcId: clone.abcId || "",
       village: clone.address?.village || clone.village || "",
       post: clone.address?.post || clone.post || "",
       taluk: clone.address?.taluk || clone.taluk || "",
@@ -35,7 +37,40 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
       ifscCode: clone.bankDetails?.ifscCode || clone.ifscCode || "",
       bankNameBranch: clone.bankDetails?.bankNameBranch || clone.bankNameBranch || "",
       address: clone.address || {},
-      bankDetails: clone.bankDetails || {}
+      bankDetails: clone.bankDetails || {},
+      // SSLC fields mapping from sslcDetails or direct
+      sslcRegNo: clone.sslcDetails?.registerNo || clone.sslcRegNo || "",
+      sslcYear: clone.sslcDetails?.yearOfPassing || clone.sslcYear || "",
+      sslcSchool: clone.sslcDetails?.schoolName || clone.sslcSchool || "",
+      sslcPlace: clone.sslcDetails?.placeOfSchool || clone.sslcPlace || "",
+      sslcBoard: clone.sslcDetails?.boardOfExamination || clone.sslcBoard || "",
+      sslcTotalMarks: clone.sslcDetails?.totalMarks || clone.sslcTotalMarks || "",
+      sslcSecuredMarks: clone.sslcDetails?.securedMarks || clone.sslcSecuredMarks || "",
+      sslcPercentage: clone.sslcDetails?.percentage || clone.sslcPercentage || "",
+      // HSC fields mapping from hscDetails or direct
+      hscRegNo: clone.hscDetails?.registerNo || clone.hscRegNo || "",
+      hscYear: clone.hscDetails?.yearOfPassing || clone.hscYear || "",
+      hscSchool: clone.hscDetails?.schoolName || clone.hscSchool || "",
+      hscPlace: clone.hscDetails?.placeOfSchool || clone.hscPlace || "",
+      hscBoard: clone.hscDetails?.boardOfExamination || clone.hscBoard || "",
+      hscTotalMarks: clone.hscDetails?.totalMarks || clone.hscTotalMarks || "",
+      hscSecuredMarks: clone.hscDetails?.securedMarks || clone.hscSecuredMarks || "",
+      hscPercentage: clone.hscDetails?.percentage || clone.hscPercentage || "",
+      // SSLC and HSC subject mark arrays
+      sslcSubjects: clone.sslcSubjects && clone.sslcSubjects.length > 0 
+        ? clone.sslcSubjects 
+        : Array.from({ length: 6 }, () => ({ subject: "", totalMark: "", securedMark: "" })),
+      hscSubjects: clone.hscSubjects && clone.hscSubjects.length > 0 
+        ? clone.hscSubjects 
+        : Array.from({ length: 7 }, () => ({ subject: "", totalMark: "", securedMark: "" })),
+      // Languages
+      language1: clone.languagesKnown?.[0] || clone.language1 || "",
+      language2: clone.languagesKnown?.[1] || clone.language2 || "",
+      language3: clone.languagesKnown?.[2] || clone.language3 || "",
+      // Arrays
+      familyBackground: clone.familyBackground || [],
+      references: clone.references || [],
+      educationBackground: clone.educationBackground || []
     };
   });
 
@@ -193,7 +228,41 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
     setSaving(true);
     try {
-      const payload = { ...formData, fees: feeForm.fees };
+      const payload = {
+        ...formData,
+        fees: feeForm.fees,
+        sslcDetails: {
+          registerNo: formData.sslcRegNo || "",
+          yearOfPassing: formData.sslcYear || "",
+          schoolName: formData.sslcSchool || "",
+          placeOfSchool: formData.sslcPlace || "",
+          boardOfExamination: formData.sslcBoard || "",
+          totalMarks: formData.sslcTotalMarks || "",
+          securedMarks: formData.sslcSecuredMarks || "",
+          percentage: formData.sslcPercentage || "",
+        },
+        hscDetails: {
+          registerNo: formData.hscRegNo || "",
+          yearOfPassing: formData.hscYear || "",
+          schoolName: formData.hscSchool || "",
+          placeOfSchool: formData.hscPlace || "",
+          boardOfExamination: formData.hscBoard || "",
+          totalMarks: formData.hscTotalMarks || "",
+          securedMarks: formData.hscSecuredMarks || "",
+          percentage: formData.hscPercentage || "",
+        },
+        sslcSubjects: (formData.sslcSubjects || []).map(s => ({
+          subject: s.subject || "",
+          totalMark: Number(s.totalMark) || 0,
+          securedMark: Number(s.securedMark) || 0
+        })),
+        hscSubjects: (formData.hscSubjects || []).map(s => ({
+          subject: s.subject || "",
+          totalMark: Number(s.totalMark) || 0,
+          securedMark: Number(s.securedMark) || 0
+        })),
+        languagesKnown: [formData.language1, formData.language2, formData.language3].map(l => (l || "").trim()).filter(Boolean),
+      };
       
       // Update enrolledCourses based on selected course and batch
       if (payload.course || payload.batch) {
@@ -208,6 +277,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
       await onUpdate(payload);
       setMode("view");
+      if (onBack) onBack();
     } catch (err) {
       console.error(err);
     } finally {
@@ -336,7 +406,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
               <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                   <FormInput label="Name of Student (English)" name="studentNameEnglish" value={formData.studentNameEnglish} onChange={handleChange} />
-                  <FormInput label="Name of Student (Mother Tongue)" name="studentNameMotherTongue" value={formData.studentNameMotherTongue} onChange={handleChange} />
+                  <FormInput label="Student ID" name="studentId" value={formData.studentId} onChange={handleChange} />
                   <div className="grid grid-cols-2 gap-6">
                     <FormInput label="Date of Birth" type="date" name="dob" value={formData.dob ? formData.dob.split("T")[0] : ""} onChange={handleChange} />
                     <FormInput label="Age" name="age" value={formData.age} onChange={handleChange} />
@@ -356,12 +426,14 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                   <FormInput label="NEET Reg No" name="neetRegNo" value={formData.neetRegNo} onChange={handleChange} />
                   <FormInput label="APAAR ID" name="apaarId" value={formData.apaarId} onChange={handleChange} />
                   <FormInput label="DEB ID" name="debId" value={formData.debId} onChange={handleChange} />
+                  <FormInput label="ABC ID" name="abcId" value={formData.abcId} onChange={handleChange} />
                 </div>
 
                 <StepHeader title="Demographics & Center" icon={<Globe className="text-brand-700" />} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormInput label="Religion" name="religion" value={formData.religion} onChange={handleChange} />
                   <FormInput label="Community" name="community" value={formData.community} onChange={handleChange} />
+                  <SelectBox label="Marital Status" name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} options={["Married", "Unmarried"]} />
                   <SelectBox label="Academic Center" name="center" value={formData.center} onChange={handleChange} isObjectOptions options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} />
                 </div>
               </div>
@@ -370,6 +442,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormDisplay label="Name of Student (English)" value={formData.studentNameEnglish || student.user?.name} />
                   <FormDisplay label="Name of Student (Mother Tongue)" value={formData.studentNameMotherTongue} />
+                  <FormDisplay label="Student ID" value={formData.studentId} />
                   <FormDisplay label="Date of Birth" value={formData.dob ? new Date(formData.dob).toLocaleDateString() : "-"} />
                   <FormDisplay label="Age" value={formData.age} />
                   <FormDisplay label="Father Name" value={formData.fatherName} />
@@ -385,12 +458,14 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                   <FormDisplay label="NEET Reg No" value={formData.neetRegNo} />
                   <FormDisplay label="APAAR ID" value={formData.apaarId} />
                   <FormDisplay label="DEB ID" value={formData.debId} />
+                  <FormDisplay label="ABC ID" value={formData.abcId} />
                 </div>
 
                 <StepHeader title="Demographics & Center" icon={<Globe className="text-brand-700" />} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormDisplay label="Religion" value={formData.religion} />
                   <FormDisplay label="Community" value={formData.community} />
+                  <FormDisplay label="Marital Status" value={formData.maritalStatus} />
                   <FormDisplay label="Academic Center" value={student.center?.name ? `${student.center.name} - ${student.center.location}` : "Online Student"} />
                 </div>
               </div>
@@ -417,10 +492,11 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                 </div>
 
                 <StepHeader title="Language Proficiency" icon={<Languages className="text-brand-700" />} />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                   <SelectBox label="English Fluency" name="englishFluency" value={formData.englishFluency} onChange={handleChange} options={["Fluent", "Intermediate", "Basic"]} />
                   <FormInput label="Language 1" name="language1" value={formData.language1} onChange={handleChange} />
                   <FormInput label="Language 2" name="language2" value={formData.language2} onChange={handleChange} />
+                  <FormInput label="Language 3" name="language3" value={formData.language3} onChange={handleChange} />
                 </div>
               </div>
             ) : (
@@ -440,10 +516,11 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                 </div>
 
                 <StepHeader title="Language Proficiency" icon={<Languages className="text-brand-700" />} />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <FormDisplay label="English Fluency" value={formData.englishFluency} />
                   <FormDisplay label="Language 1" value={formData.language1} />
                   <FormDisplay label="Language 2" value={formData.language2} />
+                  <FormDisplay label="Language 3" value={formData.language3} />
                 </div>
               </div>
             )}
@@ -474,45 +551,514 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
             <StepHeader title="Step 4. Academic History & Marksheets" icon={<GraduationCap className="text-brand-700" />} />
             {mode === "edit" ? (
               <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormInput label="SSLC Reg No" name="sslcRegNo" value={formData.sslcRegNo} onChange={handleChange} />
-                  <FormInput label="Year of Passing" name="sslcYear" value={formData.sslcYear} onChange={handleChange} />
-                  <FormInput label="School Name" name="sslcSchool" value={formData.sslcSchool} onChange={handleChange} />
-                  <FormInput label="Board Name" name="sslcBoard" value={formData.sslcBoard} onChange={handleChange} />
-                  <FormInput label="Total Marks" name="sslcTotalMarks" value={formData.sslcTotalMarks} onChange={handleChange} />
-                  <FormInput label="Percentage (%)" name="sslcPercentage" value={formData.sslcPercentage} onChange={handleChange} />
+                {/* SSLC SECTION */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">SSLC Details</h3>
+                    <div className="h-1 w-12 bg-brand-700 mt-1.5 rounded-full"></div>
+                  </div>
+
+                  {/* DETAILS ABOVE TABLE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/60 p-6 rounded-2xl border border-slate-200/80">
+                    <FormInput label="Register No" name="sslcRegNo" value={formData.sslcRegNo} onChange={handleChange} />
+                    <FormInput label="Year of Passing" name="sslcYear" value={formData.sslcYear} onChange={handleChange} />
+                    <FormInput label="School / Institution" name="sslcSchool" value={formData.sslcSchool} onChange={handleChange} />
+                    <FormInput label="Place of school" name="sslcPlace" value={formData.sslcPlace} onChange={handleChange} />
+                    <FormInput label="Board of Examination" name="sslcBoard" value={formData.sslcBoard} onChange={handleChange} />
+                  </div>
+
+                  {/* SSLC SUBJECT MARKS TABLE */}
+                  <div className="overflow-hidden border border-slate-200 rounded-2xl">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                        <tr>
+                          <th className="p-3 text-center w-12 font-bold">S.No</th>
+                          <th className="p-3 text-left font-bold">Subject</th>
+                          <th className="p-3 text-center font-bold w-28">Total</th>
+                          <th className="p-3 text-center font-bold w-28">Secured</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {[0, 1, 2, 3, 4, 5].map((idx) => {
+                          const item = (formData.sslcSubjects && formData.sslcSubjects[idx]) || {};
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="text-center font-semibold text-slate-400 p-2">{idx + 1}</td>
+                              <td className="p-2">
+                                <input
+                                  value={item.subject || ""}
+                                  placeholder="Subject"
+                                  onChange={(e) => {
+                                    const updated = [...(formData.sslcSubjects || [])];
+                                    while (updated.length <= idx) updated.push({ subject: "", totalMark: "", securedMark: "" });
+                                    updated[idx] = { ...updated[idx], subject: e.target.value };
+                                    setFormData(prev => ({ ...prev, sslcSubjects: updated }));
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-brand-600"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <input
+                                  type="number"
+                                  value={item.totalMark !== undefined && item.totalMark !== null ? item.totalMark : ""}
+                                  onChange={(e) => {
+                                    const updated = [...(formData.sslcSubjects || [])];
+                                    while (updated.length <= idx) updated.push({ subject: "", totalMark: "", securedMark: "" });
+                                    updated[idx] = { ...updated[idx], totalMark: e.target.value };
+                                    const total = updated.reduce((sum, s) => sum + (Number(s.totalMark) || 0), 0);
+                                    const secured = updated.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0);
+                                    const pct = total > 0 ? ((secured / total) * 100).toFixed(2) : "";
+                                    setFormData(prev => ({ ...prev, sslcSubjects: updated, sslcTotalMarks: total || prev.sslcTotalMarks, sslcPercentage: pct || prev.sslcPercentage }));
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none text-center focus:border-brand-600"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <input
+                                  type="number"
+                                  value={item.securedMark !== undefined && item.securedMark !== null ? item.securedMark : ""}
+                                  onChange={(e) => {
+                                    const updated = [...(formData.sslcSubjects || [])];
+                                    while (updated.length <= idx) updated.push({ subject: "", totalMark: "", securedMark: "" });
+                                    updated[idx] = { ...updated[idx], securedMark: e.target.value };
+                                    const total = updated.reduce((sum, s) => sum + (Number(s.totalMark) || 0), 0);
+                                    const secured = updated.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0);
+                                    const pct = total > 0 ? ((secured / total) * 100).toFixed(2) : "";
+                                    setFormData(prev => ({ ...prev, sslcSubjects: updated, sslcTotalMarks: total || prev.sslcTotalMarks, sslcPercentage: pct || prev.sslcPercentage }));
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none text-center focus:border-brand-600"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {/* TOTAL ROW */}
+                        <tr className="bg-slate-50 font-semibold">
+                          <td colSpan="2" className="p-3 text-right">Total</td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              name="sslcTotalMarks"
+                              value={formData.sslcTotalMarks || ""}
+                              onChange={handleChange}
+                              className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-brand-600"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              name="sslcSecuredMarks"
+                              value={formData.sslcSecuredMarks || (formData.sslcSubjects ? formData.sslcSubjects.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0) || "" : "")}
+                              onChange={handleChange}
+                              className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-brand-600"
+                            />
+                          </td>
+                        </tr>
+
+                        {/* PERCENTAGE ROW */}
+                        <tr className="bg-white">
+                          <td colSpan="3" className="p-3 text-right text-slate-500 font-medium">Percentage (%)</td>
+                          <td className="p-2">
+                            <input
+                              name="sslcPercentage"
+                              value={formData.sslcPercentage || ""}
+                              onChange={handleChange}
+                              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-brand-600"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
-                <StepHeader title="HSC / PUC Qualification Details" icon={<GraduationCap className="text-brand-700" />} />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormInput label="HSC Reg No" name="hscRegNo" value={formData.hscRegNo} onChange={handleChange} />
-                  <FormInput label="Year of Passing" name="hscYear" value={formData.hscYear} onChange={handleChange} />
-                  <FormInput label="College Name" name="hscSchool" value={formData.hscSchool} onChange={handleChange} />
-                  <FormInput label="Board Name" name="hscBoard" value={formData.hscBoard} onChange={handleChange} />
-                  <FormInput label="Total Marks" name="hscTotalMarks" value={formData.hscTotalMarks} onChange={handleChange} />
-                  <FormInput label="Percentage (%)" name="hscPercentage" value={formData.hscPercentage} onChange={handleChange} />
+                {/* HSC / PU SECTION */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">HSC / PU Details</h3>
+                    <div className="h-1 w-12 bg-brand-700 mt-1.5 rounded-full"></div>
+                  </div>
+
+                  {/* DETAILS ABOVE TABLE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/60 p-6 rounded-2xl border border-slate-200/80">
+                    <FormInput label="Register No" name="hscRegNo" value={formData.hscRegNo} onChange={handleChange} />
+                    <FormInput label="Year of Passing" name="hscYear" value={formData.hscYear} onChange={handleChange} />
+                    <FormInput label="School / Institution" name="hscSchool" value={formData.hscSchool} onChange={handleChange} />
+                    <FormInput label="Place of school" name="hscPlace" value={formData.hscPlace} onChange={handleChange} />
+                    <FormInput label="Board of Examination" name="hscBoard" value={formData.hscBoard} onChange={handleChange} />
+                  </div>
+
+                  {/* HSC SUBJECT MARKS TABLE */}
+                  <div className="overflow-hidden border border-slate-200 rounded-2xl">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                        <tr>
+                          <th className="p-3 text-center w-12 font-bold">S.No</th>
+                          <th className="p-3 text-left font-bold">Subject</th>
+                          <th className="p-3 text-center font-bold w-28">Total</th>
+                          <th className="p-3 text-center font-bold w-28">Secured</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {[0, 1, 2, 3, 4, 5, 6].map((idx) => {
+                          const item = (formData.hscSubjects && formData.hscSubjects[idx]) || {};
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="text-center font-semibold text-slate-400 p-2">{idx + 1}</td>
+                              <td className="p-2">
+                                <input
+                                  value={item.subject || ""}
+                                  placeholder="Subject"
+                                  onChange={(e) => {
+                                    const updated = [...(formData.hscSubjects || [])];
+                                    while (updated.length <= idx) updated.push({ subject: "", totalMark: "", securedMark: "" });
+                                    updated[idx] = { ...updated[idx], subject: e.target.value };
+                                    setFormData(prev => ({ ...prev, hscSubjects: updated }));
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-brand-600"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <input
+                                  type="number"
+                                  value={item.totalMark !== undefined && item.totalMark !== null ? item.totalMark : ""}
+                                  onChange={(e) => {
+                                    const updated = [...(formData.hscSubjects || [])];
+                                    while (updated.length <= idx) updated.push({ subject: "", totalMark: "", securedMark: "" });
+                                    updated[idx] = { ...updated[idx], totalMark: e.target.value };
+                                    const total = updated.reduce((sum, s) => sum + (Number(s.totalMark) || 0), 0);
+                                    const secured = updated.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0);
+                                    const pct = total > 0 ? ((secured / total) * 100).toFixed(2) : "";
+                                    setFormData(prev => ({ ...prev, hscSubjects: updated, hscTotalMarks: total || prev.hscTotalMarks, hscPercentage: pct || prev.hscPercentage }));
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none text-center focus:border-brand-600"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <input
+                                  type="number"
+                                  value={item.securedMark !== undefined && item.securedMark !== null ? item.securedMark : ""}
+                                  onChange={(e) => {
+                                    const updated = [...(formData.hscSubjects || [])];
+                                    while (updated.length <= idx) updated.push({ subject: "", totalMark: "", securedMark: "" });
+                                    updated[idx] = { ...updated[idx], securedMark: e.target.value };
+                                    const total = updated.reduce((sum, s) => sum + (Number(s.totalMark) || 0), 0);
+                                    const secured = updated.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0);
+                                    const pct = total > 0 ? ((secured / total) * 100).toFixed(2) : "";
+                                    setFormData(prev => ({ ...prev, hscSubjects: updated, hscTotalMarks: total || prev.hscTotalMarks, hscPercentage: pct || prev.hscPercentage }));
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none text-center focus:border-brand-600"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {/* TOTAL ROW */}
+                        <tr className="bg-slate-50 font-semibold">
+                          <td colSpan="2" className="p-3 text-right">Total</td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              name="hscTotalMarks"
+                              value={formData.hscTotalMarks || ""}
+                              onChange={handleChange}
+                              className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-brand-600"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              name="hscSecuredMarks"
+                              value={formData.hscSecuredMarks || (formData.hscSubjects ? formData.hscSubjects.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0) || "" : "")}
+                              onChange={handleChange}
+                              className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-brand-600"
+                            />
+                          </td>
+                        </tr>
+
+                        {/* PERCENTAGE ROW */}
+                        <tr className="bg-white">
+                          <td colSpan="3" className="p-3 text-right text-slate-500 font-medium">Percentage (%)</td>
+                          <td className="p-2">
+                            <input
+                              name="hscPercentage"
+                              value={formData.hscPercentage || ""}
+                              onChange={handleChange}
+                              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-brand-600"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <StepHeader title="Other Educational History" icon={<GraduationCap className="text-brand-700" />} />
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-100 text-slate-700 font-bold">
+                      <tr>
+                        <th className="p-3 text-left">Exam Passed</th>
+                        <th className="p-3 text-left">Institute / School</th>
+                        <th className="p-3 text-left">Group</th>
+                        <th className="p-3 text-left">Year</th>
+                        <th className="p-3 text-left">Mark %</th>
+                        <th className="p-3 text-left">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {[0, 1, 2].map(idx => {
+                        const item = (formData.educationBackground && formData.educationBackground[idx]) || {};
+                        return (
+                          <tr key={idx} className="bg-white">
+                            <td className="p-2">
+                              <input
+                                value={item.examinationPassed || ""}
+                                placeholder="Exam..."
+                                onChange={(e) => {
+                                  const updated = [...(formData.educationBackground || [])];
+                                  while (updated.length <= idx) updated.push({});
+                                  updated[idx] = { ...updated[idx], examinationPassed: e.target.value };
+                                  setFormData(prev => ({ ...prev, educationBackground: updated }));
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-brand-700 shadow-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={item.instituteName || ""}
+                                placeholder="Institute..."
+                                onChange={(e) => {
+                                  const updated = [...(formData.educationBackground || [])];
+                                  while (updated.length <= idx) updated.push({});
+                                  updated[idx] = { ...updated[idx], instituteName: e.target.value };
+                                  setFormData(prev => ({ ...prev, educationBackground: updated }));
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-brand-700 shadow-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={item.group || ""}
+                                placeholder="Group..."
+                                onChange={(e) => {
+                                  const updated = [...(formData.educationBackground || [])];
+                                  while (updated.length <= idx) updated.push({});
+                                  updated[idx] = { ...updated[idx], group: e.target.value };
+                                  setFormData(prev => ({ ...prev, educationBackground: updated }));
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-brand-700 shadow-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={item.yearOfPassing || ""}
+                                placeholder="Year..."
+                                onChange={(e) => {
+                                  const updated = [...(formData.educationBackground || [])];
+                                  while (updated.length <= idx) updated.push({});
+                                  updated[idx] = { ...updated[idx], yearOfPassing: e.target.value };
+                                  setFormData(prev => ({ ...prev, educationBackground: updated }));
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-brand-700 shadow-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={item.marksPercentage || ""}
+                                placeholder="%"
+                                onChange={(e) => {
+                                  const updated = [...(formData.educationBackground || [])];
+                                  while (updated.length <= idx) updated.push({});
+                                  updated[idx] = { ...updated[idx], marksPercentage: e.target.value };
+                                  setFormData(prev => ({ ...prev, educationBackground: updated }));
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-brand-700 shadow-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={item.remarks || ""}
+                                placeholder="Remarks..."
+                                onChange={(e) => {
+                                  const updated = [...(formData.educationBackground || [])];
+                                  while (updated.length <= idx) updated.push({});
+                                  updated[idx] = { ...updated[idx], remarks: e.target.value };
+                                  setFormData(prev => ({ ...prev, educationBackground: updated }));
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-brand-700 shadow-sm"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             ) : (
               <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormDisplay label="SSLC Reg No" value={formData.sslcRegNo} />
-                  <FormDisplay label="Year of Passing" value={formData.sslcYear} />
-                  <FormDisplay label="School Name" value={formData.sslcSchool} />
-                  <FormDisplay label="Board Name" value={formData.sslcBoard} />
-                  <FormDisplay label="Total Marks" value={formData.sslcTotalMarks} />
-                  <FormDisplay label="Percentage" value={formData.sslcPercentage ? `${formData.sslcPercentage}%` : "-"} />
+                {/* SSLC SECTION IN VIEW MODE */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">SSLC Details</h3>
+                    <div className="h-1 w-12 bg-brand-700 mt-1.5 rounded-full"></div>
+                  </div>
+
+                  {/* DETAILS ABOVE TABLE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/60 p-6 rounded-2xl border border-slate-200/80">
+                    <FormDisplay label="Register No" value={formData.sslcRegNo} />
+                    <FormDisplay label="Year of Passing" value={formData.sslcYear} />
+                    <FormDisplay label="School / Institution" value={formData.sslcSchool} />
+                    <FormDisplay label="Place of school" value={formData.sslcPlace} />
+                    <FormDisplay label="Board of Examination" value={formData.sslcBoard} />
+                  </div>
+
+                  {/* SSLC SUBJECT MARKS TABLE */}
+                  <div className="overflow-hidden border border-slate-200 rounded-2xl">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                        <tr>
+                          <th className="p-3 text-center w-12">S.No</th>
+                          <th className="p-3 text-left">Subject</th>
+                          <th className="p-3 text-center w-28">Total</th>
+                          <th className="p-3 text-center w-28">Secured</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {formData.sslcSubjects && formData.sslcSubjects.some(s => s.subject || s.securedMark) ? (
+                          formData.sslcSubjects.filter(s => s.subject || s.securedMark).map((s, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="text-center font-semibold text-slate-400 p-2.5">{idx + 1}</td>
+                              <td className="p-2.5 font-medium text-slate-800">{s.subject || "-"}</td>
+                              <td className="p-2.5 text-center text-slate-600 font-mono">{s.totalMark ?? "-"}</td>
+                              <td className="p-2.5 text-center font-bold text-brand-700 font-mono">{s.securedMark ?? "-"}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="p-4 text-center text-slate-400 font-medium">No subject marks recorded</td>
+                          </tr>
+                        )}
+                        {(formData.sslcTotalMarks || formData.sslcPercentage || formData.sslcSecuredMarks) && (
+                          <>
+                            <tr className="bg-slate-50 font-bold text-slate-800">
+                              <td colSpan="2" className="p-3 text-right">Total</td>
+                              <td className="p-3 text-center font-mono">{formData.sslcTotalMarks || "-"}</td>
+                              <td className="p-3 text-center font-mono text-brand-700">
+                                {formData.sslcSecuredMarks || (formData.sslcSubjects ? formData.sslcSubjects.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0) || "-" : "-")}
+                              </td>
+                            </tr>
+                            <tr className="bg-white font-semibold">
+                              <td colSpan="3" className="p-3 text-right text-slate-500">Percentage (%)</td>
+                              <td className="p-3 text-center text-brand-700 font-bold font-mono">
+                                {formData.sslcPercentage ? `${formData.sslcPercentage}%` : "-"}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
-                <StepHeader title="HSC / PUC Qualification Details" icon={<GraduationCap className="text-brand-700" />} />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormDisplay label="HSC Reg No" value={formData.hscRegNo} />
-                  <FormDisplay label="Year of Passing" value={formData.hscYear} />
-                  <FormDisplay label="College Name" value={formData.hscSchool} />
-                  <FormDisplay label="Board Name" value={formData.hscBoard} />
-                  <FormDisplay label="Total Marks" value={formData.hscTotalMarks} />
-                  <FormDisplay label="Percentage" value={formData.hscPercentage ? `${formData.hscPercentage}%` : "-"} />
+                {/* HSC / PU SECTION IN VIEW MODE */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">HSC / PU Details</h3>
+                    <div className="h-1 w-12 bg-brand-700 mt-1.5 rounded-full"></div>
+                  </div>
+
+                  {/* DETAILS ABOVE TABLE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/60 p-6 rounded-2xl border border-slate-200/80">
+                    <FormDisplay label="Register No" value={formData.hscRegNo} />
+                    <FormDisplay label="Year of Passing" value={formData.hscYear} />
+                    <FormDisplay label="School / Institution" value={formData.hscSchool} />
+                    <FormDisplay label="Place of school" value={formData.hscPlace} />
+                    <FormDisplay label="Board of Examination" value={formData.hscBoard} />
+                  </div>
+
+                  {/* HSC SUBJECT MARKS TABLE */}
+                  <div className="overflow-hidden border border-slate-200 rounded-2xl">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                        <tr>
+                          <th className="p-3 text-center w-12">S.No</th>
+                          <th className="p-3 text-left">Subject</th>
+                          <th className="p-3 text-center w-28">Total</th>
+                          <th className="p-3 text-center w-28">Secured</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {formData.hscSubjects && formData.hscSubjects.some(s => s.subject || s.securedMark) ? (
+                          formData.hscSubjects.filter(s => s.subject || s.securedMark).map((s, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="text-center font-semibold text-slate-400 p-2.5">{idx + 1}</td>
+                              <td className="p-2.5 font-medium text-slate-800">{s.subject || "-"}</td>
+                              <td className="p-2.5 text-center text-slate-600 font-mono">{s.totalMark ?? "-"}</td>
+                              <td className="p-2.5 text-center font-bold text-brand-700 font-mono">{s.securedMark ?? "-"}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="p-4 text-center text-slate-400 font-medium">No subject marks recorded</td>
+                          </tr>
+                        )}
+                        {(formData.hscTotalMarks || formData.hscPercentage || formData.hscSecuredMarks) && (
+                          <>
+                            <tr className="bg-slate-50 font-bold text-slate-800">
+                              <td colSpan="2" className="p-3 text-right">Total</td>
+                              <td className="p-3 text-center font-mono">{formData.hscTotalMarks || "-"}</td>
+                              <td className="p-3 text-center font-mono text-brand-700">
+                                {formData.hscSecuredMarks || (formData.hscSubjects ? formData.hscSubjects.reduce((sum, s) => sum + (Number(s.securedMark) || 0), 0) || "-" : "-")}
+                              </td>
+                            </tr>
+                            <tr className="bg-white font-semibold">
+                              <td colSpan="3" className="p-3 text-right text-slate-500">Percentage (%)</td>
+                              <td className="p-3 text-center text-brand-700 font-bold font-mono">
+                                {formData.hscPercentage ? `${formData.hscPercentage}%` : "-"}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
+                {formData.educationBackground && formData.educationBackground.some(e => e.examinationPassed || e.instituteName) && (
+                  <>
+                    <StepHeader title="Other Educational History" icon={<GraduationCap className="text-brand-700" />} />
+                    <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-100 text-slate-700 font-bold">
+                          <tr>
+                            <th className="p-3 text-left">Exam Passed</th>
+                            <th className="p-3 text-left">Institute / School</th>
+                            <th className="p-3 text-left">Group</th>
+                            <th className="p-3 text-left">Year</th>
+                            <th className="p-3 text-left">Mark %</th>
+                            <th className="p-3 text-left">Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {formData.educationBackground.filter(e => e.examinationPassed || e.instituteName).map((item, idx) => (
+                            <tr key={idx} className="bg-white">
+                              <td className="p-3 font-semibold text-slate-800">{item.examinationPassed || "-"}</td>
+                              <td className="p-3 text-slate-700">{item.instituteName || "-"}</td>
+                              <td className="p-3 text-slate-700">{item.group || "-"}</td>
+                              <td className="p-3 text-slate-700">{item.yearOfPassing || "-"}</td>
+                              <td className="p-3 text-slate-700">{item.marksPercentage ? `${item.marksPercentage}%` : "-"}</td>
+                              <td className="p-3 text-slate-500">{item.remarks || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -524,21 +1070,61 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
               <div>
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Family Background</h4>
                 <div className="space-y-3">
-                  {student.familyBackground?.length > 0 ? (
-                    student.familyBackground.map((mem, i) => (
-                      <div key={i} className="flex justify-between items-center p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{mem.relationship}</p>
-                          <p className="font-bold text-slate-900">{mem.name}</p>
+                  {mode === "edit" ? (
+                    ["Father", "Mother", "Brother / Sister", "Brother / Sister", "Brother / Sister"].map((defaultRel, i) => {
+                      const current = (formData.familyBackground && formData.familyBackground[i]) || { relationship: defaultRel, name: "", phone: "", occupation: "" };
+                      return (
+                        <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                          <FormInput
+                            label={`Relationship`}
+                            value={current.relationship || defaultRel}
+                            onChange={(e) => {
+                              const updated = [...(formData.familyBackground || [])];
+                              while (updated.length <= i) updated.push({ relationship: "", name: "", phone: "" });
+                              updated[i] = { ...updated[i], relationship: e.target.value };
+                              setFormData(prev => ({ ...prev, familyBackground: updated }));
+                            }}
+                          />
+                          <FormInput
+                            label="Full Name"
+                            value={current.name || ""}
+                            onChange={(e) => {
+                              const updated = [...(formData.familyBackground || [])];
+                              while (updated.length <= i) updated.push({ relationship: defaultRel, name: "", phone: "" });
+                              updated[i] = { ...updated[i], name: e.target.value };
+                              setFormData(prev => ({ ...prev, familyBackground: updated }));
+                            }}
+                          />
+                          <FormInput
+                            label="Mobile Number"
+                            value={current.phone || ""}
+                            onChange={(e) => {
+                              const updated = [...(formData.familyBackground || [])];
+                              while (updated.length <= i) updated.push({ relationship: defaultRel, name: "", phone: "" });
+                              updated[i] = { ...updated[i], phone: e.target.value };
+                              setFormData(prev => ({ ...prev, familyBackground: updated }));
+                            }}
+                          />
                         </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mobile</p>
-                          <p className="font-bold text-slate-700">{mem.phone}</p>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    <p className="text-xs font-bold text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-dashed text-center">No family background records available</p>
+                    formData.familyBackground?.length > 0 ? (
+                      formData.familyBackground.map((mem, i) => (
+                        <div key={i} className="flex justify-between items-center p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{mem.relationship}</p>
+                            <p className="font-bold text-slate-900">{mem.name || "-"}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mobile</p>
+                            <p className="font-bold text-slate-700">{mem.phone || "-"}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs font-bold text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-dashed text-center">No family background records available</p>
+                    )
                   )}
                 </div>
               </div>
@@ -546,15 +1132,50 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
               <div>
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Key References</h4>
                 <div className="space-y-3">
-                  {student.references?.length > 0 ? (
-                    student.references.map((ref, i) => (
-                      <div key={i} className="flex justify-between items-center p-4 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">
-                        <p className="font-bold text-slate-900">{ref.name}</p>
-                        <p className="font-bold text-brand-700">{ref.mobile}</p>
-                      </div>
-                    ))
+                  {mode === "edit" ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[1, 2, 3, 4, 5].map((num, i) => {
+                        const current = (formData.references && formData.references[i]) || { name: "", mobile: "" };
+                        return (
+                          <div key={i} className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+                            <span className="text-[11px] font-black text-brand-700 uppercase tracking-wider">Reference {num}</span>
+                            <div className="grid grid-cols-2 gap-3">
+                              <FormInput
+                                label="Name"
+                                value={current.name || ""}
+                                onChange={(e) => {
+                                  const updated = [...(formData.references || [])];
+                                  while (updated.length <= i) updated.push({ name: "", mobile: "" });
+                                  updated[i] = { ...updated[i], name: e.target.value };
+                                  setFormData(prev => ({ ...prev, references: updated }));
+                                }}
+                              />
+                              <FormInput
+                                label="Mobile"
+                                value={current.mobile || ""}
+                                onChange={(e) => {
+                                  const updated = [...(formData.references || [])];
+                                  while (updated.length <= i) updated.push({ name: "", mobile: "" });
+                                  updated[i] = { ...updated[i], mobile: e.target.value };
+                                  setFormData(prev => ({ ...prev, references: updated }));
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <p className="text-xs font-bold text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-dashed text-center">No reference records available</p>
+                    formData.references?.length > 0 ? (
+                      formData.references.map((ref, i) => (
+                        <div key={i} className="flex justify-between items-center p-4 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">
+                          <p className="font-bold text-slate-900">{ref.name || "-"}</p>
+                          <p className="font-bold text-brand-700">{ref.mobile || "-"}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs font-bold text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-dashed text-center">No reference records available</p>
+                    )
                   )}
                 </div>
               </div>
@@ -708,7 +1329,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                             <td className="p-3">
                               <input
                                 type="text"
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-brand-700"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-brand-700 shadow-sm"
                                 value={fee.otherFeeType || fee.name || fee.feeType}
                                 onChange={(e) => {
                                   const updated = [...feeForm.fees];
@@ -726,7 +1347,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                                   updated[idx].feeType = e.target.value;
                                   setFeeForm(prev => ({ ...prev, fees: updated }));
                                 }}
-                                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-brand-700 shadow-sm"
                               >
                                 <option value="Sem">Sem Fee</option>
                                 <option value="Term">Term Fee</option>
@@ -737,7 +1358,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                             <td className="p-3 text-right">
                               <input
                                 type="number"
-                                className="w-32 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-right text-slate-900 outline-none focus:bg-white focus:border-brand-700"
+                                className="w-32 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right text-slate-900 outline-none focus:border-brand-700 shadow-sm"
                                 value={fee.amount}
                                 onChange={(e) => {
                                   const updated = [...feeForm.fees];
@@ -879,17 +1500,23 @@ const StepHeader = ({ title, subtitle, icon }) => (
   </div>
 );
 
-const FormInput = ({ label, ...props }) => (
+const FormInput = ({ label, className = "", ...props }) => (
   <div className="group space-y-1">
-    <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <input {...props} className="w-full px-3.5 py-2.5 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-xs font-bold text-slate-900 focus:bg-white focus:border-brand-700 focus:shadow-[0_20px_40px_-20px_rgba(185,28,28,0.1)]" />
+    {label && <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>}
+    <input
+      {...props}
+      className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl outline-none transition-all text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-brand-700 focus:ring-2 focus:ring-brand-700/10 shadow-sm ${className}`}
+    />
   </div>
 );
 
-const SelectBox = ({ label, options, isObjectOptions, ...props }) => (
+const SelectBox = ({ label, options, isObjectOptions, className = "", ...props }) => (
   <div className="group space-y-1">
-    <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>
-    <select {...props} className="w-full px-3.5 py-2.5 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-xs font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 disabled:bg-slate-100 disabled:text-slate-500">
+    {label && <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>}
+    <select
+      {...props}
+      className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl outline-none transition-all text-xs font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 focus:ring-2 focus:ring-brand-700/10 shadow-sm disabled:bg-slate-100 disabled:text-slate-500 ${className}`}
+    >
       <option value="">Select Option</option>
       {options.map((opt, i) => (
         <option key={i} value={isObjectOptions ? opt.value : opt}>{isObjectOptions ? opt.label : opt}</option>

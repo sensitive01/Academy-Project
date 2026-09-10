@@ -500,6 +500,7 @@ const SubjectsTab = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
 
     const formattedData = {
       ...formData,
@@ -611,6 +612,7 @@ const SubjectsTab = () => {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     setIsSavingLogin(true);
     try {
       await api.post(`/centers/${currentId}/login`, loginData);
@@ -641,6 +643,7 @@ const SubjectsTab = () => {
 
   const handleAssignSubjectSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     try {
       const updatedSemesters = assignSubjectsData.map(sem => ({
         semesterNumber: sem.semesterNumber,

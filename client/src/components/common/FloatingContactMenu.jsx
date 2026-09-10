@@ -12,6 +12,7 @@ const FloatingContactMenu = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return; // prevent double submission
     try {
       setIsSubmitting(true);
       const res = await api.post('/enquiries', formData);

@@ -55,6 +55,7 @@ const TakeAttendanceModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     if (!selectedUser) return toast.error("Please select a name");
 
     setLoading(true);

@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
 import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign } from "lucide-react";
 import api from "../../services/api";
@@ -20,6 +21,7 @@ const templates = [
 ];
 
 const ExamsTab = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -170,6 +172,7 @@ const ExamsTab = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     try {
       const payload = { ...formData };
       if (isEditing) {
@@ -231,6 +234,7 @@ const ExamsTab = () => {
 
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     try {
       if (isEditing) {
         await api.put(`/marks/${currentId}`, markFormData);

@@ -53,7 +53,7 @@ const DashboardLayout = () => {
           toggleMobileSidebar={() => setIsMobileSidebarOpen(true)}
           title={getPageTitle()}
         />
-        <main className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
+        <main id="main-scroll-container" className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
           <div className="flex-1 p-6">
             {isNavigating ? (
               <div className="flex items-center justify-center h-full">

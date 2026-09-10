@@ -176,6 +176,7 @@ const BatchesTab = () => {
     batchId: "",
     numberOfSemesters: 1,
     period: { startDate: "", endDate: "" },
+    periods: [{ year: 1, startDate: "", endDate: "" }],
     numberOfStudents: 0,
     semesters: [],
   });
@@ -471,6 +472,7 @@ const BatchesTab = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
 
     const formattedData = {
       ...formData,
@@ -573,6 +575,8 @@ const BatchesTab = () => {
         batchId: item.batchId || "",
         numberOfSemesters: item.numberOfSemesters || 1,
         period: item.period || { startDate: "", endDate: "" },
+        periods: item.periods && item.periods.length > 0 ? item.periods : [{ year: 1, startDate: item.period?.startDate || "", endDate: item.period?.endDate || "" }],
+        numberOfStudents: item.numberOfStudents || 0,
         semesters: item.semesters || [],
       });
       setIsEditing(true);
@@ -597,6 +601,8 @@ const BatchesTab = () => {
         batchId: "",
         numberOfSemesters: 1,
         period: { startDate: "", endDate: "" },
+        periods: [{ year: 1, startDate: "", endDate: "" }],
+        numberOfStudents: 0,
         semesters: [],
       });
       setIsEditing(false);
@@ -632,6 +638,7 @@ const BatchesTab = () => {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     setIsSavingLogin(true);
     try {
       await api.post(`/centers/${currentId}/login`, loginData);
@@ -673,6 +680,7 @@ const BatchesTab = () => {
 
   const handleAssignSubjectSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     console.log("SUBMIT ASSIGN SUBJECT - assignSubjectsData:", assignSubjectsData);
     try {
       const updatedSemesters = assignSubjectsData.map(sem => ({
@@ -1161,16 +1169,63 @@ const BatchesTab = () => {
                       placeholder="Select Course(s)"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">Start Date</label>
-                      <input type="month" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.period?.startDate} onChange={e => setFormData({ ...formData, period: { ...formData.period, startDate: e.target.value } })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">End Date</label>
-                      <input type="month" required className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" value={formData.period?.endDate} onChange={e => setFormData({ ...formData, period: { ...formData.period, endDate: e.target.value } })} />
-                    </div>
-                  </div>
+                  {(() => {
+                    const maxYears = (() => {
+                      if (!formData.courses || formData.courses.length === 0) return 1;
+                      let max = 1;
+                      formData.courses.forEach(cId => {
+                        const course = coursesList.find(c => c._id === cId);
+                        if (course && course.durationUnit === 'year' && course.duration > max) {
+                          max = course.duration;
+                        }
+                      });
+                      return max;
+                    })();
+
+                    return Array.from({ length: maxYears }).map((_, i) => (
+                      <div key={i} className="mb-4">
+                        <h4 className="text-sm font-bold text-slate-700 mb-2">Year {i + 1} Period</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Start Date</label>
+                            <input 
+                              type="month" 
+                              className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" 
+                              value={formData.periods?.[i]?.startDate || ""} 
+                              onChange={e => {
+                                const newPeriods = [...(formData.periods || [])];
+                                if (!newPeriods[i]) newPeriods[i] = { year: i + 1, startDate: "", endDate: "" };
+                                newPeriods[i].startDate = e.target.value;
+                                
+                                const periodObj = { ...formData.period };
+                                if (i === 0) periodObj.startDate = e.target.value;
+                                
+                                setFormData({ ...formData, periods: newPeriods, period: periodObj });
+                              }} 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">End Date</label>
+                            <input 
+                              type="month" 
+                              className="w-full rounded-xl border-gray-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3" 
+                              value={formData.periods?.[i]?.endDate || ""} 
+                              onChange={e => {
+                                const newPeriods = [...(formData.periods || [])];
+                                if (!newPeriods[i]) newPeriods[i] = { year: i + 1, startDate: "", endDate: "" };
+                                newPeriods[i].endDate = e.target.value;
+                                
+                                const periodObj = { ...formData.period };
+                                if (i === maxYears - 1) periodObj.endDate = e.target.value;
+                                
+                                setFormData({ ...formData, periods: newPeriods, period: periodObj });
+                              }} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Certificate Date (Optional)</label>

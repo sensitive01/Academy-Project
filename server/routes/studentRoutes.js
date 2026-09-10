@@ -341,6 +341,16 @@ router.put(
       }
 
       // =========================
+      // VALIDATE STUDENT ID UNIQUENESS
+      // =========================
+      if (data.studentId && data.studentId !== student.studentId) {
+        const conflict = await Student.findOne({ studentId: data.studentId, _id: { $ne: student._id } });
+        if (conflict) {
+          return res.status(400).json({ message: `Student ID "${data.studentId}" is already assigned to another student.` });
+        }
+      }
+
+      // =========================
       // UPDATE STUDENT FIELDS
       // =========================
       Object.assign(student, data);
@@ -1086,6 +1096,318 @@ router.post("/bulk-upload", protect, async (req, res) => {
     }
 
     res.json({ successCount, skippedRecords });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+//////////////////////////////////////////////////////
+// BULK EDIT STUDENTS
+//////////////////////////////////////////////////////
+router.post("/bulk-edit", protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const { students } = req.body;
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "No student data provided" });
+    }
+
+    const valid = [];
+    const invalid = [];
+
+    for (let i = 0; i < students.length; i++) {
+      const row = students[i];
+      const mongoId = row["_mongoId"];
+      const newStudentId = row["Student ID"] ? String(row["Student ID"]).trim() : null;
+
+      if (!mongoId) {
+        invalid.push({ ...row, _error: "Missing internal ID (_mongoId). Export data again." });
+        continue;
+      }
+
+      const existing = await Student.findById(mongoId);
+      if (!existing) {
+        invalid.push({ ...row, _error: `Student not found for _mongoId: ${mongoId}` });
+        continue;
+      }
+
+      // Validate student ID uniqueness (if changed)
+      if (newStudentId && newStudentId !== existing.studentId) {
+        const conflict = await Student.findOne({ studentId: newStudentId, _id: { $ne: mongoId } });
+        if (conflict) {
+          invalid.push({ ...row, _error: `Student ID "${newStudentId}" is already used by another student.` });
+          continue;
+        }
+      }
+
+      // Validate DOB format (if provided)
+      const rawDob = row["DOB"];
+      if (rawDob !== undefined && rawDob !== null && String(rawDob).trim() !== '') {
+        const s = String(rawDob).trim();
+        let validDob = false;
+        if (/^\d{5}$/.test(s)) {
+          const excelEpoch = new Date(1899, 11, 30);
+          const d = new Date(excelEpoch.getTime() + Number(s) * 86400000);
+          validDob = !isNaN(d.getTime());
+        } else if (/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.test(s)) {
+          const [, dd, mm, yyyy] = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+          const d = new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`);
+          validDob = !isNaN(d.getTime());
+        } else {
+          const d = new Date(s);
+          validDob = !isNaN(d.getTime());
+        }
+        if (!validDob) {
+          invalid.push({ ...row, _error: `Invalid DOB format "${rawDob}". Please use DD/MM/YYYY or YYYY-MM-DD.` });
+          continue;
+        } else {
+          // Normalize DOB to DD/MM/YYYY for clear preview display
+          let normDate = null;
+          if (/^\d{5}$/.test(s)) {
+            const excelEpoch = new Date(1899, 11, 30);
+            normDate = new Date(excelEpoch.getTime() + Number(s) * 86400000);
+          } else if (/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.test(s)) {
+            const [, dd, mm, yyyy] = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            normDate = new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`);
+          } else {
+            normDate = new Date(s);
+          }
+          if (normDate && !isNaN(normDate.getTime())) {
+            const day = String(normDate.getDate()).padStart(2, '0');
+            const month = String(normDate.getMonth() + 1).padStart(2, '0');
+            const year = normDate.getFullYear();
+            row["DOB"] = `${day}/${month}/${year}`;
+          }
+        }
+      }
+
+      valid.push({ ...row, _existing: existing });
+    }
+
+    // Return preview payload (without _existing object for client)
+    const previewValid = valid.map(r => {
+      const { _existing, ...rest } = r;
+      return rest;
+    });
+
+    res.json({ valid: previewValid, invalid });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+//////////////////////////////////////////////////////
+// BULK EDIT STUDENTS - CONFIRM (actually save)
+//////////////////////////////////////////////////////
+router.post("/bulk-edit-confirm", protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'hr') {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const { students } = req.body;
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "No student data provided" });
+    }
+
+    let updatedCount = 0;
+    const errors = [];
+
+    const IMMUTABLE = ["_mongoId", "__v", "createdAt", "updatedAt"];
+
+    for (const row of students) {
+      const mongoId = row["_mongoId"];
+      if (!mongoId) continue;
+
+      try {
+        const student = await Student.findById(mongoId);
+        if (!student) { errors.push(`ID ${mongoId} not found`); continue; }
+
+        const newStudentId = row["Student ID"] ? String(row["Student ID"]).trim() : null;
+
+        // Re-validate uniqueness at save time
+        if (newStudentId && newStudentId !== student.studentId) {
+          const conflict = await Student.findOne({ studentId: newStudentId, _id: { $ne: mongoId } });
+          if (conflict) { errors.push(`Student ID "${newStudentId}" conflict`); continue; }
+          student.studentId = newStudentId;
+        }
+
+        // Map editable fields
+        const fieldMap = {
+          "Name (English)":           "studentNameEnglish",
+          "Name":                     "studentNameEnglish",  // backward compat
+          // "Name (Mother Tongue)":     "studentNameMotherTongue",
+          "Father Name":              "fatherName",
+          "DOB":                      "dob",
+          "Age":                      "age",
+          "Gender":                   "gender",
+          "Religion":                 "religion",
+          "Community":                "community",
+          "Marital Status":           "maritalStatus",
+          "Nationality":              "nationality",
+          "Email":                    "email",
+          "Phone":                    "phone",
+          "WhatsApp":                 "whatsapp",
+          "Aadhar No":                "aadharNo",
+          "KCET Reg No":              "kcetRegNo",
+          "NEET Reg No":              "neetRegNo",
+          "APAAR ID":                 "apaarId",
+          "DEB ID":                   "debId",
+          "ABC ID":                   "abcId",
+          "Address Village":          "address.village",
+          "Address Post":             "address.post",
+          "Address Taluk":            "address.taluk",
+          "Address District":         "address.district",
+          "Address PIN":              "address.pin",
+          "Bank Account Holder":      "bankDetails.accountHolderName",
+          "Bank Account Number":      "bankDetails.accountNumber",
+          "Bank IFSC Code":           "bankDetails.ifscCode",
+          "Bank Name & Branch":       "bankDetails.bankNameBranch",
+          "SSLC Register No":         "sslcDetails.registerNo",
+          "SSLC Year of Passing":     "sslcDetails.yearOfPassing",
+          "SSLC School Name":         "sslcDetails.schoolName",
+          "SSLC Place of School":     "sslcDetails.placeOfSchool",
+          "SSLC Board of Examination":"sslcDetails.boardOfExamination",
+          "SSLC Percentage":          "sslcDetails.percentage",
+          "HSC Register No":          "hscDetails.registerNo",
+          "HSC Year of Passing":      "hscDetails.yearOfPassing",
+          "HSC School Name":          "hscDetails.schoolName",
+          "HSC Place of School":      "hscDetails.placeOfSchool",
+          "HSC Board of Examination": "hscDetails.boardOfExamination",
+          "HSC Percentage":           "hscDetails.percentage",
+          "Year":                     "year",
+          "Department":               "department",
+          "Status":                   "status",
+          "English Fluency":                            "englishFluency",
+          "English Fluency (Fluent/Intermediate/Basic)": "englishFluency",
+        };
+
+        // Helper: parse DOB — supports YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY
+        const parseDOB = (raw) => {
+          const s = String(raw).trim();
+          // Excel serial number (numeric date)
+          if (/^\d{5}$/.test(s)) {
+            const excelEpoch = new Date(1899, 11, 30);
+            const d = new Date(excelEpoch.getTime() + Number(s) * 86400000);
+            return isNaN(d) ? null : d;
+          }
+          // DD/MM/YYYY or DD-MM-YYYY
+          const dmyMatch = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+          if (dmyMatch) {
+            const [, dd, mm, yyyy] = dmyMatch;
+            const d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+            return isNaN(d) ? null : d;
+          }
+          // YYYY-MM-DD or any other ISO-ish format
+          const d = new Date(s);
+          return isNaN(d) ? null : d;
+        };
+
+        for (const [excelCol, mongoField] of Object.entries(fieldMap)) {
+          if (row[excelCol] !== undefined && row[excelCol] !== null && String(row[excelCol]).trim() !== '') {
+            const rawVal = String(row[excelCol]).trim();
+
+            // Special handling: DOB must be converted to a proper Date
+            if (mongoField === 'dob') {
+              const parsed = parseDOB(rawVal);
+              if (parsed) {
+                student.dob = parsed;
+              } else {
+                errors.push(`Invalid DOB format "${rawVal}" — use DD/MM/YYYY or YYYY-MM-DD`);
+              }
+              continue;
+            }
+
+            if (mongoField.includes('.')) {
+              const [parent, child] = mongoField.split('.');
+              if (!student[parent]) student[parent] = {};
+              student[parent][child] = rawVal;
+            } else {
+              student[mongoField] = rawVal;
+            }
+          }
+        }
+
+        // Handle "Languages Known" — comma or semicolon separated → array
+        const langRaw = row["Languages Known"];
+        if (langRaw !== undefined && langRaw !== null && String(langRaw).trim() !== '') {
+          student.languagesKnown = String(langRaw)
+            .split(/[,;]+/)
+            .map(l => l.trim())
+            .filter(Boolean);
+        }
+
+        // Handle Center, Course, Batch via their system IDs
+        const centerIdStr = row["Center ID"] ? String(row["Center ID"]).trim() : null;
+        const courseIdStr = row["Course ID"] ? String(row["Course ID"]).trim() : null;
+        const batchIdStr  = row["Batch ID"]  ? String(row["Batch ID"]).trim()  : null;
+
+        if (centerIdStr) {
+          const Center = require('../models/Center');
+          const center = await Center.findOne({ centerId: centerIdStr });
+          if (center) {
+            student.center = center._id;
+          } else {
+            errors.push(`Center ID "${centerIdStr}" not found (row skipped center update)`);
+          }
+        }
+
+        if (courseIdStr || batchIdStr) {
+          const Course = require('../models/Course');
+          const Batch = require('../models/Batch');
+
+          let courseDoc = null;
+          let batchDoc = null;
+
+          if (courseIdStr) {
+            courseDoc = await Course.findOne({ courseId: courseIdStr });
+            if (!courseDoc) errors.push(`Course ID "${courseIdStr}" not found (row skipped course update)`);
+          }
+          if (batchIdStr) {
+            batchDoc = await Batch.findOne({ batchId: batchIdStr });
+            if (!batchDoc) errors.push(`Batch ID "${batchIdStr}" not found (row skipped batch update)`);
+          }
+
+          if (courseDoc || batchDoc) {
+            // Update the first enrolled course entry (or create one)
+            const existingEntry = student.enrolledCourses && student.enrolledCourses[0]
+              ? { ...student.enrolledCourses[0].toObject() }
+              : { completed: false, progress: 0 };
+
+            if (courseDoc) existingEntry.course = courseDoc._id;
+            if (batchDoc)  existingEntry.batch  = batchDoc._id;
+
+            student.enrolledCourses = [existingEntry, ...(student.enrolledCourses?.slice(1) || [])];
+
+            // Sync batch.students
+            if (batchDoc) {
+              // Remove from old batches first
+              await Batch.updateMany({ students: student._id }, { $pull: { students: student._id } });
+              await Batch.findByIdAndUpdate(batchDoc._id, { $addToSet: { students: student._id } });
+            }
+          }
+        }
+
+        // Also update associated User name & email if changed
+        if (student.user && (row["Name"] || row["Email"])) {
+          const User = require('../models/User');
+          const userUpdate = {};
+          if (row["Name"]) userUpdate.name = String(row["Name"]).trim();
+          if (row["Email"]) userUpdate.email = String(row["Email"]).trim();
+          await User.findByIdAndUpdate(student.user, userUpdate);
+        }
+
+        await student.save();
+        updatedCount++;
+      } catch (err) {
+        errors.push(`Row error: ${err.message}`);
+      }
+    }
+
+    res.json({ updatedCount, errors });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

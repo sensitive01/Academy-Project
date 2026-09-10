@@ -73,6 +73,7 @@ const AssignStudentsModal = ({ batch, onClose, onAssignSuccess, isTabMode = fals
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     try {
       const { data } = await api.post(`/batches/${batch._id}/assign-students`, {
         studentIds: selectedStudentIds

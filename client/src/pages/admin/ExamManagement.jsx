@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, Trash2, Edit, FileText, Calendar, BookOpen, MapPin, X, CheckSquare, Layers, Download, Upload, FileArchive, DollarSign, ArrowLeft } from "lucide-react";
 import api from "../../services/api";
 import toast from "react-hot-toast";
@@ -27,6 +27,7 @@ const templates = [
 ];
 
 const ExamManagement = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -58,6 +59,7 @@ const ExamManagement = () => {
   const [uploadProgress, setUploadProgress] = useState({ isUploading: false, current: 0, total: 0 });
   const [showSinglePreview, setShowSinglePreview] = useState(false);
   const [previewSingleData, setPreviewSingleData] = useState(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
 
   // Hall ticket generation states
   const [selectedHallTicketExam, setSelectedHallTicketExam] = useState("");
@@ -327,7 +329,9 @@ const ExamManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
     try {
+      setIsSaving(true);
       const payload = { ...formData };
       if (isEditing) {
         await api.put(`/exams/${currentId}`, payload);
@@ -340,6 +344,8 @@ const ExamManagement = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to save exam");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -395,6 +401,7 @@ const ExamManagement = () => {
 
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     setTemplateSelectionTarget({
       type: isEditing ? 'edit' : 'single',
       data: { ...markFormData },
@@ -418,6 +425,8 @@ const ExamManagement = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    setUploadedFile(file);
+
     const toastId = toast.loading("Processing Excel file...");
 
     const reader = new FileReader();
@@ -434,7 +443,7 @@ const ExamManagement = () => {
           return;
         }
 
-        toast.loading("Finding missing students...", { id: toastId });
+        toast.loading("Analyzing Records...", { id: toastId });
         const studentIds = data.map(r => r['Student ID']).filter(Boolean);
         try {
           const missingRes = await api.post('/marks/bulk-missing-students', { studentIds });
@@ -463,11 +472,24 @@ const ExamManagement = () => {
     });
   };
 
-  const processBulkUpload = async (data, templateId) => {
+  const processBulkUpload = async (rawData, templateId) => {
     try {
+      // Filter out completely empty rows (rows with no mark data at all)
+      const data = rawData.filter(row => {
+        return Object.keys(row).some(key => {
+          if (key.match(/Subject \d+ (Mark|Internal|Theory|Practical)|Subject Code/i)) {
+             const val = row[key];
+             return val !== undefined && val !== null && String(val).trim() !== '';
+          }
+          return false;
+        });
+      });
 
       const total = data.length;
-      if (total === 0) return;
+      if (total === 0) {
+        toast.error("No valid data rows found to process");
+        return;
+      }
 
       setUploadProgress({ isUploading: true, current: 0, total });
       setShowBulkUploadPreviewModal(false);
@@ -524,11 +546,43 @@ const ExamManagement = () => {
         toast.error("Some records failed. Check console for details.");
       }
 
+      try {
+        if (uploadedFile) {
+          const formData = new FormData();
+          formData.append('file', uploadedFile);
+          formData.append('module', 'Marks');
+          formData.append('totalRecords', total);
+          formData.append('successfulRecords', successCount);
+          formData.append('failedRecords', failedCount);
+          formData.append('status', failedCount > 0 ? (successCount > 0 ? 'Partial' : 'Failed') : 'Success');
+          formData.append('summary', `Processed ${total} records. Success: ${successCount}, Failed: ${failedCount}.`);
+          await api.post('/bulk-upload-history', formData);
+        }
+      } catch (err) {
+        console.error("Failed to log bulk upload history", err);
+      }
+
       setUploadProgress({ isUploading: false, current: 0, total: 0 });
       fetchData();
     } catch (err) {
       toast.error("Failed to upload bulk data");
       setUploadProgress({ isUploading: false, current: 0, total: 0 });
+
+      try {
+        if (uploadedFile) {
+          const formData = new FormData();
+          formData.append('file', uploadedFile);
+          formData.append('module', 'Marks');
+          formData.append('totalRecords', data.length);
+          formData.append('successfulRecords', 0);
+          formData.append('failedRecords', data.length);
+          formData.append('status', 'Failed');
+          formData.append('summary', `Failed to process bulk upload. Error: ${err.message}`);
+          await api.post('/bulk-upload-history', formData);
+        }
+      } catch (historyErr) {
+        console.error("Failed to log failed bulk upload history", historyErr);
+      }
     }
   };
 
@@ -981,7 +1035,7 @@ const ExamManagement = () => {
   const examColumns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     {
-      name: "Exam Code/Name",
+      name: "Exam Name",
       selector: row => row.name,
       sortable: true,
       cell: row => (
@@ -1008,6 +1062,15 @@ const ExamManagement = () => {
           <div className="text-xs text-slate-500">Sem {row.semester}</div>
         </div>
       )
+    },
+    {
+      name: "Batch",
+      selector: row => row.batch?.name || row.batch,
+      sortable: true,
+      cell: row => {
+        const batchName = row.batch?.name || batches.find(b => b._id === row.batch)?.name || "N/A";
+        return <div className="font-semibold text-slate-700">{batchName}</div>;
+      }
     },
     {
       name: "Centers",
@@ -1758,6 +1821,9 @@ const ExamManagement = () => {
                 <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 font-bold">
                   <Upload size={20} /> Bulk Upload
                 </button>
+                <button onClick={() => navigate('/dashboard/bulk-history', { state: { module: 'Marks' } })} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-200 transition-all font-bold">
+                  <FileText size={20} /> View History
+                </button>
                 <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
                 <button onClick={() => openMarkModal()} className="bg-brand-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 font-bold">
                   <Plus size={20} /> Upload Result
@@ -2200,19 +2266,19 @@ const ExamManagement = () => {
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Total Mark</label>
-                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.totalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'totalMark', Number(e.target.value))} />
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.totalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'totalMark', e.target.value === '' ? '' : Number(e.target.value))} />
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Pass Mark</label>
-                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.passMark} onChange={(e) => handleSubjectChange(subConf.subject, 'passMark', Number(e.target.value))} />
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.passMark} onChange={(e) => handleSubjectChange(subConf.subject, 'passMark', e.target.value === '' ? '' : Number(e.target.value))} />
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">External</label>
-                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.externalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'externalMark', Number(e.target.value))} />
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.externalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'externalMark', e.target.value === '' ? '' : Number(e.target.value))} />
                                 </div>
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Internal</label>
-                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.internalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'internalMark', Number(e.target.value))} />
+                                  <input type="number" required className="w-full rounded-lg border-slate-200 border p-2 text-xs" value={subConf.internalMark} onChange={(e) => handleSubjectChange(subConf.subject, 'internalMark', e.target.value === '' ? '' : Number(e.target.value))} />
                                 </div>
                               </div>
                             </div>
@@ -2227,10 +2293,17 @@ const ExamManagement = () => {
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors">Cancel</button>
                   <button
                     type="submit"
-                    disabled={formData.centers.length === 0 || formData.subjects.length === 0}
-                    className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={formData.centers.length === 0 || formData.subjects.length === 0 || isSaving}
+                    className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {isEditing ? "Update Exam Schedule" : "Create Exam Schedule"}
+                    {isSaving ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        {isEditing ? "Updating..." : "Creating..."}
+                      </>
+                    ) : (
+                      isEditing ? "Update Exam Schedule" : "Create Exam Schedule"
+                    )}
                   </button>
                 </div>
               </form>
@@ -2690,18 +2763,19 @@ const ExamManagement = () => {
         />
       )}
 
-      {uploadProgress.isUploading && ReactDOM.createPortal(
-        <div className="fixed inset-0 z-[10000] bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+        {uploadProgress.isUploading && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col items-center">
+            <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
             <h3 className="text-lg font-bold text-slate-800 mb-4">Uploading Data...</h3>
-            <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden relative">
+            <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden">
               <div
-                className="bg-brand-600 h-4 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${Math.max(5, (uploadProgress.current / uploadProgress.total) * 100)}%` }}
+                className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
+                style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
               ></div>
             </div>
-            <p className="text-sm text-slate-600 text-center font-medium">
-              Processing {uploadProgress.current} of {uploadProgress.total} records
+            <p className="text-sm font-semibold text-slate-500">
+              {uploadProgress.current} / {uploadProgress.total} Datas processed
             </p>
           </div>
         </div>,

@@ -47,18 +47,36 @@ const storage = new CloudinaryStorage({
         }
 
         // =========================
+        // BULK HISTORY
+        // =========================
+        else if (file.fieldname === 'bulkHistoryFile' || file.fieldname === 'file') {
+            // Need to check if the path is explicitly requested for bulk history
+            if (req.originalUrl && req.originalUrl.includes('bulk-upload-history')) {
+                folder += '/bulk-history';
+            } else {
+                folder += '/others';
+            }
+        }
+
+        // =========================
         // DEFAULT
         // =========================
         else {
             folder += '/others';
         }
 
+        const ext = file.originalname.split('.').pop().toLowerCase();
+        const isRaw = ['pdf', 'docx', 'xls', 'xlsx', 'csv', 'zip'].includes(ext);
+
         const options = {
             folder: folder,
-            resource_type: 'auto',
-            allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'docx', 'webp', 'mp4', 'mkv', 'xls', 'xlsx'],
+            resource_type: isRaw ? 'raw' : 'auto',
             public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
         };
+
+        if (!isRaw) {
+            options.allowed_formats = ['jpg', 'png', 'jpeg', 'webp', 'mp4', 'mkv'];
+        }
 
         // Profile image transformation
         if (file.fieldname === 'profilePic') {

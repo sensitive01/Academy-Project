@@ -70,6 +70,7 @@ const AssignParentStudentsModal = ({ parent, onClose, onAssignSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // prevent double submission
     try {
       setLoading(true);
       await api.post(`/parent/parent/${parent._id}/assign-students`, {
