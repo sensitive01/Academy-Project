@@ -106,7 +106,7 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
       selector: row => row.user?.name,
       sortable: true,
       cell: row => (
-        <div className="flex items-center gap-3 py-1">
+        <div className="flex items-center gap-3 py-1.5 min-w-0 w-full">
           <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 shadow-sm ring-2 ring-white">
             {row.profilePic?.url ? (
               <img src={row.profilePic.url} alt="" className="w-full h-full object-cover" />
@@ -116,23 +116,23 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
               </div>
             )}
           </div>
-          <div className="min-w-0">
-            <div className="font-bold text-slate-900 whitespace-nowrap leading-tight truncate">{row.user?.name}</div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter shrink-0">{row.studentId || "NO-ID"}</div>
-            <div className="text-[10px] font-black text-brand-600 uppercase tracking-tighter shrink-0 mt-0.5">{row.year || ""}</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-slate-900 leading-tight truncate" title={row.user?.name}>{row.user?.name}</div>
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate">{row.studentId || "NO-ID"}</div>
+            <div className="text-[10px] font-black text-brand-600 uppercase tracking-tighter truncate mt-0.5">{row.year || ""}</div>
           </div>
         </div>
       ),
-      width: "200px"
+      width: "220px"
     },
     {
       name: "DOB",
       selector: row => row.dob,
       sortable: true,
       cell: row => (
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 whitespace-nowrap">
           <Calendar size={13} className="text-slate-400 shrink-0" />
-          <span className="whitespace-nowrap">{row.dob ? new Date(row.dob).toLocaleDateString('en-GB').replace(/\//g, '-') : "N/A"}</span>
+          <span>{row.dob ? new Date(row.dob).toLocaleDateString('en-GB').replace(/\//g, '-') : "N/A"}</span>
         </div>
       ),
       width: "120px"
@@ -145,10 +145,10 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
         const isIntern = row.internships && row.internships.length > 0;
         const type = isIntern ? "Intern" : (row.center ? "Center Student" : "Online Student");
         return (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             <div className={`p-0.5 px-2 rounded-md text-[10px] font-black uppercase tracking-widest border truncate ${isIntern ? "text-amber-700 border-amber-200 bg-amber-50" :
               (row.center ? "text-brand-700 border-brand-200 bg-brand-50" : "text-emerald-700 border-emerald-200 bg-emerald-50")
-              }`}>
+              }`} title={type}>
               {type}
             </div>
           </div>
@@ -159,43 +159,45 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
     {
       name: "Contact info",
       cell: row => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium truncate max-w-[150px]">
-            <Mail size={12} className="text-slate-400 shrink-0" /> {row.user?.email || row.email}
+        <div className="flex flex-col gap-0.5 min-w-0 w-full py-1">
+          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium min-w-0">
+            <Mail size={12} className="text-slate-400 shrink-0" />
+            <span className="truncate" title={row.user?.email || row.email}>{row.user?.email || row.email || "N/A"}</span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
-            <Phone size={12} className="text-slate-400 shrink-0" /> {row.whatsapp || row.phone || "N/A"}
+          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium min-w-0">
+            <Phone size={12} className="text-slate-400 shrink-0" />
+            <span className="truncate">{row.whatsapp || row.phone || "N/A"}</span>
           </div>
         </div>
       ),
-      width: "250px"
+      width: "220px"
     },
     {
       name: "Center",
       selector: row => row.center?.name,
       sortable: true,
       cell: row => (
-        <div className="flex items-center gap-1.5">
-          <MapPin size={11} className="text-indigo-400 shrink-0" />
-          <div className="p-0.5 px-2 text-indigo-700 rounded-md text-[10px] font-black uppercase tracking-widest border border-indigo-100 truncate">
+        <div className="flex items-center gap-1.5 min-w-0 w-full py-1" title={row.center?.name || "N/A"}>
+          <MapPin size={12} className="text-indigo-500 shrink-0" />
+          <div className="p-1 px-2.5 bg-indigo-50 text-indigo-700 rounded-md text-[10px] font-black uppercase tracking-wider border border-indigo-100 truncate min-w-0">
             {row.center?.name || "N/A"}
           </div>
         </div>
       ),
-      width: "200px"
+      width: "240px"
     },
     {
       name: "Status",
       selector: row => row.status,
       sortable: true,
       cell: row => (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${row.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border shrink-0 ${row.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
           }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${row.status === "active" ? "bg-green-500" : "bg-red-500"}`}></span>
           {row.status}
         </span>
       ),
-      width: "150px"
+      width: "130px"
     },
     {
       name: "Registered",
@@ -206,7 +208,7 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
           {row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-"}
         </span>
       ),
-      width: "150px"
+      width: "140px"
     },
     {
       name: "Action",
