@@ -68,15 +68,15 @@ const customStyles = {
   },
 };
 
-const CustomDataTable = ({ 
-  columns, 
-  data, 
-  searchPlaceholder = "Search...", 
-  search, 
-  setSearch, 
+const CustomDataTable = ({
+  columns,
+  data,
+  searchPlaceholder = "Search...",
+  search,
+  setSearch,
   exportButton,
   additionalHeaderContent,
-  ...props 
+  ...props
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible flex flex-col w-full h-full">
@@ -105,7 +105,7 @@ const CustomDataTable = ({
           </div>
         </div>
       )}
-      
+
       <div className="flex-1 w-full relative overflow-auto z-10 min-h-0">
         <DataTable
           columns={columns}

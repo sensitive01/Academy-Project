@@ -75,9 +75,9 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
   });
 
   const [feeForm, setFeeForm] = useState({
-    councilFee: "",
-    courseFee: "",
-    selectedScheme: "",
+    councilFee: student?.councilFee || "",
+    courseFee: student?.courseFee || "",
+    selectedScheme: student?.paymentScheme || "",
     fees: []
   });
 
@@ -158,64 +158,8 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
   };
 
   const calculateAndApplyScheme = (councilFeeVal, courseFeeVal, scheme) => {
-    const cFee = Number(councilFeeVal) || 0;
-    const crsFee = Number(courseFeeVal) || 0;
-    const generatedFees = [];
-
-    if (cFee > 0) {
-      generatedFees.push({
-        feeType: 'Other',
-        otherFeeType: 'Council Fees',
-        amount: cFee,
-        name: 'Council Fees'
-      });
-    }
-
-    if (crsFee > 0 && scheme) {
-      if (scheme === 'monthly') {
-        const monthlyAmt = Math.round(crsFee / 12);
-        for (let i = 1; i <= 12; i++) {
-          generatedFees.push({
-            feeType: 'Monthly',
-            otherFeeType: `Month ${i}`,
-            amount: monthlyAmt,
-            name: `Month ${i} Installment`
-          });
-        }
-      } else if (scheme === 'sem') {
-        const semAmt = Math.round(crsFee / 2);
-        for (let i = 1; i <= 2; i++) {
-          generatedFees.push({
-            feeType: 'Sem',
-            otherFeeType: `Semester ${i}`,
-            amount: semAmt,
-            name: `Semester ${i} Fee`
-          });
-        }
-      } else if (scheme === 'term3') {
-        const termAmt = Math.round(crsFee / 3);
-        for (let i = 1; i <= 3; i++) {
-          generatedFees.push({
-            feeType: 'Term',
-            otherFeeType: `Term ${i}`,
-            amount: termAmt,
-            name: `Term ${i} Fee`
-          });
-        }
-      } else if (scheme === 'term4') {
-        const termAmt = Math.round(crsFee / 4);
-        for (let i = 1; i <= 4; i++) {
-          generatedFees.push({
-            feeType: 'Term',
-            otherFeeType: `Term ${i}`,
-            amount: termAmt,
-            name: `Term ${i} Fee`
-          });
-        }
-      }
-    }
-
-    setFeeForm(prev => ({ ...prev, fees: generatedFees }));
+    // The payment scheme is now only saved for reference, 
+    // no automatic fee installments are generated.
   };
 
   const handleSave = async (e) => {
@@ -228,9 +172,59 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
     setSaving(true);
     try {
+      // Ensure that Council Fee and Course Fee exist as fee records in the backend
+      const cFeeAmt = Number(feeForm.councilFee) || 0;
+      const crsFeeAmt = Number(feeForm.courseFee) || 0;
+      
+      let finalFees = [...feeForm.fees];
+
+      const currentYearMatch = formData.year?.match(/\d+/);
+      const currentYear = currentYearMatch ? currentYearMatch[0] : "1";
+
+      if (cFeeAmt > 0) {
+        const cIndex = finalFees.findIndex(f => (f.name === `Council Fees - Year ${currentYear}`) || (!f.name?.includes("Year") && (f.name === 'Council Fees' || f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees'))));
+        if (cIndex >= 0) {
+          finalFees[cIndex].amount = cFeeAmt;
+          finalFees[cIndex].name = `Council Fees - Year ${currentYear}`;
+          finalFees[cIndex].year = currentYear;
+        } else {
+          finalFees.push({ feeType: 'Other', otherFeeType: 'Council Fees', name: `Council Fees - Year ${currentYear}`, amount: cFeeAmt, year: currentYear });
+        }
+      }
+
+      if (crsFeeAmt > 0) {
+        const expectedName = `Course Fees - Year ${currentYear}`;
+
+        // Try to identify legacy unified course fee to migrate its payment history safely
+        const legacyIndex = finalFees.findIndex(f => (f.feeType === 'Course' || f.otherFeeType === 'Course Fees' || f.name === 'Course Fees') && (!f.name || !f.name.includes("Year")));
+        
+        if (legacyIndex >= 0) {
+           finalFees[legacyIndex].name = expectedName;
+           finalFees[legacyIndex].year = currentYear;
+           finalFees[legacyIndex].amount = crsFeeAmt;
+        } else {
+          const crsIndex = finalFees.findIndex(f => f.name === expectedName);
+          if (crsIndex >= 0) {
+            finalFees[crsIndex].amount = crsFeeAmt;
+            finalFees[crsIndex].year = currentYear;
+          } else {
+            finalFees.push({ 
+              feeType: 'Course', 
+              otherFeeType: 'Course Fees', 
+              name: expectedName, 
+              amount: crsFeeAmt,
+              year: currentYear
+            });
+          }
+        }
+      }
+
       const payload = {
         ...formData,
-        fees: feeForm.fees,
+        councilFee: feeForm.councilFee,
+        courseFee: feeForm.courseFee,
+        paymentScheme: feeForm.selectedScheme,
+        fees: finalFees,
         sslcDetails: {
           registerNo: formData.sslcRegNo || "",
           yearOfPassing: formData.sslcYear || "",
@@ -1205,7 +1199,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                             const bCenterId = b.center?._id ? b.center._id.toString() : b.center?.toString();
                             matchesCenter = bCenterIds.includes(studentCenterId) || (bCenterId === studentCenterId);
                           }
-                          return matchesCenter;
+                          return matchesCenter || (b._id && formData.batch && b._id.toString() === formData.batch.toString());
                         });
                         
                         if (filtered.length === 0) {
@@ -1236,7 +1230,9 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                         }
                         
                         const uniqueCourseIds = [...new Set(batchCourseIds)];
-                        const availableCourses = courses.filter(c => uniqueCourseIds.includes(c._id.toString()));
+                        const availableCourses = courses.filter(c => 
+                          uniqueCourseIds.includes(c._id.toString()) || c._id.toString() === formData.course?.toString()
+                        );
                         
                         if (availableCourses.length === 0) return [{ value: "", label: "No courses assigned to batch" }];
                         
@@ -1291,106 +1287,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center pt-4">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Fee Installments Breakdown</h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFeeForm(prev => ({
-                        ...prev,
-                        fees: [
-                          ...prev.fees,
-                          { feeType: "Other", otherFeeType: "", amount: 0, name: "" }
-                        ]
-                      }));
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-bold text-brand-700 bg-brand-50 px-4 py-2 rounded-xl hover:bg-brand-100 transition-colors"
-                  >
-                    <Plus size={14} /> Add Custom Fee Row
-                  </button>
-                </div>
 
-                {feeForm.fees.length > 0 ? (
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider">
-                        <tr>
-                          <th className="p-3">#</th>
-                          <th className="p-3">Fee Name / Installment</th>
-                          <th className="p-3">Fee Type</th>
-                          <th className="p-3 text-right">Amount (₹)</th>
-                          <th className="p-3 text-center">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {feeForm.fees.map((fee, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-3 font-semibold text-slate-400">{idx + 1}</td>
-                            <td className="p-3">
-                              <input
-                                type="text"
-                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-brand-700 shadow-sm"
-                                value={fee.otherFeeType || fee.name || fee.feeType}
-                                onChange={(e) => {
-                                  const updated = [...feeForm.fees];
-                                  updated[idx].otherFeeType = e.target.value;
-                                  updated[idx].name = e.target.value;
-                                  setFeeForm(prev => ({ ...prev, fees: updated }));
-                                }}
-                              />
-                            </td>
-                            <td className="p-3">
-                              <select
-                                value={fee.feeType}
-                                onChange={(e) => {
-                                  const updated = [...feeForm.fees];
-                                  updated[idx].feeType = e.target.value;
-                                  setFeeForm(prev => ({ ...prev, fees: updated }));
-                                }}
-                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-brand-700 shadow-sm"
-                              >
-                                <option value="Sem">Sem Fee</option>
-                                <option value="Term">Term Fee</option>
-                                <option value="Monthly">Monthly Fee</option>
-                                <option value="Other">Other / Council</option>
-                              </select>
-                            </td>
-                            <td className="p-3 text-right">
-                              <input
-                                type="number"
-                                className="w-32 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right text-slate-900 outline-none focus:border-brand-700 shadow-sm"
-                                value={fee.amount}
-                                onChange={(e) => {
-                                  const updated = [...feeForm.fees];
-                                  updated[idx].amount = e.target.value;
-                                  setFeeForm(prev => ({ ...prev, fees: updated }));
-                                }}
-                              />
-                            </td>
-                            <td className="p-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setFeeForm(prev => ({
-                                    ...prev,
-                                    fees: prev.fees.filter((_, i) => i !== idx)
-                                  }));
-                                }}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic p-6 bg-slate-50 rounded-2xl border border-dashed text-center">
-                    No fees structured for this student yet.
-                  </p>
-                )}
               </div>
             ) : (
               <div className="space-y-6">
@@ -1413,42 +1310,28 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
                   />
                 </div>
 
-                {feeForm.fees.length > 0 ? (
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
-                        <tr>
-                          <th className="p-4">#</th>
-                          <th className="p-4">Fee Installment Name</th>
-                          <th className="p-4">Category</th>
-                          <th className="p-4">Status</th>
-                          <th className="p-4 text-right">Amount (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {feeForm.fees.map((fee, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-4 font-bold text-slate-400">{idx + 1}</td>
-                            <td className="p-4 font-bold text-slate-800">{fee.name || fee.otherFeeType}</td>
-                            <td className="p-4 font-bold text-slate-600">{fee.feeType} Fee</td>
-                            <td className="p-4">
-                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                                fee.status === 'paid' ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}>
-                                {fee.status || "pending"}
-                              </span>
-                            </td>
-                            <td className="p-4 font-black text-brand-700 text-right">₹{Number(fee.amount || 0).toLocaleString('en-IN')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-xs font-bold text-slate-400 italic bg-slate-50 p-6 rounded-2xl border border-dashed text-center">
-                    No fees structured for this student. Click Edit Mode to add fees.
-                  </p>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-6 border-b border-slate-100">
+                  <FormDisplay 
+                    label="Council Fees (₹)" 
+                    value={formData.councilFee || "0"} 
+                  />
+                  <FormDisplay 
+                    label="Course Fees (₹)" 
+                    value={formData.courseFee || "0"} 
+                  />
+                  <FormDisplay 
+                    label="Payment Scheme" 
+                    value={
+                      formData.paymentScheme === "monthly" ? "Monthly Scheme" :
+                      formData.paymentScheme === "sem" ? "Semester Scheme" :
+                      formData.paymentScheme === "term3" ? "Term Scheme (3 Terms)" :
+                      formData.paymentScheme === "term4" ? "Term Scheme (4 Terms)" :
+                      formData.paymentScheme || "Not Selected"
+                    } 
+                  />
+                </div>
+
+
               </div>
             )}
           </div>

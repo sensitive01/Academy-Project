@@ -18,6 +18,7 @@ const PendingApprovalsList = () => {
   const [selectedMode, setSelectedMode] = useState("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null, status: null });
 
   useEffect(() => {
     fetchPendingFees();
@@ -46,13 +47,17 @@ const PendingApprovalsList = () => {
     }
   };
 
-  const handleApproval = async (id, status) => {
+  const executeApproval = async () => {
+    const { id, status } = confirmModal;
+    if (!id || !status) return;
     try {
       const res = await api.patch(`/student-fees/${id}/approve`, { approvalStatus: status });
       setFees(fees.filter(f => f._id !== id));
       toast.success(`Payment ${status}`);
     } catch (err) {
       toast.error(err.response?.data?.message || `Failed to ${status} payment`);
+    } finally {
+      setConfirmModal({ isOpen: false, id: null, status: null });
     }
   };
 
@@ -218,13 +223,13 @@ const PendingApprovalsList = () => {
       cell: row => (
         <div className="flex gap-2">
           <button 
-            onClick={() => handleApproval(row._id, 'Approved')} 
+            onClick={() => setConfirmModal({ isOpen: true, id: row._id, status: 'Approved' })} 
             className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-xs font-bold transition-colors"
           >
             Approve
           </button>
           <button 
-            onClick={() => handleApproval(row._id, 'Rejected')} 
+            onClick={() => setConfirmModal({ isOpen: true, id: row._id, status: 'Rejected' })} 
             className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold transition-colors"
           >
             Reject
@@ -342,6 +347,35 @@ const PendingApprovalsList = () => {
                 className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-200 transition-all cursor-pointer"
               >
                 Export
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* CONFIRMATION MODAL */}
+      {confirmModal.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={() => setConfirmModal({ isOpen: false, id: null, status: null })}>
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Confirm Action</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Are you sure you want to <span className={`font-bold ${confirmModal.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{confirmModal.status === 'Approved' ? 'approve' : 'reject'}</span> this payment?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmModal({ isOpen: false, id: null, status: null })}
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeApproval}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white transition-colors shadow-sm ${
+                  confirmModal.status === 'Approved' ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-red-600 hover:bg-red-700 shadow-red-200'
+                }`}
+              >
+                Yes, {confirmModal.status === 'Approved' ? 'Approve' : 'Reject'}
               </button>
             </div>
           </div>

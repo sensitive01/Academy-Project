@@ -21,6 +21,8 @@ const VendorPaymentsList = ({ paidOnly }) => {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   useEffect(() => {
     fetchPayments();
@@ -97,7 +99,20 @@ const VendorPaymentsList = ({ paidOnly }) => {
 
     const matchesStatus = selectedStatus === "all" || p.status === selectedStatus;
 
-    return matchesSearch && matchesVendor && matchesStatus;
+    let matchesDate = true;
+    const pDate = new Date(p.date || p.createdAt);
+    if (fromDate) {
+      const from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+      matchesDate = matchesDate && pDate >= from;
+    }
+    if (toDate) {
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+      matchesDate = matchesDate && pDate <= to;
+    }
+
+    return matchesSearch && matchesVendor && matchesStatus && matchesDate;
   });
 
   const handleExport = () => {
@@ -120,7 +135,7 @@ const VendorPaymentsList = ({ paidOnly }) => {
     } else {
       const doc = new jsPDF({ orientation: "landscape" });
       doc.text("Vendor Payments Report", 14, 15);
-      
+
       const tableColumn = ["S.No", "Vendor Company", "Contact Person", "Payment Title", "Amount", "Status", "Payment Date"];
       const tableRows = [];
       filtered.forEach((p, index) => {
@@ -135,7 +150,7 @@ const VendorPaymentsList = ({ paidOnly }) => {
         ];
         tableRows.push(rowData);
       });
-      
+
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
@@ -143,7 +158,7 @@ const VendorPaymentsList = ({ paidOnly }) => {
         theme: "striped",
         styles: { fontSize: 8, cellPadding: 2 }
       });
-      
+
       const pdfBlob = doc.output("blob");
       saveAs(pdfBlob, "Vendor_Payments_Report.pdf");
       toast.success("PDF exported successfully!");
@@ -152,9 +167,9 @@ const VendorPaymentsList = ({ paidOnly }) => {
 
   const columns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
-    { 
+    {
       name: "Vendor",
-      selector: row => row.vendor?.companyName, 
+      selector: row => row.vendor?.companyName,
       sortable: true,
       cell: row => (
         <div>
@@ -163,22 +178,22 @@ const VendorPaymentsList = ({ paidOnly }) => {
         </div>
       )
     },
-    { 
-      name: "Title", 
-      selector: row => row.title, 
+    {
+      name: "Title",
+      selector: row => row.title,
       sortable: true,
       cell: row => <div className="font-medium text-gray-700">{row.title}</div>
     },
-    { 
+    {
       name: "Amount", width: "130px",
-      selector: row => row.amount, 
-      sortable: true, 
-      cell: row => <span className="font-bold text-brand-600">₹ {row.amount?.toLocaleString("en-IN")}</span> 
+      selector: row => row.amount,
+      sortable: true,
+      cell: row => <span className="font-bold text-brand-600">₹ {row.amount?.toLocaleString("en-IN")}</span>
     },
-    { 
+    {
       name: "Status", width: "150px",
-      selector: row => row.status, 
-      sortable: true, 
+      selector: row => row.status,
+      sortable: true,
       center: true,
       cell: row => {
         if (paidOnly) {
@@ -189,23 +204,22 @@ const VendorPaymentsList = ({ paidOnly }) => {
           );
         }
         return (
-          <button 
+          <button
             onClick={() => handleToggleStatus(row._id)}
-            className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors ${
-              row.status === "paid" ? "bg-green-100 text-green-700 hover:bg-green-200" :
-              "bg-orange-100 text-orange-700 hover:bg-orange-200"
-            }`}
+            className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-colors ${row.status === "paid" ? "bg-green-100 text-green-700 hover:bg-green-200" :
+                "bg-orange-100 text-orange-700 hover:bg-orange-200"
+              }`}
           >
             {row.status}
           </button>
         );
       }
     },
-    { 
+    {
       name: "Date", width: "130px",
-      selector: row => row.date, 
-      sortable: true, 
-      cell: row => <span className="text-gray-600 font-medium">{new Date(row.date).toLocaleDateString("en-GB")}</span> 
+      selector: row => row.date,
+      sortable: true,
+      cell: row => <span className="text-gray-600 font-medium">{new Date(row.date).toLocaleDateString("en-GB")}</span>
     },
     {
       name: "Action",
@@ -214,7 +228,7 @@ const VendorPaymentsList = ({ paidOnly }) => {
       cell: row => (
         <div className="flex items-center gap-1">
           {row.status === "paid" && (
-            <button 
+            <button
               onClick={() => downloadReceipt(`/vendor-payments/${row._id}/receipt`, `Voucher_${row._id}.pdf`)}
               className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
               title="Download Voucher"
@@ -236,15 +250,23 @@ const VendorPaymentsList = ({ paidOnly }) => {
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-slate-800">Vendor Payments</h2>
-        {!paidOnly && (
-          <button 
-            onClick={() => setShowModal(true)}
-            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md"
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Add Payment
+            <Download size={16} /> Export
           </button>
-        )}
+          {!paidOnly && (
+            <button 
+              onClick={() => setShowModal(true)}
+              className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Payment
+            </button>
+          )}
+        </div>
       </div>
       <CustomDataTable
         columns={columns}
@@ -254,16 +276,26 @@ const VendorPaymentsList = ({ paidOnly }) => {
         setSearch={setSearch}
         searchPlaceholder="Search vendor payments..."
         pagination
-        exportButton={
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-200 transition-colors cursor-pointer"
-          >
-            <Download size={14} /> Export
-          </button>
-        }
         additionalHeaderContent={
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">To</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+              />
+            </div>
             <select
               value={selectedVendor}
               onChange={(e) => setSelectedVendor(e.target.value)}
@@ -287,11 +319,13 @@ const VendorPaymentsList = ({ paidOnly }) => {
               </select>
             )}
 
-            {(selectedVendor !== "all" || selectedStatus !== "all") && (
+            {(selectedVendor !== "all" || selectedStatus !== "all" || fromDate !== "" || toDate !== "") && (
               <button
                 onClick={() => {
                   setSelectedVendor("all");
                   setSelectedStatus("all");
+                  setFromDate("");
+                  setToDate("");
                 }}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
               >
@@ -302,7 +336,7 @@ const VendorPaymentsList = ({ paidOnly }) => {
         }
       />
       {showModal && (
-        <AddVendorPaymentModal 
+        <AddVendorPaymentModal
           onClose={() => setShowModal(false)}
           onSave={handleSavePayment}
           vendors={vendors}
@@ -315,15 +349,14 @@ const VendorPaymentsList = ({ paidOnly }) => {
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-900 mb-2">Export Data</h3>
             <p className="text-slate-500 text-xs mb-6">Choose your preferred format to export the filtered list.</p>
-            
+
             <div className="grid grid-cols-2 gap-3 mb-6">
               <button
                 onClick={() => setExportFormat("excel")}
-                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
-                  exportFormat === "excel"
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "excel"
                     ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                     : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
                   <FileSpreadsheet size={20} />
@@ -333,11 +366,10 @@ const VendorPaymentsList = ({ paidOnly }) => {
 
               <button
                 onClick={() => setExportFormat("pdf")}
-                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
-                  exportFormat === "pdf"
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "pdf"
                     ? "border-red-500 bg-red-50 text-red-700"
                     : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>
                   <FileText size={20} />

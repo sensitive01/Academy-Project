@@ -424,7 +424,8 @@ router.put(
               name: fee.name || fee.otherFeeType,
               amount: Number(fee.amount),
               status: fee.status || "pending",
-              dueDate: fee.dueDate
+              dueDate: fee.dueDate,
+              year: fee.year
             };
 
             if (data.enrolledCourses && data.enrolledCourses.length > 0) {

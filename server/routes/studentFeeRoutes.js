@@ -157,9 +157,19 @@ router.post('/collect-cascade', protect, async (req, res) => {
     };
     if (year) {
       if (year === "Unknown Year") {
-        query.year = { $exists: false }; // or match those explicitly marked as unknown
+        query.$or = [
+          { year: { $exists: false } },
+          { year: null },
+          { year: "" },
+          { year: "Unknown Year" }
+        ];
       } else {
-        query.year = year;
+        query.$or = [
+          { year: year },
+          { year: { $exists: false } },
+          { year: null },
+          { year: "" }
+        ];
       }
     }
     let feeRecords = await StudentFee.find(query);
@@ -167,8 +177,8 @@ router.post('/collect-cascade', protect, async (req, res) => {
     // Filter by feeType matching logic
     feeRecords = feeRecords.filter(f => {
       if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
-      if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
-      if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees';
+      if (feeType === 'Course') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
+      if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees' && f.otherFeeType !== 'Course Fees';
       return f.feeType === feeType;
     });
 

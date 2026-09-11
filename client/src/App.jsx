@@ -19,6 +19,7 @@ import CourseCatalog from "./pages/lms/CourseCatalog";
 import ForgotPassword from "./components/auth/ForgotPassword";
 import StudentRegistration from "./pages/public/StudentRegistration";
 import PublicResults from "./pages/public/PublicResults";
+import PublicHallTicket from "./pages/public/PublicHallTicket";
 
 import CertificateView from "./pages/lms/CertificateView";
 
@@ -258,6 +259,7 @@ function App() {
 
           <Route path="/results" element={<PublicResults />} />
           <Route path="/public-attendance" element={<PublicAttendance />} />
+          <Route path="/hallticket" element={<PublicHallTicket />} />
 
           {/* ================= DASHBOARD ROUTES ================= */}
           <Route

@@ -21,7 +21,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const [showModal, setShowModal] = useState(false);
   const [showCollectModal, setShowCollectModal] = useState(false);
   const [selectedFee, setSelectedFee] = useState(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
@@ -29,9 +29,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedBatch, setSelectedBatch] = useState("all");
   const [selectedBatchYear, setSelectedBatchYear] = useState(1);
+  const [selectedFeeYear, setSelectedFeeYear] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const getDynamicMonths = () => {
     let currentStartDate = "";
@@ -62,10 +66,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     let currentMonth = parseInt(startParts[1]) - 1;
     const endYear = parseInt(endParts[0]);
     const endMonth = parseInt(endParts[1]) - 1;
-    
+
     const columns = [];
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
+
     let safety = 0;
     while ((currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) && safety < 60) {
       columns.push({
@@ -120,14 +124,14 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   };
 
   const getRemainingBalance = (row) => {
-    const totalDue = row.amount + 
-      (row.isPenaltyApplied ? row.penaltyAmount : 0) + 
+    const totalDue = row.amount +
+      (row.isPenaltyApplied ? row.penaltyAmount : 0) +
       (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
-    
+
     const totalApprovedPaid = row.payments
       ? row.payments
-          .filter(p => p.status === 'Approved')
-          .reduce((sum, p) => sum + p.amount, 0)
+        .filter(p => p.status === 'Approved')
+        .reduce((sum, p) => sum + p.amount, 0)
       : (row.status === 'paid' ? row.amount : 0);
 
     return Math.max(0, totalDue - totalApprovedPaid);
@@ -135,7 +139,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
   const getSelectedSchemeName = (group) => {
     if (!group.originalFees || group.originalFees.length === 0) return "";
-    
+
     // Check if there are any Monthly fee records
     const hasMonthly = group.originalFees.some(f => f.feeType === 'Monthly');
     if (hasMonthly) {
@@ -175,7 +179,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const getSchemeBadgeLabel = (group) => {
     if (feeType === 'Council') return "Council Fees";
     if (feeType === 'Other') return group.otherFeeType || "Other Fees";
-    
+
     const schemeName = getSelectedSchemeName(group);
     return schemeName || group.feeType || "Course Fees";
   };
@@ -189,7 +193,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     setSelectedBatch("all");
     setSelectedStatus("all");
   }, [feeType, excludePaid]);
- 
+
   const fetchDropdownData = async () => {
     try {
       const [studentsRes, centersRes, coursesRes, batchesRes] = await Promise.all([
@@ -228,9 +232,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         if (batchObj && f.batch?._id !== batchObj._id) return false;
         if (feeType === 'All') return true;
         if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
-        if (feeType === 'Course') return ['Sem', 'Term', 'Monthly'].includes(f.feeType);
-        if (feeType === 'Both') return ['Sem', 'Term', 'Monthly'].includes(f.feeType) || f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
-        if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees';
+        if (feeType === 'Course') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
+        if (feeType === 'Both') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees') || f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
+        if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees' && f.otherFeeType !== 'Course Fees';
         return f.feeType === feeType;
       });
 
@@ -295,7 +299,22 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           const studentId = f.student?._id?.toString();
           if (!studentId) return;
 
-          const feeYear = f.year || f.student?.year || "Unknown Year";
+          let feeYearDigit = null;
+          if (f.year) {
+             const match = f.year.match(/\d+/);
+             if (match) feeYearDigit = match[0];
+          } else if (f.otherFeeType) {
+             const match = f.otherFeeType.match(/Year\s*(\d+)/i);
+             if (match) feeYearDigit = match[1];
+          }
+
+          let studentYearDigit = null;
+          if (f.student?.year) {
+             const match = f.student.year.match(/\d+/);
+             if (match) studentYearDigit = match[0];
+          }
+
+          const feeYear = feeYearDigit ? `Year ${feeYearDigit}` : (f.student?.year || "Unknown Year");
           const groupKey = `${studentId}_${feeYear}`;
 
           if (!studentMap[groupKey]) {
@@ -331,8 +350,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           const group = studentMap[groupKey];
           group.originalFees.push(f);
           group.amount += f.amount || 0;
-          
-          let isCourse = ['Sem', 'Term', 'Monthly'].includes(f.feeType);
+
+          let isCourse = ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
           let isCouncil = f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
 
           if (isCourse) group.courseAmount += f.amount || 0;
@@ -377,9 +396,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           const totalApprovedPaid = group.payments
             .filter(p => p.status === 'Approved')
             .reduce((sum, p) => sum + p.amount, 0);
-          
+
           const remaining = totalDue - totalApprovedPaid;
-          
+
           if (remaining <= 0) {
             group.status = 'paid';
           } else {
@@ -443,14 +462,28 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this fee record?")) return;
+  const handleDelete = (id) => {
+    setConfirmModal({ isOpen: true, id });
+  };
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
     try {
-      await api.delete(`/student-fees/${id}`);
+      const rowToDelete = fees.find(f => f._id === id);
+      if (rowToDelete && rowToDelete.originalFees && rowToDelete.originalFees.length > 0) {
+        // It's a grouped row, delete all underlying fees
+        await Promise.all(rowToDelete.originalFees.map(of => api.delete(`/student-fees/${of._id}`)));
+      } else {
+        // Single fee deletion
+        await api.delete(`/student-fees/${id}`);
+      }
       setFees(fees.filter(f => f._id !== id));
-      toast.success("Deleted successfully");
+      toast.success("Fee deleted successfully");
     } catch (err) {
-      toast.error("Failed to delete");
+      toast.error("Failed to delete fee");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
     }
   };
 
@@ -473,6 +506,28 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     const fBatchId = f.batch?._id ? f.batch._id.toString() : f.batch ? f.batch.toString() : "";
     const matchesBatch = selectedBatch === "all" || fBatchId === selectedBatch || (f.batch?.name || f.batch?.batchId) === selectedBatch;
 
+    let matchesYear = true;
+    let rowYearDigit = null;
+    if (f.year) {
+      const match = String(f.year).match(/\d+/);
+      if (match) rowYearDigit = Number(match[0]);
+    } else if (f.otherFeeType) {
+      const match = String(f.otherFeeType).match(/Year\s*(\d+)/i);
+      if (match) rowYearDigit = Number(match[1]);
+    }
+    
+    if (batchObj) {
+      if (rowYearDigit !== null) {
+        matchesYear = rowYearDigit === selectedBatchYear;
+      }
+    } else if (selectedFeeYear !== "all") {
+      if (rowYearDigit !== null) {
+        matchesYear = rowYearDigit === Number(selectedFeeYear);
+      } else {
+        matchesYear = false;
+      }
+    }
+
     let matchesStatus = true;
     if (selectedStatus !== "all") {
       if (selectedStatus === "paid") {
@@ -484,7 +539,20 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       }
     }
 
-    return matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesStatus;
+    let matchesDate = true;
+    const fDate = new Date(paidOnly ? (f.paidAt || f.createdAt) : f.createdAt);
+    if (fromDate) {
+      const from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+      matchesDate = matchesDate && fDate >= from;
+    }
+    if (toDate) {
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+      matchesDate = matchesDate && fDate <= to;
+    }
+
+    return matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesYear && matchesStatus && matchesDate;
   });
 
   const handleExport = () => {
@@ -525,7 +593,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       } else {
         const doc = new jsPDF({ orientation: "landscape" });
         doc.text(`${feeType} Inward Payments Report`, 14, 15);
-        
+
         const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Type", "Amount Paid", "Mode", "Reference", "Paid Date"];
         const tableRows = [];
         filtered.forEach((f, index) => {
@@ -553,7 +621,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           ];
           tableRows.push(rowData);
         });
-        
+
         autoTable(doc, {
           head: [tableColumn],
           body: tableRows,
@@ -561,7 +629,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           theme: "striped",
           styles: { fontSize: 8, cellPadding: 2 }
         });
-        
+
         const pdfBlob = doc.output("blob");
         saveAs(pdfBlob, `${feeType}_Inward_Payments_Report.pdf`);
         toast.success("PDF exported successfully!");
@@ -571,10 +639,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
     if (exportFormat === "excel") {
       const data = filtered.map((f, i) => {
-        const totalDue = f.amount + 
-          (f.isPenaltyApplied ? f.penaltyAmount : 0) + 
+        const totalDue = f.amount +
+          (f.isPenaltyApplied ? f.penaltyAmount : 0) +
           (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
-          
+
         const exportRow = {
           "S.No": i + 1,
           "Student Name": f.student?.studentNameEnglish || "N/A",
@@ -606,19 +674,19 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     } else {
       const doc = new jsPDF({ orientation: "landscape" });
       doc.text(`${feeType} Fees Report`, 14, 15);
-      
+
       const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Total Fee"];
       if (feeType !== 'Exam') {
         dynamicMonths.forEach(m => tableColumn.push(m.label));
       }
       tableColumn.push("Balance", "Status");
-      
+
       const tableRows = [];
       filtered.forEach((f, index) => {
-        const totalDue = f.amount + 
-          (f.isPenaltyApplied ? f.penaltyAmount : 0) + 
+        const totalDue = f.amount +
+          (f.isPenaltyApplied ? f.penaltyAmount : 0) +
           (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
-          
+
         const rowData = [
           index + 1,
           `${f.student?.studentNameEnglish || "N/A"} (${f.student?.studentId || "-"})`,
@@ -626,20 +694,20 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           f.center?.name || "-",
           `Rs. ${totalDue.toLocaleString("en-IN")}`
         ];
-        
+
         if (feeType !== 'Exam') {
           dynamicMonths.forEach(m => {
             rowData.push(getAmountForMonth(f, m));
           });
         }
-        
+
         rowData.push(
           `Rs. ${getRemainingBalance(f).toLocaleString("en-IN")}`,
           f.status || "-"
         );
         tableRows.push(rowData);
       });
-      
+
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
@@ -647,7 +715,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         theme: "striped",
         styles: { fontSize: 8, cellPadding: 2 }
       });
-      
+
       const pdfBlob = doc.output("blob");
       saveAs(pdfBlob, `${feeType}_Fees_Report.pdf`);
       toast.success("PDF exported successfully!");
@@ -670,9 +738,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
   const columns = paidOnly ? [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
-    { 
-      name: "Student", width:"180px", 
-      selector: row => row.student?.studentNameEnglish, 
+    {
+      name: "Student", width: "180px",
+      selector: row => row.student?.studentNameEnglish,
       sortable: true,
       cell: row => (
         <div>
@@ -682,10 +750,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         </div>
       )
     },
-    { 
-      name: "Course & Batch", 
-      selector: row => row.course?.title, 
-      sortable: true, width:"250px",
+    {
+      name: "Course & Batch",
+      selector: row => row.course?.title,
+      sortable: true, width: "250px",
       cell: row => (
         <div>
           <div className="font-medium text-gray-700 truncate max-w-[200px]">{row.course?.title || "-"}</div>
@@ -693,15 +761,15 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         </div>
       )
     },
-    { 
-      name: "Center", 
-      selector: row => row.center?.name, 
+    {
+      name: "Center",
+      selector: row => row.center?.name,
       sortable: true,
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
-    { 
-      name: "Fee Type", 
-      selector: row => row.feeType, 
+    {
+      name: "Fee Type",
+      selector: row => row.feeType,
       sortable: true,
       cell: row => {
         let lbl = row.feeType;
@@ -721,27 +789,27 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         );
       }
     },
-    { 
-      name: "Amount Paid", 
-      selector: row => row.amount, 
-      sortable: true, 
+    {
+      name: "Amount Paid",
+      selector: row => row.amount,
+      sortable: true,
       cell: row => <span className="text-sm font-black text-slate-800">₹{row.amount?.toLocaleString("en-IN")}</span>
     },
-    { 
-      name: "Mode", 
-      selector: row => row.paymentMode, 
+    {
+      name: "Mode",
+      selector: row => row.paymentMode,
       sortable: true,
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.paymentMode || "-"}</span>
     },
-    { 
-      name: "Reference / Proof", 
+    {
+      name: "Reference / Proof",
       selector: row => row.bankReference || row.proofOfPayment,
       cell: row => {
         if (row.paymentMode === 'Online' && row.proofOfPayment) {
           return (
-            <a 
-              href={row.proofOfPayment} 
-              target="_blank" 
+            <a
+              href={row.proofOfPayment}
+              target="_blank"
               rel="noopener noreferrer"
               className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap"
             >
@@ -752,11 +820,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         return <span className="font-mono text-xs text-slate-600">{row.bankReference || '-'}</span>;
       }
     },
-    { 
-      name: "Date", width:"110px",
-      selector: row => row.paidAt, 
-      sortable: true, 
-      cell: row => <span className="text-gray-600 font-medium">{new Date(row.paidAt).toLocaleDateString("en-GB")}</span> 
+    {
+      name: "Date", width: "110px",
+      selector: row => row.paidAt,
+      sortable: true,
+      cell: row => <span className="text-gray-600 font-medium">{new Date(row.paidAt).toLocaleDateString("en-GB")}</span>
     },
     {
       name: "Action",
@@ -764,10 +832,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       width: "100px",
       cell: row => (
         <div className="flex items-center gap-1">
-          <button 
+          <button
             onClick={() => {
-              const url = row.paymentId 
-                ? `/student-fees/${row.originalFeeId}/receipt?paymentId=${row.paymentId}` 
+              const url = row.paymentId
+                ? `/student-fees/${row.originalFeeId}/receipt?paymentId=${row.paymentId}`
                 : `/student-fees/${row.originalFeeId || row._id}/receipt`;
               downloadReceipt(url, `FeeReceipt_${row.originalFeeId || row._id}.pdf`);
             }}
@@ -781,9 +849,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     }
   ] : [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
-    { 
-      name: "Student",width:"150px", 
-      selector: row => row.student?.studentNameEnglish, 
+    {
+      name: "Student", width: "150px",
+      selector: row => row.student?.studentNameEnglish,
       sortable: true,
       cell: row => (
         <div>
@@ -793,10 +861,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         </div>
       )
     },
-    { 
-      name: "Course & Batch", 
-      selector: row => row.course?.title, 
-      sortable: true, width:"200px",
+    {
+      name: "Course & Batch",
+      selector: row => row.course?.title,
+      sortable: true, width: "200px",
       cell: row => (
         <div>
           <div className="font-medium text-gray-700 truncate max-w-[200px]">{row.course?.title || "-"}</div>
@@ -804,21 +872,21 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         </div>
       )
     },
-    { 
-      name: "Center", 
-      selector: row => row.center?.name, 
+    {
+      name: "Center",
+      selector: row => row.center?.name,
       sortable: true,
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
-    { 
-      name: feeType === 'Both' ? "Total Fees" : "Fee Details", width:"180px",
-      selector: row => row.amount, 
-      sortable: true, 
+    {
+      name: feeType === 'Both' ? "Total Fees" : "Fee Details", width: "180px",
+      selector: row => row.amount,
+      sortable: true,
       cell: row => {
-        const totalDue = row.amount + 
-          (row.isPenaltyApplied ? row.penaltyAmount : 0) + 
+        const totalDue = row.amount +
+          (row.isPenaltyApplied ? row.penaltyAmount : 0) +
           (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
-          
+
         return (
           <div className="flex flex-col gap-1 py-1.5">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -827,10 +895,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
                 {getSchemeBadgeLabel(row)}
               </span>
             </div>
-            
+
             <div className="text-[9px] text-slate-500">
               Base: ₹{row.amount?.toLocaleString("en-IN")}
-              {((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)) > 0 && 
+              {((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)) > 0 &&
                 ` + Penalty: ₹${((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}`
               }
             </div>
@@ -889,10 +957,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         );
       }
     },
-    { 
-      name: "Status", width:"150px",
-      selector: row => row.status, 
-      sortable: true, 
+    {
+      name: "Status", width: "150px",
+      selector: row => row.status,
+      sortable: true,
       center: true,
       cell: row => {
         const bal = getRemainingBalance(row);
@@ -923,7 +991,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           );
         } else {
           return (
-            <button 
+            <button
               onClick={() => {
                 setSelectedFee(row);
                 setShowCollectModal(true);
@@ -936,11 +1004,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         }
       }
     },
-    { 
-      name: "Date", width:"110px",
-      selector: row => row.createdAt, 
-      sortable: true, 
-      cell: row => <span className="text-gray-600 font-medium">{new Date(row.createdAt).toLocaleDateString("en-GB")}</span> 
+    {
+      name: "Date", width: "110px",
+      selector: row => row.createdAt,
+      sortable: true,
+      cell: row => <span className="text-gray-600 font-medium">{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
     },
     {
       name: "Action",
@@ -949,7 +1017,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       cell: row => (
         <div className="flex items-center gap-1">
           {(row.status === "paid" || getRemainingBalance(row) === 0) && (
-            <button 
+            <button
               onClick={() => downloadReceipt(`/student-fees/${row._id}/receipt`, `FeeReceipt_${row._id}.pdf`)}
               className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
               title="Download Receipt"
@@ -958,7 +1026,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             </button>
           )}
           {!paidOnly && (
-            <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
+            <button onClick={() => setConfirmModal({ isOpen: true, id: row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
             </button>
           )}
@@ -971,15 +1039,23 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-slate-800">{feeType === 'All' ? 'All' : feeType} Fees</h2>
-        {!paidOnly && (
-          <button 
-            onClick={() => setShowModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md"
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Add Fee
+            <Download size={16} /> Export
           </button>
-        )}
+          {!paidOnly && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-red-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Fee
+            </button>
+          )}
+        </div>
       </div>
       <CustomDataTable
         columns={columns}
@@ -989,16 +1065,26 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         setSearch={setSearch}
         searchPlaceholder={`Search ${feeType} fees by student, ID, course...`}
         pagination
-        exportButton={
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-200 transition-colors cursor-pointer"
-          >
-            <Download size={14} /> Export
-          </button>
-        }
         additionalHeaderContent={
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">To</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+              />
+            </div>
             <select
               value={selectedCenter}
               onChange={(e) => setSelectedCenter(e.target.value)}
@@ -1046,6 +1132,21 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               </select>
             )}
 
+            {!batchObj && !paidOnly && (
+              <select
+                value={selectedFeeYear}
+                onChange={(e) => setSelectedFeeYear(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+              >
+                <option value="all">All Years</option>
+                <option value="1">Year 1</option>
+                <option value="2">Year 2</option>
+                <option value="3">Year 3</option>
+                <option value="4">Year 4</option>
+                <option value="5">Year 5</option>
+              </select>
+            )}
+
             {!paidOnly && (
               <select
                 value={selectedStatus}
@@ -1059,13 +1160,16 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               </select>
             )}
 
-            {(selectedCenter !== "all" || selectedCourse !== "all" || selectedBatch !== "all" || selectedStatus !== "all") && (
+            {(selectedCenter !== "all" || selectedCourse !== "all" || selectedBatch !== "all" || selectedFeeYear !== "all" || selectedStatus !== "all" || fromDate !== "" || toDate !== "") && (
               <button
                 onClick={() => {
                   setSelectedCenter("all");
                   setSelectedCourse("all");
                   setSelectedBatch("all");
+                  setSelectedFeeYear("all");
                   setSelectedStatus("all");
+                  setFromDate("");
+                  setToDate("");
                 }}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
               >
@@ -1076,7 +1180,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         }
       />
       {showModal && (
-        <AddStudentFeeModal 
+        <AddStudentFeeModal
           onClose={() => setShowModal(false)}
           onSave={handleSaveFee}
           students={students}
@@ -1104,15 +1208,14 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-900 mb-2">Export Data</h3>
             <p className="text-slate-500 text-xs mb-6">Choose your preferred format to export the filtered list.</p>
-            
+
             <div className="grid grid-cols-2 gap-3 mb-6">
               <button
                 onClick={() => setExportFormat("excel")}
-                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
-                  exportFormat === "excel"
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "excel"
                     ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                     : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
                   <FileSpreadsheet size={20} />
@@ -1122,11 +1225,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
               <button
                 onClick={() => setExportFormat("pdf")}
-                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
-                  exportFormat === "pdf"
+                className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "pdf"
                     ? "border-red-500 bg-red-50 text-red-700"
                     : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>
                   <FileText size={20} />
@@ -1147,6 +1249,33 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
                 className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-200 transition-all cursor-pointer"
               >
                 Export
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {confirmModal.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={() => setConfirmModal({ isOpen: false, id: null })}>
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Fee Record</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Are you sure you want to delete this fee record? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmModal({ isOpen: false, id: null })}
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeDelete}
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white transition-colors shadow-sm bg-red-600 hover:bg-red-700 shadow-red-200"
+              >
+                Yes, Delete
               </button>
             </div>
           </div>

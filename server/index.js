@@ -40,6 +40,7 @@ const searchRoutes = require("./routes/searchRoutes");
 const reminderRoutes = require("./routes/reminderRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
 const hallTicketRoutes = require("./routes/hallTicketRoutes");
+const publicHallTicketRoutes = require("./routes/publicHallTicketRoutes");
 const bulkUploadHistoryRoutes = require("./routes/bulkUploadHistoryRoutes");
 dotenv.config();
 connectDB().then(async () => {
@@ -109,6 +110,7 @@ app.use("/api/search", searchRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/hall-tickets", hallTicketRoutes);
+app.use("/api/public-hallticket", publicHallTicketRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

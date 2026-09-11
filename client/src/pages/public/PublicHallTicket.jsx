@@ -1,13 +1,50 @@
-import React, { useRef, useState } from 'react';
-import { X, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
+import { Search, Calendar, FileText, ArrowRight, ArrowLeft, Printer } from 'lucide-react';
+import logoHeader from "../../assets/RG-Academy.png";
 import logo from '../../assets/logo-2.jpeg';
 
-const HallTicketModal = ({ students, exam, onClose }) => {
+const PublicHallTicket = () => {
+  const [step, setStep] = useState(1);
+  const [studentId, setStudentId] = useState('');
+  const [dob, setDob] = useState('');
+  const [hallTicketData, setHallTicketData] = useState(null);
+  const [loading, setLoading] = useState(false);
   const printRef = useRef();
-  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  const handleFetchHallTicket = async (e) => {
+    e.preventDefault();
+    if (!studentId) return toast.error('Please enter your Student ID');
+    if (!dob) return toast.error('Please enter your Date of Birth');
+
+    let formattedDob = dob;
+    if (dob.includes('-') && dob.split('-')[0].length === 4) {
+      const [year, month, day] = dob.split('-');
+      formattedDob = `${year}-${month}-${day}`;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/public-hallticket/verify`, { studentId, dob: formattedDob });
+      setHallTicketData(data);
+      setStep(2);
+      toast.success('Details verified successfully.');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Invalid Student ID or Date of Birth');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePrint = () => {
     const printContent = printRef.current;
+    if (!printContent) return;
+
     const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
       .map(el => el.outerHTML)
       .join('\n');
@@ -24,7 +61,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
     doc.write(`
       <html>
         <head>
-          <title>Print Hall Tickets</title>
+          <title>Print Hall Ticket</title>
           ${styleTags}
           <style>
             @page { size: A4; margin: 10mm; }
@@ -68,14 +105,17 @@ const HallTicketModal = ({ students, exam, onClose }) => {
     "In case of any discrepancy, Institution's decision will be final."
   ];
 
-  const renderTicket = (student, index, isPrint = false) => {
-    if (!student) return null;
+  const renderTicket = () => {
+    if (!hallTicketData) return null;
+    const { student, hallTicket } = hallTicketData;
+    const { exam } = hallTicket;
+    
+    // Fallback if populate didn't work as expected
     const courseTitle = student.enrolledCourses?.[0]?.course?.title || exam?.course?.title || "N/A";
 
     return (
-      <div key={student._id || index} style={{ pageBreakAfter: index === students.length - 1 ? 'auto' : 'always' }}>
+      <div>
         <div className="hall-ticket-container bg-white text-black" style={{ border: '2px solid #000', padding: '20px' }}>
-
           {/* Header */}
         <div className="flex items-center border-b-2 border-black pb-2 mb-0">
           <div className="w-32 text-center p-2">
@@ -149,9 +189,7 @@ const HallTicketModal = ({ students, exam, onClose }) => {
 
         {/* Footer Box */}
         <div className="border-2 border-black border-t-0 border-l-0 border-r-0 p-4 flex justify-between items-end font-bold text-[15px] text-[#1e3a8a]">
-          <div className="leading-relaxed">
-
-          </div>
+          <div className="leading-relaxed"></div>
           <div className="pr-12 pt-16 text-black font-semibold">
             Examiner Signature
           </div>
@@ -171,76 +209,112 @@ const HallTicketModal = ({ students, exam, onClose }) => {
     );
   };
 
-  const handlePrev = () => {
-    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-  };
-
-  const handleNext = () => {
-    if (currentIndex < students.length - 1) setCurrentIndex(currentIndex + 1);
-  };
-
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-100 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[95vh]">
-        {/* Modal Header */}
-        <div className="bg-white px-6 py-4 rounded-t-2xl border-b border-slate-200 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Hall Tickets</h2>
-            <p className="text-sm text-slate-500 font-medium">Viewing Student {currentIndex + 1} of {students?.length || 0}</p>
-          </div>
-
-          {/* Pagination Controls */}
-          {students?.length > 1 && (
-            <div className="flex items-center gap-4 bg-slate-100 p-1.5 rounded-xl">
-              <button
-                onClick={handlePrev}
-                disabled={currentIndex === 0}
-                className="p-2 rounded-lg bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <span className="font-bold text-slate-700 text-sm w-12 text-center">
-                {currentIndex + 1} / {students.length}
-              </span>
-              <button
-                onClick={handleNext}
-                disabled={currentIndex === students.length - 1}
-                className="p-2 rounded-lg bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
-              >
-                <ChevronRight size={20} />
-              </button>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        {step === 1 && (
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <div className="inline-flex flex-col items-center justify-center mb-6">
+                <img src={logoHeader} alt="Academy Logo" className="h-20 object-contain mb-3" />
+                <h1 className="text-3xl font-bold text-slate-900">Dr.RG Academy</h1>
+              </div>
+              <h2 className="text-xl font-medium text-slate-700 mb-2">Download Hall Ticket</h2>
+              <p className="text-slate-600">Enter your Student ID and Date of Birth to proceed.</p>
             </div>
-          )}
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handlePrint}
-              className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 font-bold"
-            >
-              <Printer size={18} /> Print All ({students?.length || 0})
-            </button>
-            <button onClick={onClose} className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-              <X size={24} />
-            </button>
-          </div>
-        </div>
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 sm:p-8">
+              <form onSubmit={handleFetchHallTicket} className="space-y-5">
+                <div>
+                  <label htmlFor="studentId" className="block text-sm font-medium text-slate-700 mb-1">Student ID</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search size={18} />
+                    </div>
+                    <input
+                      type="text"
+                      id="studentId"
+                      value={studentId}
+                      onChange={(e) => setStudentId(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-slate-900"
+                      placeholder="e.g. STU-XXXX-YYYY"
+                      required
+                    />
+                  </div>
+                </div>
 
-        {/* Modal Body with Display Content */}
-        <div className="overflow-y-auto p-8 flex flex-col gap-8 items-center bg-slate-200">
-          <div className="w-full flex flex-col gap-8 max-w-[210mm]">
-            {students?.length > 0 && renderTicket(students[currentIndex], currentIndex)}
-          </div>
-        </div>
+                <div>
+                  <label htmlFor="dob" className="block text-sm font-medium text-slate-700 mb-1">Date of Birth</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Calendar size={18} />
+                    </div>
+                    <input
+                      type="date"
+                      id="dob"
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-slate-900"
+                      required
+                    />
+                  </div>
+                </div>
 
-        {/* Hidden Print Content */}
-        <div style={{ display: 'none' }}>
-          <div ref={printRef}>
-            {students?.map((student, index) => renderTicket(student, index, true))}
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <span>Loading...</span>
+                    ) : (
+                      <>
+                        Download Hall Ticket <ArrowRight size={18} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        )}
+
+        {step === 2 && hallTicketData && (
+          <div>
+            <div className="mb-8 flex justify-between items-center bg-white px-8 py-4 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex items-center gap-4">
+                <img src={logoHeader} alt="Academy Logo" className="h-14 object-contain drop-shadow-sm" />
+                <h2 className="text-3xl font-black text-slate-900 tracking-wide">Dr.RG Academy</h2>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handlePrint}
+                  className="bg-indigo-600 text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-md font-medium"
+                >
+                  <Printer size={18} /> Print Hall Ticket
+                </button>
+                <button 
+                  onClick={() => { setStep(1); setHallTicketData(null); setStudentId(''); setDob(''); }}
+                  className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-4 py-2 rounded-lg"
+                >
+                  <ArrowLeft size={16} /> Back
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-8 overflow-x-auto">
+              <div className="p-8 flex justify-center bg-slate-200 min-h-screen">
+                <div ref={printRef} className="bg-white shadow-xl max-w-[210mm] w-full">
+                  {renderTicket()}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default HallTicketModal;
+export default PublicHallTicket;

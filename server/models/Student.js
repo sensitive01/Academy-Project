@@ -136,6 +136,10 @@ const studentSchema = new mongoose.Schema(
     ],
 
     // COURSE INFO
+    paymentScheme: String,
+    courseFee: Number,
+    councilFee: Number,
+
     enrolledCourses: [
       {
         course: {
