@@ -313,7 +313,13 @@ const Students = () => {
   const [students, setStudents] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const getSessionValue = (key, defaultVal) => {
+    const val = sessionStorage.getItem(key);
+    if (!val) return defaultVal;
+    try { return JSON.parse(val); } catch (e) { return val; }
+  };
+
+  const [search, setSearch] = useState(() => getSessionValue("students_search", ""));
   const [attendanceRefresh, setAttendanceRefresh] = useState(0);
 
   // Preview Pagination & Search
@@ -346,13 +352,24 @@ const Students = () => {
     return `${dd}/${mm}/${d.getFullYear()}`;
   };
   // New Filter States
-  const [filterType, setFilterType] = useState([]);
-  const [filterCenter, setFilterCenter] = useState([]);
-  const [filterCourse, setFilterCourse] = useState([]);
-  const [filterBatch, setFilterBatch] = useState([]);
-  const [filterYears, setFilterYears] = useState([]);
-  const [filterStatus, setFilterStatus] = useState([]);
-  const [filterVendor, setFilterVendor] = useState([]);
+  const [filterType, setFilterType] = useState(() => getSessionValue("students_filterType", []));
+  const [filterCenter, setFilterCenter] = useState(() => getSessionValue("students_filterCenter", []));
+  const [filterCourse, setFilterCourse] = useState(() => getSessionValue("students_filterCourse", []));
+  const [filterBatch, setFilterBatch] = useState(() => getSessionValue("students_filterBatch", []));
+  const [filterYears, setFilterYears] = useState(() => getSessionValue("students_filterYears", []));
+  const [filterStatus, setFilterStatus] = useState(() => getSessionValue("students_filterStatus", []));
+  const [filterVendor, setFilterVendor] = useState(() => getSessionValue("students_filterVendor", []));
+
+  useEffect(() => {
+    sessionStorage.setItem("students_search", JSON.stringify(search));
+    sessionStorage.setItem("students_filterType", JSON.stringify(filterType));
+    sessionStorage.setItem("students_filterCenter", JSON.stringify(filterCenter));
+    sessionStorage.setItem("students_filterCourse", JSON.stringify(filterCourse));
+    sessionStorage.setItem("students_filterBatch", JSON.stringify(filterBatch));
+    sessionStorage.setItem("students_filterYears", JSON.stringify(filterYears));
+    sessionStorage.setItem("students_filterStatus", JSON.stringify(filterStatus));
+    sessionStorage.setItem("students_filterVendor", JSON.stringify(filterVendor));
+  }, [search, filterType, filterCenter, filterCourse, filterBatch, filterYears, filterStatus, filterVendor]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);

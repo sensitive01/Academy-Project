@@ -4,8 +4,11 @@ import CustomDataTable from "../common/DataTable";
 import toast from "react-hot-toast";
 import AddStudentFeeModal from "../modals/AddStudentFeeModal";
 import CollectPaymentModal from "./CollectPaymentModal";
+import PaymentHistoryView from "./PaymentHistoryView";
+import BulkUploadFeeView from "./BulkUploadFeeView";
+import { Upload } from "lucide-react";
 import { downloadReceipt } from "../../utils/downloadReceipt";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Search } from "lucide-react";
 import ReactDOM from "react-dom";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
@@ -21,28 +24,50 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const [showModal, setShowModal] = useState(false);
   const [showCollectModal, setShowCollectModal] = useState(false);
   const [selectedFee, setSelectedFee] = useState(null);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [selectedPaymentsFee, setSelectedPaymentsFee] = useState(null);
+  const [showBulkUploadView, setShowBulkUploadView] = useState(false);
+  const [bulkUploadData, setBulkUploadData] = useState([]);
+  const [showBulkDropdown, setShowBulkDropdown] = useState(false);
+  const fileInputRef = React.useRef(null);
+
+  const getSessionValue = (key, defaultVal) => {
+    const val = sessionStorage.getItem(`fees_${feeType}_${paidOnly}_${key}`);
+    if (!val) return defaultVal;
+    try { return JSON.parse(val); } catch (e) { return val; }
+  };
 
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => getSessionValue("search", ""));
 
-  const [selectedCenter, setSelectedCenter] = useState("all");
-  const [selectedCourse, setSelectedCourse] = useState("all");
-  const [selectedBatch, setSelectedBatch] = useState("all");
-  const [selectedBatchYear, setSelectedBatchYear] = useState(1);
-  const [selectedFeeYear, setSelectedFeeYear] = useState("all");
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedCenter, setSelectedCenter] = useState(() => getSessionValue("center", "all"));
+  const [selectedCourse, setSelectedCourse] = useState(() => getSessionValue("course", "all"));
+  const [selectedBatch, setSelectedBatch] = useState(() => getSessionValue("batch", "all"));
+  const [selectedFeeYear, setSelectedFeeYear] = useState(() => getSessionValue("feeYear", "all"));
+  const [selectedStatus, setSelectedStatus] = useState(() => getSessionValue("status", "all"));
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(() => getSessionValue("fromDate", ""));
+  const [toDate, setToDate] = useState(() => getSessionValue("toDate", ""));
+
+  useEffect(() => {
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_search`, JSON.stringify(search));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_center`, JSON.stringify(selectedCenter));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_course`, JSON.stringify(selectedCourse));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_batch`, JSON.stringify(selectedBatch));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_feeYear`, JSON.stringify(selectedFeeYear));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_status`, JSON.stringify(selectedStatus));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_fromDate`, JSON.stringify(fromDate));
+    sessionStorage.setItem(`fees_${feeType}_${paidOnly}_toDate`, JSON.stringify(toDate));
+  }, [search, selectedCenter, selectedCourse, selectedBatch, selectedFeeYear, selectedStatus, fromDate, toDate, feeType, paidOnly]);
 
   const getDynamicMonths = () => {
     let currentStartDate = "";
     let currentEndDate = "";
 
     if (batchObj && batchObj.periods && batchObj.periods.length > 0) {
-      const currentPeriod = batchObj.periods.find(p => p.year === selectedBatchYear) || batchObj.periods[0];
+      const currentPeriod = batchObj.periods.find(p => p.year === (selectedFeeYear !== "all" ? Number(selectedFeeYear) : 1)) || batchObj.periods[0];
       if (currentPeriod) {
         currentStartDate = currentPeriod.startDate;
         currentEndDate = currentPeriod.endDate;
@@ -251,6 +276,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
                 course: f.course,
                 batch: f.batch,
                 center: f.center,
+                year: f.year,
                 feeType: f.feeType,
                 otherFeeType: f.otherFeeType,
                 paymentMode: p.paymentMode,
@@ -271,6 +297,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               course: f.course,
               batch: f.batch,
               center: f.center,
+              year: f.year,
               feeType: f.feeType,
               otherFeeType: f.otherFeeType,
               paymentMode: f.paymentMode,
@@ -301,17 +328,17 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
           let feeYearDigit = null;
           if (f.year) {
-             const match = f.year.match(/\d+/);
-             if (match) feeYearDigit = match[0];
+            const match = f.year.match(/\d+/);
+            if (match) feeYearDigit = match[0];
           } else if (f.otherFeeType) {
-             const match = f.otherFeeType.match(/Year\s*(\d+)/i);
-             if (match) feeYearDigit = match[1];
+            const match = f.otherFeeType.match(/Year\s*(\d+)/i);
+            if (match) feeYearDigit = match[1];
           }
 
           let studentYearDigit = null;
           if (f.student?.year) {
-             const match = f.student.year.match(/\d+/);
-             if (match) studentYearDigit = match[0];
+            const match = f.student.year.match(/\d+/);
+            if (match) studentYearDigit = match[0];
           }
 
           const feeYear = feeYearDigit ? `Year ${feeYearDigit}` : (f.student?.year || "Unknown Year");
@@ -478,7 +505,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         // Single fee deletion
         await api.delete(`/student-fees/${id}`);
       }
-      setFees(fees.filter(f => f._id !== id));
+      setFees(fees.filter(f => f._id !== id && f.originalFeeId !== id));
       toast.success("Fee deleted successfully");
     } catch (err) {
       toast.error("Failed to delete fee");
@@ -515,12 +542,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       const match = String(f.otherFeeType).match(/Year\s*(\d+)/i);
       if (match) rowYearDigit = Number(match[1]);
     }
-    
-    if (batchObj) {
-      if (rowYearDigit !== null) {
-        matchesYear = rowYearDigit === selectedBatchYear;
-      }
-    } else if (selectedFeeYear !== "all") {
+
+    if (rowYearDigit === null && f.student?.year) {
+      const match = String(f.student.year).match(/\d+/);
+      if (match) rowYearDigit = Number(match[0]);
+    }
+
+    if (selectedFeeYear !== "all") {
       if (rowYearDigit !== null) {
         matchesYear = rowYearDigit === Number(selectedFeeYear);
       } else {
@@ -540,26 +568,159 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     }
 
     let matchesDate = true;
-    const fDate = new Date(paidOnly ? (f.paidAt || f.createdAt) : f.createdAt);
-    if (fromDate) {
-      const from = new Date(fromDate);
-      from.setHours(0, 0, 0, 0);
-      matchesDate = matchesDate && fDate >= from;
-    }
-    if (toDate) {
-      const to = new Date(toDate);
-      to.setHours(23, 59, 59, 999);
-      matchesDate = matchesDate && fDate <= to;
+    if (fromDate || toDate) {
+      let from = fromDate ? new Date(fromDate) : null;
+      if (from) from.setHours(0, 0, 0, 0);
+      let to = toDate ? new Date(toDate) : null;
+      if (to) to.setHours(23, 59, 59, 999);
+
+      const createdDate = new Date(f.createdAt);
+      let createdInRange = true;
+      if (from) createdInRange = createdInRange && createdDate >= from;
+      if (to) createdInRange = createdInRange && createdDate <= to;
+
+      let paymentInRange = false;
+      if (f.payments && f.payments.length > 0) {
+        paymentInRange = f.payments.some(p => {
+          const pDate = new Date(p.paidAt || p.createdAt || f.createdAt);
+          let pMatch = true;
+          if (from) pMatch = pMatch && pDate >= from;
+          if (to) pMatch = pMatch && pDate <= to;
+          return pMatch;
+        });
+      }
+
+      // Special fallback for paidOnly mode if top-level paidAt is set
+      let topPaidInRange = false;
+      if (paidOnly && f.paidAt) {
+        const tpDate = new Date(f.paidAt);
+        topPaidInRange = true;
+        if (from) topPaidInRange = topPaidInRange && tpDate >= from;
+        if (to) topPaidInRange = topPaidInRange && tpDate <= to;
+      }
+
+      matchesDate = createdInRange || paymentInRange || topPaidInRange;
     }
 
     return matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesYear && matchesStatus && matchesDate;
   });
 
+
+  const dataWithSummary = [...filtered];
+  if (filtered.length > 0) {
+    if (!paidOnly) {
+      const summaryRow = {
+        isSummary: true,
+        _id: 'summary_row_totals',
+        student: { studentNameEnglish: 'TOTALS' },
+        amount: filtered.reduce((sum, f) => sum + (f.amount || 0), 0),
+        penaltyAmount: filtered.reduce((sum, f) => sum + (f.penaltyAmount || 0), 0),
+        finalPenaltyAmount: filtered.reduce((sum, f) => sum + (f.finalPenaltyAmount || 0), 0),
+        courseAmount: filtered.reduce((sum, f) => sum + (f.courseAmount || 0), 0),
+        coursePenaltyAmount: filtered.reduce((sum, f) => sum + (f.coursePenaltyAmount || 0), 0),
+        totalCoursePaid: filtered.reduce((sum, f) => sum + (f.coursePayments ? f.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0), 0),
+        councilAmount: filtered.reduce((sum, f) => sum + (f.councilAmount || 0), 0),
+        councilPenaltyAmount: filtered.reduce((sum, f) => sum + (f.councilPenaltyAmount || 0), 0),
+        totalCouncilPaid: filtered.reduce((sum, f) => sum + (f.councilPayments ? f.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0), 0),
+        totalRemainingBalance: filtered.reduce((sum, f) => sum + getRemainingBalance(f), 0),
+        isPenaltyApplied: true,
+        isFinalPenaltyApplied: true
+      };
+
+      dynamicMonths.forEach(m => {
+        summaryRow['month_' + m.label] = filtered.reduce((sum, f) => sum + getAmountForMonth(f, m), 0);
+      });
+
+      dataWithSummary.push(summaryRow);
+    } else {
+      const summaryRow = {
+        isSummary: true,
+        _id: 'summary_row_totals',
+        student: { studentNameEnglish: 'TOTALS' },
+        amount: filtered.reduce((sum, f) => sum + (f.amount || 0), 0)
+      };
+      dataWithSummary.push(summaryRow);
+    }
+  }
+
+
+  const handleDownloadSample = () => {
+    const sampleData = [
+      {
+        "Student ID": "STU-2023-001",
+        "Year": "1st Year",
+        "Fee Type": "Course",
+        "Total Amount": "50000",
+        "Paid Amount": "25000",
+        "Payment Mode": "Online",
+        "Bank Reference": "TXN12345678",
+        "Paid Date": "2023-08-15"
+      },
+      {
+        "Student ID": "STU-2023-002",
+        "Year": "1st Year",
+        "Fee Type": "Council",
+        "Total Amount": "5000",
+        "Paid Amount": "5000",
+        "Payment Mode": "Cash",
+        "Bank Reference": "",
+        "Paid Date": "2023-08-16"
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    const wscols = Object.keys(sampleData[0]).map(key => ({ wch: Math.max(key.length, 15) }));
+    ws['!cols'] = wscols;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sample Format");
+    XLSX.writeFile(wb, "Bulk_Fees_Import_Sample.xlsx");
+  };
+
+  const handleBulkFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+          if (jsonData.length === 0) {
+            toast.error("The uploaded file is empty");
+            return;
+          }
+
+          const mappedData = jsonData.map(row => ({
+            studentId: row["Student ID"] ? String(row["Student ID"]).trim() : "",
+            year: row["Year"] ? String(row["Year"]).trim() : "",
+            feeType: row["Fee Type"] ? String(row["Fee Type"]).trim() : "",
+            totalAmount: row["Total Amt"] || row["Total Amount"],
+            paidAmount: row["Paid Amt"] || row["Paid Amount"],
+            paymentMode: row["Payment Mode"] || row["Payment M..."] || "Cash",
+            bankReference: row["Bank Reference"] ? String(row["Bank Reference"]).trim() : "",
+            paidDate: row["Paid Date"]
+          }));
+
+          setBulkUploadData(mappedData);
+          setShowBulkUploadView(true);
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to parse the Excel file");
+        }
+      };
+      reader.onerror = () => toast.error("Error reading file");
+      reader.readAsArrayBuffer(file);
+      e.target.value = null;
+    }
+  };
+
   const handleExport = () => {
     setShowExportModal(false);
     if (paidOnly) {
       if (exportFormat === "excel") {
-        const data = filtered.map((f, i) => {
+        const data = dataWithSummary.map((f, i) => {
           let lbl = f.feeType;
           if (f.feeType === 'Other' && f.otherFeeType) {
             lbl = f.otherFeeType;
@@ -572,17 +733,17 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           }
 
           return {
-            "S.No": i + 1,
-            "Student Name": f.student?.studentNameEnglish || "N/A",
-            "Student ID": f.student?.studentId || "-",
-            "Course": f.course?.title || "-",
-            "Batch": f.batch?.name || "-",
-            "Center": f.center?.name || "-",
-            "Fee Type": lbl,
+            "S.No": f.isSummary ? "" : i + 1,
+            "Student Name": f.isSummary ? "TOTALS" : f.student?.studentNameEnglish || "N/A",
+            "Student ID": f.isSummary ? "" : f.student?.studentId || "-",
+            "Course": f.isSummary ? "" : f.course?.title || "-",
+            "Batch": f.isSummary ? "" : f.batch?.name || "-",
+            "Center": f.isSummary ? "" : f.center?.name || "-",
+            "Fee Type": f.isSummary ? "" : lbl,
             "Amount Paid": f.amount || 0,
-            "Payment Mode": f.paymentMode || "-",
-            "Reference": f.bankReference || "-",
-            "Paid Date": f.paidAt ? new Date(f.paidAt).toLocaleDateString("en-IN") : "-"
+            "Payment Mode": f.isSummary ? "" : f.paymentMode || "-",
+            "Reference": f.isSummary ? "" : f.bankReference || "-",
+            "Paid Date": f.isSummary ? "" : f.paidAt ? new Date(f.paidAt).toLocaleDateString("en-IN") : "-"
           };
         });
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -596,7 +757,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
         const tableColumn = ["S.No", "Student", "Course & Batch", "Center", "Type", "Amount Paid", "Mode", "Reference", "Paid Date"];
         const tableRows = [];
-        filtered.forEach((f, index) => {
+        dataWithSummary.forEach((f, index) => {
           let lbl = f.feeType;
           if (f.feeType === 'Other' && f.otherFeeType) {
             lbl = f.otherFeeType;
@@ -614,7 +775,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             `${f.course?.title || "-"} / ${f.batch?.name || "-"}`,
             f.center?.name || "-",
             lbl,
-            `Rs. ${f.amount.toLocaleString("en-IN")}`,
+            `Rs.${f.amount.toLocaleString("en-IN")}`,
             f.paymentMode || "-",
             f.bankReference || "-",
             f.paidAt ? new Date(f.paidAt).toLocaleDateString("en-IN") : "-"
@@ -638,18 +799,18 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     }
 
     if (exportFormat === "excel") {
-      const data = filtered.map((f, i) => {
+      const data = dataWithSummary.map((f, i) => {
         const totalDue = f.amount +
           (f.isPenaltyApplied ? f.penaltyAmount : 0) +
           (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
 
         const exportRow = {
-          "S.No": i + 1,
-          "Student Name": f.student?.studentNameEnglish || "N/A",
-          "Student ID": f.student?.studentId || "-",
-          "Course": f.course?.title || "-",
-          "Batch": f.batch?.name || "-",
-          "Center": f.center?.name || "-",
+          "S.No": f.isSummary ? "" : i + 1,
+          "Student Name": f.isSummary ? "TOTALS" : f.student?.studentNameEnglish || "N/A",
+          "Student ID": f.isSummary ? "" : f.student?.studentId || "-",
+          "Course": f.isSummary ? "" : f.course?.title || "-",
+          "Batch": f.isSummary ? "" : f.batch?.name || "-",
+          "Center": f.isSummary ? "" : f.center?.name || "-",
           "Fee Type": f.feeType === 'Other' && f.otherFeeType ? f.otherFeeType : f.feeType,
           "Total Fee": totalDue || 0,
         };
@@ -682,7 +843,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       tableColumn.push("Balance", "Status");
 
       const tableRows = [];
-      filtered.forEach((f, index) => {
+      dataWithSummary.forEach((f, index) => {
         const totalDue = f.amount +
           (f.isPenaltyApplied ? f.penaltyAmount : 0) +
           (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
@@ -692,7 +853,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           `${f.student?.studentNameEnglish || "N/A"} (${f.student?.studentId || "-"})`,
           `${f.course?.title || "-"} / ${f.batch?.name || "-"}`,
           f.center?.name || "-",
-          `Rs. ${totalDue.toLocaleString("en-IN")}`
+          `Rs.${totalDue.toLocaleString("en-IN")}`
         ];
 
         if (feeType !== 'Exam') {
@@ -702,7 +863,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         }
 
         rowData.push(
-          `Rs. ${getRemainingBalance(f).toLocaleString("en-IN")}`,
+          `Rs.${getRemainingBalance(f).toLocaleString("en-IN")}`,
           f.status || "-"
         );
         tableRows.push(rowData);
@@ -746,7 +907,20 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         <div>
           <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
           <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
-          <div className="text-[10px] text-brand-600 font-bold">{row.year || row.student?.year || ""}</div>
+          <div className="text-[10px] text-brand-600 font-bold">
+            {(() => {
+              const yr = row.year || row.student?.year || "";
+              const match = String(yr).match(/\d+/);
+              if (match) {
+                const n = match[0];
+                if (n === "1") return "1st Year";
+                if (n === "2") return "2nd Year";
+                if (n === "3") return "3rd Year";
+                return `${n}th Year`;
+              }
+              return yr;
+            })()}
+          </div>
         </div>
       )
     },
@@ -824,13 +998,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       name: "Date", width: "110px",
       selector: row => row.paidAt,
       sortable: true,
-      cell: row => <span className="text-gray-600 font-medium">{new Date(row.paidAt).toLocaleDateString("en-GB")}</span>
+      cell: row => row.isSummary ? null : <span className="text-gray-600 font-medium">{new Date(row.paidAt).toLocaleDateString("en-GB")}</span>
     },
     {
       name: "Action",
       center: true,
       width: "100px",
-      cell: row => (
+      cell: row => row.isSummary ? null : (
         <div className="flex items-center gap-1">
           <button
             onClick={() => {
@@ -843,6 +1017,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             title="Download Receipt"
           >
             <Download size={16} />
+          </button>
+          <button onClick={() => setConfirmModal({ isOpen: true, id: row.originalFeeId || row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Delete Fee">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
           </button>
         </div>
       )
@@ -857,7 +1034,20 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         <div>
           <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
           <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
-          <div className="text-[10px] text-brand-600 font-bold">{row.year || row.student?.year || ""}</div>
+          <div className="text-[10px] text-brand-600 font-bold">
+            {(() => {
+              const yr = row.year || row.student?.year || "";
+              const match = String(yr).match(/\d+/);
+              if (match) {
+                const n = match[0];
+                if (n === "1") return "1st Year";
+                if (n === "2") return "2nd Year";
+                if (n === "3") return "3rd Year";
+                return `${n}th Year`;
+              }
+              return yr;
+            })()}
+          </div>
         </div>
       )
     },
@@ -876,6 +1066,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       name: "Center",
       selector: row => row.center?.name,
       sortable: true,
+      width: "130px",
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
     {
@@ -897,7 +1088,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             </div>
 
             <div className="text-[9px] text-slate-500">
-              Base: ₹{row.amount?.toLocaleString("en-IN")}
+              Balance: ₹{row.amount?.toLocaleString("en-IN")}
               {((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)) > 0 &&
                 ` + Penalty: ₹${((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}`
               }
@@ -945,7 +1136,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     ] : []),
     {
       name: "Balance",
-      width: "110px",
+      width: "120px",
       selector: row => getRemainingBalance(row),
       sortable: true,
       cell: row => {
@@ -963,6 +1154,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       sortable: true,
       center: true,
       cell: row => {
+        if (row.isSummary) return null;
         const bal = getRemainingBalance(row);
         if (row.status === 'paid' || bal === 0) {
           return (
@@ -1008,13 +1200,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       name: "Date", width: "110px",
       selector: row => row.createdAt,
       sortable: true,
-      cell: row => <span className="text-gray-600 font-medium">{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
+      cell: row => row.isSummary ? null : <span className="text-gray-600 font-medium">{new Date(row.createdAt).toLocaleDateString("en-GB")}</span>
     },
     {
       name: "Action",
       center: true,
       width: "100px",
-      cell: row => (
+      cell: row => row.isSummary ? null : (
         <div className="flex items-center gap-1">
           {(row.status === "paid" || getRemainingBalance(row) === 0) && (
             <button
@@ -1025,66 +1217,140 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               <Download size={16} />
             </button>
           )}
-          {!paidOnly && (
-            <button onClick={() => setConfirmModal({ isOpen: true, id: row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-            </button>
-          )}
+          <button onClick={() => setConfirmModal({ isOpen: true, id: row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+          </button>
         </div>
       )
     }
   ];
 
+
+  if (showBulkUploadView) {
+    return (
+      <BulkUploadFeeView
+        parsedData={bulkUploadData}
+        onBack={() => setShowBulkUploadView(false)}
+        onSuccess={() => {
+          setShowBulkUploadView(false);
+          fetchFees();
+        }}
+      />
+    );
+  }
+
+  if (showPaymentHistory && selectedPaymentsFee) {
+    return (
+      <PaymentHistoryView
+        fee={selectedPaymentsFee}
+        onBack={() => {
+          setShowPaymentHistory(false);
+          setSelectedPaymentsFee(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-slate-800">{feeType === 'All' ? 'All' : feeType} Fees</h2>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
+        <h2 className="text-xl font-bold text-slate-800 shrink-0">{feeType === 'All' ? 'All' : feeType} Fees</h2>
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end">
+
+          <div className="relative w-full sm:w-64 group shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={16} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${feeType} fees...`}
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-sm font-semibold text-slate-700"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">To</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+            />
+          </div>
+
           <button
             onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer shrink-0"
           >
             <Download size={16} /> Export
           </button>
           {!paidOnly && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-red-200"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              Add Fee
-            </button>
+            <div className="flex gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowBulkDropdown(!showBulkDropdown)}
+                  className="bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
+                >
+                  <Upload size={16} /> Bulk Upload
+                </button>
+                {showBulkDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in slide-in-from-top-2">
+                    <button
+                      onClick={() => {
+                        setShowBulkDropdown(false);
+                        handleDownloadSample();
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Download size={16} /> Sample Download
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowBulkDropdown(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Upload size={16} /> Upload File
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleBulkFileChange}
+                  accept=".xlsx, .xls"
+                  className="hidden"
+                />
+              </div>
+              <button
+                onClick={() => setShowModal(true)}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-red-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Add Fee
+              </button>
+            </div>
           )}
         </div>
       </div>
       <CustomDataTable
         columns={columns}
-        data={filtered}
+        data={dataWithSummary}
         progressPending={loading}
-        search={search}
-        setSearch={setSearch}
-        searchPlaceholder={`Search ${feeType} fees by student, ID, course...`}
         pagination
         additionalHeaderContent={
-          <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-1">
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
-              />
-            </div>
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">To</span>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
-              />
-            </div>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto py-1">
             <select
               value={selectedCenter}
               onChange={(e) => setSelectedCenter(e.target.value)}
@@ -1120,32 +1386,17 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               </select>
             )}
 
-            {batchObj && batchObj.periods && batchObj.periods.length > 1 && (
-              <select
-                value={selectedBatchYear}
-                onChange={(e) => setSelectedBatchYear(Number(e.target.value))}
-                className="px-3 py-2 bg-brand-50 border border-brand-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500 text-brand-700 shadow-sm cursor-pointer hover:bg-brand-100 transition-colors"
-              >
-                {batchObj.periods.map(p => (
-                  <option key={p.year} value={p.year}>Year {p.year}</option>
-                ))}
-              </select>
-            )}
-
-            {!batchObj && !paidOnly && (
-              <select
-                value={selectedFeeYear}
-                onChange={(e) => setSelectedFeeYear(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
-              >
-                <option value="all">All Years</option>
-                <option value="1">Year 1</option>
-                <option value="2">Year 2</option>
-                <option value="3">Year 3</option>
-                <option value="4">Year 4</option>
-                <option value="5">Year 5</option>
-              </select>
-            )}
+            <select
+              value={selectedFeeYear}
+              onChange={(e) => setSelectedFeeYear(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+            >
+              <option value="all">All Years</option>
+              <option value="1">Year 1</option>
+              <option value="2">Year 2</option>
+              <option value="3">Year 3</option>
+              <option value="4">Year 4</option>
+            </select>
 
             {!paidOnly && (
               <select
@@ -1213,8 +1464,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               <button
                 onClick={() => setExportFormat("excel")}
                 className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "excel"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                  : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
@@ -1226,8 +1477,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               <button
                 onClick={() => setExportFormat("pdf")}
                 className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "pdf"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-red-500 bg-red-50 text-red-700"
+                  : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>

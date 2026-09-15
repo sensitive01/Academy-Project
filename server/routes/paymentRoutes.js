@@ -367,4 +367,25 @@ router.get("/invoice/:id", protect, async (req, res) => {
   }
 });
 
+
+
+// @route   DELETE /api/payment/:id
+// @desc    Delete a payment
+// @access  Private/Admin
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+    
+    // Optionally remove student reference if needed, but usually just deleting payment is fine
+    await Payment.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Payment removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

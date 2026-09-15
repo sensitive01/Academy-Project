@@ -49,6 +49,115 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// Bulk Upload Fees
+router.post('/bulk-upload', protect, async (req, res) => {
+  try {
+    const { fees } = req.body;
+    if (!fees || !Array.isArray(fees)) {
+      return res.status(400).json({ message: "Invalid payload format. Expected an array of fees." });
+    }
+
+    let successCount = 0;
+    let failedRows = [];
+
+    for (let i = 0; i < fees.length; i++) {
+      const row = fees[i];
+      const { studentId, year, feeType, totalAmount, paidAmount, paymentMode, bankReference, paidDate } = row;
+      
+      if (!studentId || !feeType || !totalAmount || !paidAmount) {
+        failedRows.push({ row: i + 2, reason: "Missing required fields (Student ID, Fee Type, Total Amount, Paid Amount)" });
+        continue;
+      }
+
+      // Lookup student
+      const student = await Student.findOne({ studentId });
+      if (!student) {
+        failedRows.push({ row: i + 2, reason: `Student ID ${studentId} not found` });
+        continue;
+      }
+
+      // Parse feeType
+      let parsedFeeType = 'Other';
+      let parsedOtherFeeType = '';
+      const fTypeLower = feeType.toString().toLowerCase();
+      
+      if (fTypeLower === 'council' || fTypeLower === 'council fee' || fTypeLower === 'council fees') {
+        parsedFeeType = 'Council';
+      } else if (fTypeLower === 'course' || fTypeLower === 'course fee' || fTypeLower === 'course fees') {
+        parsedFeeType = 'Other';
+        parsedOtherFeeType = 'Course Fees';
+      } else if (['term', 'sem', 'exam', 'monthly'].includes(fTypeLower)) {
+        parsedFeeType = feeType.charAt(0).toUpperCase() + feeType.slice(1).toLowerCase();
+      } else {
+        parsedFeeType = 'Other';
+        parsedOtherFeeType = feeType;
+      }
+
+      const academicYear = year ? String(year) : (student.year || "1");
+
+      let existingFee = await StudentFee.findOne({
+        student: student._id,
+        year: academicYear,
+        feeType: parsedFeeType,
+        ...(parsedOtherFeeType ? { otherFeeType: parsedOtherFeeType } : {})
+      });
+
+      const paymentDetail = {
+        amount: Number(paidAmount),
+        paymentMode: paymentMode || 'Cash',
+        bankReference: bankReference || '',
+        status: 'Approved',
+        paidAt: paidDate ? new Date(paidDate) : new Date()
+      };
+
+      if (existingFee) {
+        if (!existingFee.course || !existingFee.batch) {
+          existingFee.course = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
+          existingFee.batch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
+        }
+
+        existingFee.payments.push(paymentDetail);
+        
+        const totalPaid = existingFee.payments.filter(p => p.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0);
+        const totalDue = existingFee.amount + 
+                         (existingFee.isPenaltyApplied ? existingFee.penaltyAmount : 0) + 
+                         (existingFee.isFinalPenaltyApplied ? existingFee.finalPenaltyAmount : 0);
+                         
+        if (totalPaid >= totalDue) {
+          existingFee.status = 'paid';
+        } else {
+          existingFee.status = 'pending';
+        }
+        await existingFee.save();
+      } else {
+        const studentCourse = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
+        const studentBatch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
+
+        const newFee = new StudentFee({
+          student: student._id,
+          center: student.center,
+          course: studentCourse,
+          batch: studentBatch,
+          year: academicYear,
+          feeType: parsedFeeType,
+          otherFeeType: parsedOtherFeeType,
+          amount: Number(totalAmount),
+          status: Number(paidAmount) >= Number(totalAmount) ? 'paid' : 'pending',
+          payments: [paymentDetail]
+        });
+        await newFee.save();
+      }
+      
+      successCount++;
+    }
+
+    res.json({ successCount, failedCount: failedRows.length, failedRows });
+  } catch (error) {
+    console.error("Bulk Upload Error:", error);
+    res.status(500).json({ message: "Internal server error during bulk upload." });
+  }
+});
+
 // Create new student fee
 router.post('/', protect, async (req, res) => {
   try {
@@ -164,12 +273,25 @@ router.post('/collect-cascade', protect, async (req, res) => {
           { year: "Unknown Year" }
         ];
       } else {
-        query.$or = [
-          { year: year },
-          { year: { $exists: false } },
-          { year: null },
-          { year: "" }
-        ];
+        const match = year.match(/\d+/);
+        if (match) {
+          const digit = match[0];
+          query.$or = [
+            { year: year },
+            { year: new RegExp(`^${digit}$`, 'i') },
+            { year: new RegExp(`\\b${digit}\\b`, 'i') },
+            { year: { $exists: false } },
+            { year: null },
+            { year: "" }
+          ];
+        } else {
+          query.$or = [
+            { year: year },
+            { year: { $exists: false } },
+            { year: null },
+            { year: "" }
+          ];
+        }
       }
     }
     let feeRecords = await StudentFee.find(query);
