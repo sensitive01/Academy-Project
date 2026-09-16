@@ -36,6 +36,7 @@ import GlobalSearch from "./pages/admin/GlobalSearch";
 import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import Settings from "./pages/dashboard/Settings";
 import Students from "./pages/students/Students";
+import AdmissionManagement from "./pages/students/AdmissionManagement";
 import VendorManagement from "./pages/admin/VendorManagement";
 import VendorStudents from "./pages/admin/VendorStudents";
 import EnquiryManagement from "./pages/admin/EnquiryManagement";
@@ -319,8 +320,9 @@ function App() {
             <Route path="finance" element={<Finance />} />
             <Route path="expenses" element={<Expenses />} />
 
-            {/* Students */}
+            {/* Students & Admissions */}
             <Route path="students" element={<Students />} />
+            <Route path="admissions" element={<AdmissionManagement />} />
             <Route path="students/bulk-attendance" element={<BulkAttendance />} />
 
             {/* Coach */}

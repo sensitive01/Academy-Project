@@ -73,6 +73,11 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       // App specific
       year,
       department,
+      createParentLogin,
+      parentLoginEmail,
+      parentLoginName,
+      parentLoginPhone,
+      parentLoginRelation,
     } = req.body;
 
     const finalName = (studentNameEnglish && studentNameEnglish.trim()) || "";
@@ -88,6 +93,28 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
     }
 
     const defaultPassword = "Student@123";
+
+    // 1a️⃣ Create Parent Login (if requested)
+    let parentUserId = null;
+    let parentPassword = null;
+    if (createParentLogin && parentLoginEmail) {
+      const existingParent = await User.findOne({ email: parentLoginEmail.trim() });
+      if (existingParent) {
+        parentUserId = existingParent._id;
+      } else {
+        parentPassword = "Parent@123";
+        const fatherNameVal = parentLoginName || ((familyBackground && familyBackground[0]?.name) ? familyBackground[0].name : "Parent");
+        const fatherPhoneVal = parentLoginPhone || ((familyBackground && familyBackground[0]?.phone) ? familyBackground[0].phone : "");
+        const newParent = await User.create({
+          name: fatherNameVal,
+          email: parentLoginEmail.trim(),
+          password: parentPassword,
+          role: 'parent',
+          mobile: fatherPhoneVal
+        });
+        parentUserId = newParent._id;
+      }
+    }
 
     // 1️⃣ Create User
     const user = await User.create({
@@ -151,7 +178,8 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       familyBackground,
       references,
       year,
-      status: 'active'
+      status: 'active',
+      parent: parentUserId || undefined
     });
 
     if (req.user && req.user.role === 'admin' && req.body.adminEnrollment) {
@@ -217,6 +245,20 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
         <p>Please login and change your password.</p>
       `
     });
+
+    if (parentPassword && parentLoginEmail) {
+      await sendEmailNotification({
+        to: parentLoginEmail.trim(),
+        subject: 'Welcome to DRRJ Academy - Parent Portal',
+        html: `
+          <h2>Welcome!</h2>
+          <p>A parent account has been created for you to track your child's progress.</p>
+          <p><strong>Login Email:</strong> ${parentLoginEmail.trim()}</p>
+          <p><strong>Default Password:</strong> ${parentPassword}</p>
+          <p>Please login and change your password.</p>
+        `
+      });
+    }
 
     res.status(201).json({
       message: 'Registration successful',

@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import ReactDOM from "react-dom";
 import CustomDataTable from "../../components/common/DataTable";
 import Loading from "../../components/common/Loading";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const AdminLogins = () => {
   const [users, setUsers] = useState([]);
@@ -40,6 +41,21 @@ const AdminLogins = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
+    try {
+      await api.delete(`/auth/admin-users/${id}`);
+      toast.success("Sub-admin deleted successfully");
+      fetchUsers();
+    } catch (error) {
+      toast.error("Failed to delete sub-admin");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
+    }
+  };
 
   const fetchUsers = async () => { 
     try {
@@ -89,17 +105,9 @@ const AdminLogins = () => {
     setOpenMenuId(null);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     setOpenMenuId(null);
-    if (window.confirm("Are you sure you want to delete this sub-admin?")) {
-      try {
-        await api.delete(`/auth/admin-users/${id}`);
-        toast.success("Sub-admin deleted successfully");
-        fetchUsers();
-      } catch (error) {
-        toast.error("Failed to delete sub-admin");
-      }
-    }
+    setConfirmModal({ isOpen: true, id });
   };
 
   const toggleMenu = (id, event) => {
@@ -366,6 +374,14 @@ const AdminLogins = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null })}
+        onConfirm={executeDelete}
+        title="Delete Sub-Admin?"
+        message="Are you sure you want to delete this sub-admin? This action cannot be undone."
+      />
     </div>
   );
 };

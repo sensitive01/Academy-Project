@@ -16,6 +16,7 @@ import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewMod
 import Select from "react-select";
 import BatchProgressTab from "../../components/course-management/BatchProgressTab";
 import TemplateSelector from "../../components/course-management/TemplateSelector";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const templates = [
   { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
@@ -43,6 +44,31 @@ const ExamManagement = () => {
   const [studentFees, setStudentFees] = useState([]);
 
   const [loading, setLoading] = useState(true);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null, data: null, type: null });
+
+  const executeDelete = async () => {
+    try {
+      if (confirmModal.type === 'mark') {
+        await api.delete(`/marks/${confirmModal.id}`);
+        toast.success("Mark deleted successfully");
+      } else if (confirmModal.type === 'bulkMark') {
+        await Promise.all(confirmModal.data.map(m => api.delete(`/marks/${m._id}`)));
+        toast.success("Semester marks deleted successfully");
+      } else if (confirmModal.type === 'payment') {
+        await api.delete(`/student-fees/${confirmModal.id}`);
+        toast.success("Payment record deleted successfully");
+      } else if (confirmModal.type === 'exam') {
+        await api.delete(`/exams/${confirmModal.id}`);
+        toast.success("Exam deleted successfully");
+      }
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to delete record(s)");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null, data: null, type: null });
+      setDeleteConfirm({ isOpen: false, id: null });
+    }
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showMarkModal, setShowMarkModal] = useState(false);
@@ -350,19 +376,7 @@ const ExamManagement = () => {
   };
 
   const handleDeleteClick = (id) => {
-    setDeleteConfirm({ isOpen: true, id });
-  };
-
-  const confirmDelete = async () => {
-    try {
-      await api.delete(`/exams/${deleteConfirm.id}`);
-      toast.success("Exam deleted successfully");
-      fetchData();
-    } catch (error) {
-      toast.error("Failed to delete exam");
-    } finally {
-      setDeleteConfirm({ isOpen: false, id: null });
-    }
+    setConfirmModal({ isOpen: true, id, type: 'exam' });
   };
 
   const openMarkModal = (mark = null) => {
@@ -887,28 +901,12 @@ const ExamManagement = () => {
     setShowSampleCsvModal(false);
   };
 
-  const handleMarkDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this mark?")) {
-      try {
-        await api.delete(`/marks/${id}`);
-        toast.success("Mark deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete mark");
-      }
-    }
+  const handleMarkDelete = (id) => {
+    setConfirmModal({ isOpen: true, id, type: 'mark' });
   };
 
-  const handleBulkMarkDelete = async (groupMarks) => {
-    if (window.confirm(`Are you sure you want to delete all ${groupMarks.length} marks for this semester?`)) {
-      try {
-        await Promise.all(groupMarks.map(m => api.delete(`/marks/${m._id}`)));
-        toast.success("Semester marks deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete marks");
-      }
-    }
+  const handleBulkMarkDelete = (groupMarks) => {
+    setConfirmModal({ isOpen: true, data: groupMarks, type: 'bulkMark' });
   };
 
   const handleBulkEditSave = (updatedMarks, groupDetails) => {
@@ -1010,16 +1008,8 @@ const ExamManagement = () => {
     }
   };
 
-  const handlePaymentDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this payment record?")) {
-      try {
-        await api.delete(`/student-fees/${id}`);
-        toast.success("Payment record deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete payment record");
-      }
-    }
+  const handlePaymentDelete = (id) => {
+    setConfirmModal({ isOpen: true, id, type: 'payment' });
   };
 
   const filteredStudentFees = studentFees.filter(f => {
@@ -2781,6 +2771,18 @@ const ExamManagement = () => {
         </div>,
         document.body
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null, data: null, type: null })}
+        onConfirm={executeDelete}
+        title="Confirm Deletion"
+        message={
+          confirmModal.type === 'bulkMark'
+            ? `Are you sure you want to delete all ${confirmModal.data?.length} marks for this semester?`
+            : "Are you sure you want to delete this record? This action cannot be undone."
+        }
+      />
     </div>
   );
 };

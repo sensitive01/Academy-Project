@@ -143,6 +143,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <FileText size={22} />, label: "Admission Mgmt", path: "/dashboard/admissions" },
     { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
@@ -198,6 +199,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const financeItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <FileText size={22} />, label: "Admission Mgmt", path: "/dashboard/admissions" },
     { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     { icon: <UserCheck size={22} />, label: "Leave Request", path: "/dashboard/leave-request" },
     { icon: <Megaphone size={22} />, label: "Announcements", path: "/dashboard/announcements" },
@@ -209,6 +211,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <Users size={22} />, label: "Employee Management", path: "/dashboard/hr" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <FileText size={22} />, label: "Admission Mgmt", path: "/dashboard/admissions" },
     { icon: <CalendarCheck size={22} />, label: "Attendance", path: "/dashboard/attendance" },
     { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
@@ -236,6 +239,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const centerFinanceItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
+    { icon: <FileText size={22} />, label: "Admission Mgmt", path: "/dashboard/admissions" },
     { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,

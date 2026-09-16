@@ -3,6 +3,7 @@ import api from "../../services/api";
 import CustomDataTable from "../common/DataTable";
 import toast from "react-hot-toast";
 import AddVendorPaymentModal from "./AddVendorPaymentModal";
+import ConfirmationModal from "../modals/ConfirmationModal";
 import { downloadReceipt } from "../../utils/downloadReceipt";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import ReactDOM from "react-dom";
@@ -23,6 +24,21 @@ const VendorPaymentsList = ({ paidOnly }) => {
   const [exportFormat, setExportFormat] = useState("excel");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
+    try {
+      await api.delete(`/vendor-payments/${id}`);
+      setPayments(payments.filter(p => p._id !== id));
+      toast.success("Deleted successfully");
+    } catch (err) {
+      toast.error("Failed to delete");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
+    }
+  };
 
   useEffect(() => {
     fetchPayments();
@@ -76,15 +92,8 @@ const VendorPaymentsList = ({ paidOnly }) => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this payment record?")) return;
-    try {
-      await api.delete(`/vendor-payments/${id}`);
-      setPayments(payments.filter(p => p._id !== id));
-      toast.success("Deleted successfully");
-    } catch (err) {
-      toast.error("Failed to delete");
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({ isOpen: true, id });
   };
 
   const filtered = payments.filter((p) => {
@@ -396,6 +405,14 @@ const VendorPaymentsList = ({ paidOnly }) => {
         </div>,
         document.body
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null })}
+        onConfirm={executeDelete}
+        title="Delete Payment?"
+        message="Are you sure you want to delete this payment record? This action cannot be undone."
+      />
     </div>
   );
 };

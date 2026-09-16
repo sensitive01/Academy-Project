@@ -6,6 +6,7 @@ import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Loading from "../../components/common/Loading";
 import CustomDataTable from "../../components/common/DataTable";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const VendorManagement = () => {
   const navigate = useNavigate();
@@ -17,6 +18,21 @@ const VendorManagement = () => {
   const [search, setSearch] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
+    try {
+      await api.delete(`/vendors/${id}`);
+      toast.success("Vendor deleted successfully");
+      fetchVendors();
+    } catch (error) {
+      toast.error("Failed to delete vendor");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -105,17 +121,9 @@ const VendorManagement = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     setOpenMenuId(null);
-    if (window.confirm("Are you sure you want to delete this vendor? This will also remove their user account.")) {
-      try {
-        await api.delete(`/vendors/${id}`);
-        toast.success("Vendor deleted successfully");
-        fetchVendors();
-      } catch (error) {
-        toast.error("Failed to delete vendor");
-      }
-    }
+    setConfirmModal({ isOpen: true, id });
   };
 
   const handleToggleStatus = async (id) => {
@@ -465,6 +473,14 @@ const VendorManagement = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null })}
+        onConfirm={executeDelete}
+        title="Delete Vendor?"
+        message="Are you sure you want to delete this vendor? This will also remove their user account."
+      />
     </div>
   );
 };

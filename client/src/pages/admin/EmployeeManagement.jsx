@@ -11,6 +11,7 @@ import Payroll from "../../pages/finance/Payroll";
 import LeaveRequestList from "../../components/leave/LeaveRequestList";
 import DepartmentTab from "../../components/employee-management/DepartmentTab";
 import DesignationTab from "../../components/employee-management/DesignationTab";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import { CheckCircle, Clock } from "lucide-react";
 
 // Assuming EmployeeList is kept in the same file or a new one. I will just paste the EmployeeList code here so it works seamlessly.
@@ -272,10 +273,8 @@ const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete })
 
                   <button
                     onClick={() => {
-                      if (window.confirm(`Delete ${row.firstName}?`)) {
-                        onDelete(row._id);
-                        setOpenMenuId(null);
-                      }
+                      onDelete(row);
+                      setOpenMenuId(null);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                   >
@@ -433,6 +432,21 @@ const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, data: null });
+
+  const executeDelete = async () => {
+    const { data } = confirmModal;
+    if (!data) return;
+    try {
+      await api.delete(`/employees/${data._id}`);
+      toast.success("Employee deleted successfully");
+      fetchEmployees();
+    } catch {
+      toast.error("Failed to delete employee");
+    } finally {
+      setConfirmModal({ isOpen: false, data: null });
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -462,14 +476,8 @@ const EmployeeManagement = () => {
     setIsAddModalOpen(true);
   };
 
-  const handleDeleteEmployee = async (id) => {
-    try {
-      await api.delete(`/employees/${id}`);
-      toast.success("Employee deleted successfully");
-      fetchEmployees();
-    } catch {
-      toast.error("Failed to delete employee");
-    }
+  const handleDeleteEmployee = (employee) => {
+    setConfirmModal({ isOpen: true, data: employee });
   };
 
   useEffect(() => {
@@ -633,6 +641,14 @@ const EmployeeManagement = () => {
         {activeTab === "department" && <DepartmentTab />}
         {activeTab === "designation" && <DesignationTab />}
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, data: null })}
+        onConfirm={executeDelete}
+        title="Delete Employee?"
+        message={`Are you sure you want to delete ${confirmModal.data?.firstName || "this employee"}? This action cannot be undone.`}
+      />
     </div>
   );
 };

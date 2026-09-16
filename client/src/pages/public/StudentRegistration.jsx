@@ -84,6 +84,11 @@ const StudentRegistration = () => {
   });
 
   const [declaration, setDeclaration] = useState(false);
+  const [createParentLogin, setCreateParentLogin] = useState(false);
+  const [parentLoginEmail, setParentLoginEmail] = useState("");
+  const [parentLoginName, setParentLoginName] = useState("");
+  const [parentLoginPhone, setParentLoginPhone] = useState("");
+  const [parentLoginRelation, setParentLoginRelation] = useState("Father");
 
   const [adminEnrollment, setAdminEnrollment] = useState({
     course: "",
@@ -99,57 +104,27 @@ const StudentRegistration = () => {
     const crsFee = Number(courseFeeVal) || 0;
     const generatedFees = [];
 
+    const currentYearMatch = formData.year?.match(/\d+/);
+    const currentYear = currentYearMatch ? currentYearMatch[0] : "1";
+
     if (cFee > 0) {
       generatedFees.push({
         feeType: 'Other',
         otherFeeType: 'Council Fees',
         amount: cFee,
-        name: 'Council Fees'
+        name: `Council Fees - Year ${currentYear}`,
+        year: currentYear
       });
     }
 
     if (crsFee > 0 && scheme) {
-      if (scheme === 'monthly') {
-        const monthlyAmt = Math.round(crsFee / 12);
-        for (let i = 1; i <= 12; i++) {
-          generatedFees.push({
-            feeType: 'Monthly',
-            otherFeeType: `Month ${i}`,
-            amount: monthlyAmt,
-            name: `Month ${i} Installment`
-          });
-        }
-      } else if (scheme === 'sem') {
-        const semAmt = Math.round(crsFee / 2);
-        for (let i = 1; i <= 2; i++) {
-          generatedFees.push({
-            feeType: 'Sem',
-            otherFeeType: `Semester ${i}`,
-            amount: semAmt,
-            name: `Semester ${i} Fee`
-          });
-        }
-      } else if (scheme === 'term3') {
-        const termAmt = Math.round(crsFee / 3);
-        for (let i = 1; i <= 3; i++) {
-          generatedFees.push({
-            feeType: 'Term',
-            otherFeeType: `Term ${i}`,
-            amount: termAmt,
-            name: `Term ${i} Fee`
-          });
-        }
-      } else if (scheme === 'term4') {
-        const termAmt = Math.round(crsFee / 4);
-        for (let i = 1; i <= 4; i++) {
-          generatedFees.push({
-            feeType: 'Term',
-            otherFeeType: `Term ${i}`,
-            amount: termAmt,
-            name: `Term ${i} Fee`
-          });
-        }
-      }
+      generatedFees.push({
+        feeType: 'Course',
+        otherFeeType: 'Course Fees',
+        amount: crsFee,
+        name: `Course Fees - Year ${currentYear}`,
+        year: currentYear
+      });
     }
 
     setAdminEnrollment(prev => ({
@@ -157,7 +132,7 @@ const StudentRegistration = () => {
       councilFee: councilFeeVal,
       courseFee: courseFeeVal,
       selectedScheme: scheme,
-      fees: generatedFees.length > 0 ? generatedFees : prev.fees
+      fees: generatedFees
     }));
   };
 
@@ -378,6 +353,11 @@ const StudentRegistration = () => {
           boardOfExamination: formData.hscBoard,
         },
         adminEnrollment: hasFeesStep ? adminEnrollment : undefined,
+        createParentLogin: createParentLogin,
+        parentLoginEmail: parentLoginEmail,
+        parentLoginName: parentLoginName,
+        parentLoginPhone: parentLoginPhone,
+        parentLoginRelation: parentLoginRelation,
       };
 
       if (!payload.center) delete payload.center;
@@ -859,7 +839,6 @@ const StudentRegistration = () => {
                     <p className="text-brand-900 text-sm font-medium leading-relaxed">Please ensure all educational records are accurate as per your original certificates. Verification will be performed during document submission.</p>
                   </div>
                 </div>
-
               </div>
             )}
 
@@ -884,11 +863,77 @@ const StudentRegistration = () => {
                           <td className="p-5 font-black text-slate-800 bg-slate-50/50 whitespace-nowrap">{rel}</td>
                           <td className="p-2 border-r border-slate-100"><input autoComplete="off" name={`familyName${i}`} value={formData[`familyName${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="Full Name..." /></td>
                           <td className="p-2 border-r border-slate-100"><input autoComplete="off" name={`familyOccupation${i}`} value={formData[`familyOccupation${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="Designation..." /></td>
-                          <td className="p-2"><input autoComplete="off" name={`familyPhone${i}`} value={formData[`familyPhone${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="+91..." /></td>
+                          <td className="p-2"><input autoComplete="off" name={`familyPhone${i}`} value={formData[`familyPhone${i}`] || ""} onChange={handleChange} className="w-full px-3 py-2 bg-slate-50 border-2 border-transparent rounded-lg outline-none transition-all text-[12px] font-bold text-slate-900 focus:bg-white focus:border-brand-700" placeholder="9876543210" /></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Parent Login Connection Section */}
+                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4 mt-8">
+                  <label className="flex items-start gap-4 cursor-pointer relative z-10">
+                    <input
+                      type="checkbox"
+                      checked={createParentLogin}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setCreateParentLogin(checked);
+                        if (checked) {
+                          setParentLoginName(formData.familyName0 || "");
+                          setParentLoginPhone(formData.familyPhone0 || "");
+                          setParentLoginRelation("Father");
+                        }
+                      }}
+                      className="mt-1 w-5 h-5 accent-brand-700 cursor-pointer"
+                    />
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 mb-1">
+                        Create Parent Login Account
+                      </h4>
+                      <p className="text-slate-500 text-xs leading-relaxed">
+                        Automatically create a parent account for this student using the details below. An email with login credentials will be sent.
+                      </p>
+                    </div>
+                  </label>
+
+                  {createParentLogin && (
+                    <div className="mt-6 pt-6 border-t border-slate-100 animate-fade-in-up grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <FormInput 
+                        label="Parent Name *" 
+                        type="text" 
+                        value={parentLoginName} 
+                        onChange={(e) => setParentLoginName(e.target.value)}
+                        placeholder="Enter parent name" 
+                        required={createParentLogin}
+                      />
+                      <SelectBox 
+                        label="Relationship *" 
+                        value={parentLoginRelation} 
+                        onChange={(e) => setParentLoginRelation(e.target.value)}
+                        options={["Father", "Mother", "Guardian", "Brother", "Sister"]}
+                      />
+                      <FormInput 
+                        label="Mobile Number *" 
+                        type="text" 
+                        value={parentLoginPhone} 
+                        onChange={(e) => setParentLoginPhone(e.target.value)}
+                        placeholder="e.g. 9876543210" 
+                        required={createParentLogin}
+                      />
+                      <div>
+                        <FormInput 
+                          label="Parent Login Email Address *" 
+                          type="email" 
+                          value={parentLoginEmail} 
+                          onChange={(e) => setParentLoginEmail(e.target.value)}
+                          placeholder="Enter parent email address" 
+                          required={createParentLogin}
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1 font-semibold">The login credentials will be sent to this email address.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-10">
@@ -1015,7 +1060,7 @@ const StudentRegistration = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <FormInput 
-                        label="Council Fees (₹) [Direct Enter]" 
+                        label="Council Fees (₹)" 
                         type="number" 
                         value={adminEnrollment.councilFee} 
                         onChange={(e) => calculateAndApplyScheme(e.target.value, adminEnrollment.courseFee, adminEnrollment.selectedScheme)}
@@ -1026,13 +1071,13 @@ const StudentRegistration = () => {
 
                     <div>
                       <FormInput 
-                        label="Total Course Fees (₹) [Will Split Below]" 
+                        label="Total Course Fees (₹)" 
                         type="number" 
                         value={adminEnrollment.courseFee} 
                         onChange={(e) => calculateAndApplyScheme(adminEnrollment.councilFee, e.target.value, adminEnrollment.selectedScheme)}
                         placeholder="e.g. 60000" 
                       />
-                      <p className="text-[11px] text-slate-400 mt-1 font-semibold">Total course fee to split into payment schemes</p>
+                      <p className="text-[11px] text-slate-400 mt-1 font-semibold">Total course fees</p>
                     </div>
                   </div>
 
@@ -1125,102 +1170,6 @@ const StudentRegistration = () => {
                   )}
                 </div>
 
-                {/* Generated Fee Schedule Breakdown Table */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900">Generated Fee Schedule & Breakdown</h3>
-                      <p className="text-xs text-slate-500">Review, modify, or add custom fee items before completing registration</p>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setAdminEnrollment(prev => ({ ...prev, fees: [...prev.fees, { feeType: 'Other', otherFeeType: 'Custom Fee', amount: '' }] }))} 
-                      className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors shadow-sm"
-                    >
-                      + Add Custom Fee Row
-                    </button>
-                  </div>
-                  
-                  {adminEnrollment.fees.length > 0 ? (
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider">
-                          <tr>
-                            <th className="p-3">#</th>
-                            <th className="p-3">Fee Name / Type</th>
-                            <th className="p-3">Category</th>
-                            <th className="p-3 text-right">Amount (₹)</th>
-                            <th className="p-3 text-center">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {adminEnrollment.fees.map((fee, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50/50">
-                              <td className="p-3 font-semibold text-slate-400">{idx + 1}</td>
-                              <td className="p-3">
-                                <input
-                                  type="text"
-                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 focus:bg-white focus:border-brand-600 outline-none"
-                                  value={fee.otherFeeType || fee.name || fee.feeType}
-                                  onChange={(e) => {
-                                    const newFees = [...adminEnrollment.fees];
-                                    newFees[idx].otherFeeType = e.target.value;
-                                    newFees[idx].name = e.target.value;
-                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                                  }}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <select 
-                                  value={fee.feeType}
-                                  onChange={(e) => {
-                                    const newFees = [...adminEnrollment.fees];
-                                    newFees[idx].feeType = e.target.value;
-                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                                  }}
-                                  className="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-700 outline-none"
-                                >
-                                  <option value="Sem">Sem Fee</option>
-                                  <option value="Term">Term Fee</option>
-                                  <option value="Monthly">Monthly Fee</option>
-                                  <option value="Other">Other / Council</option>
-                                </select>
-                              </td>
-                              <td className="p-3 text-right">
-                                <input
-                                  type="number"
-                                  className="w-32 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-right text-slate-900 focus:bg-white focus:border-brand-600 outline-none"
-                                  value={fee.amount}
-                                  onChange={(e) => {
-                                    const newFees = [...adminEnrollment.fees];
-                                    newFees[idx].amount = e.target.value;
-                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                                  }}
-                                />
-                              </td>
-                              <td className="p-3 text-center">
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    const newFees = adminEnrollment.fees.filter((_, i) => i !== idx);
-                                    setAdminEnrollment(prev => ({ ...prev, fees: newFees }));
-                                  }}
-                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors font-bold text-[11px]"
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
-                      No fees structured yet. Enter Council Fees & Course Fees above and select a payment scheme to split automatically.
-                    </p>
-                  )}
-                </div>
               </div>
             )}
 

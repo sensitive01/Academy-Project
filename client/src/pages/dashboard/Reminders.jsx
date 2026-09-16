@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Loading from "../../components/common/Loading";
 import CustomDataTable from "../../components/common/DataTable";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const Reminders = () => {
   const [reminders, setReminders] = useState([]);
@@ -22,6 +23,21 @@ const Reminders = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
+    try {
+      await api.delete(`/reminders/${id}`);
+      setReminders(reminders.filter(r => r._id !== id));
+    } catch (error) {
+      console.error("Error deleting reminder", error);
+      alert(error?.response?.data?.message || "Error deleting reminder");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
+    }
+  };
 
   // Form state
   const [title, setTitle] = useState("");
@@ -82,16 +98,8 @@ const Reminders = () => {
     }
   };
 
-  const deleteReminder = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this reminder?")) return;
-
-    try {
-      await api.delete(`/reminders/${id}`);
-      setReminders(reminders.filter(r => r._id !== id));
-    } catch (error) {
-      console.error("Error deleting reminder", error);
-      alert(error?.response?.data?.message || "Error deleting reminder");
-    }
+  const deleteReminder = (id) => {
+    setConfirmModal({ isOpen: true, id });
   };
 
   const columns = [
@@ -337,6 +345,13 @@ const Reminders = () => {
         </div>
       )}
 
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null })}
+        onConfirm={executeDelete}
+        title="Delete Reminder?"
+        message="Are you sure you want to delete this reminder? This action cannot be undone."
+      />
     </div>
   );
 };

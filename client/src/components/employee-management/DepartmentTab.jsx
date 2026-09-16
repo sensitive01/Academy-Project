@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import CustomDataTable from "../../components/common/DataTable";
 import AssignStudentsModal from "../../components/modals/AssignStudentsModal";
 import MultiSelectSubjects from "../../components/common/MultiSelectSubjects";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const toTitleCase = (str) => {
   return str
@@ -35,6 +36,21 @@ const DepartmentTab = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [batchStep, setBatchStep] = useState(1);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
+    try {
+      await api.delete(`${config[activeTab].endpoint}/${id}`);
+      setData(data.filter((item) => item._id !== id));
+      toast.success(`${config[activeTab].singular} deleted`);
+    } catch {
+      toast.error(`Error deleting ${activeTab}`);
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -169,20 +185,8 @@ const DepartmentTab = () => {
     fetchData();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete this ${config[activeTab].singular}?`,
-      )
-    ) {
-      try {
-        await api.delete(`${config[activeTab].endpoint}/${id}`);
-        setData(data.filter((item) => item._id !== id));
-        toast.success(`${config[activeTab].singular} deleted`);
-      } catch {
-        toast.error(`Error deleting ${activeTab}`);
-      }
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({ isOpen: true, id });
   };
 
   const handleSubmit = async (e) => {
@@ -945,6 +949,14 @@ const DepartmentTab = () => {
           onAssignSuccess={handleAssignStudentsSuccess}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null })}
+        onConfirm={executeDelete}
+        title={`Delete ${config[activeTab]?.singular || "Item"}?`}
+        message={`Are you sure you want to delete this ${config[activeTab]?.singular || "item"}? This action cannot be undone.`}
+      />
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const Settings = () => {
   const [qrCode, setQrCode] = useState(null);
@@ -18,6 +19,7 @@ const Settings = () => {
   const [step, setStep] = useState(1);
   const [isEnabled, setIsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false });
 
   // Password State
   const [currentPassword, setCurrentPassword] = useState("");
@@ -86,13 +88,11 @@ const Settings = () => {
     }
   };
 
-  const disableTwoFactor = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to disable Two-Factor Authentication?",
-      )
-    )
-      return;
+  const promptDisableTwoFactor = () => {
+    setConfirmModal({ isOpen: true });
+  };
+
+  const executeDisableTwoFactor = async () => {
     try {
       await api.post("/auth/2fa/disable", {});
       setIsEnabled(false);
@@ -100,6 +100,8 @@ const Settings = () => {
       toast.success("2FA Disabled");
     } catch {
       toast.error("Error disabling 2FA");
+    } finally {
+      setConfirmModal({ isOpen: false });
     }
   };
 
@@ -222,7 +224,7 @@ const Settings = () => {
                   </p>
                 </div>
                 <button
-                  onClick={disableTwoFactor}
+                  onClick={promptDisableTwoFactor}
                   className="text-red-600 font-medium hover:text-red-700 hover:underline text-sm"
                 >
                   Disable 2FA
@@ -284,6 +286,14 @@ const Settings = () => {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false })}
+        onConfirm={executeDisableTwoFactor}
+        title="Disable Two-Factor Authentication?"
+        message="Are you sure you want to disable Two-Factor Authentication? This will make your account less secure."
+      />
     </div>
   );
 };

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Loading from "../../components/common/Loading";
 import CustomDataTable from "../../components/common/DataTable";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 
 const EnquiryManagement = () => {
   const [enquiries, setEnquiries] = useState([]);
@@ -26,6 +27,24 @@ const EnquiryManagement = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedEnquiry, setSelectedEnquiry] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
+
+  const executeDelete = async () => {
+    const { id } = confirmModal;
+    if (!id) return;
+    try {
+      await api.delete(`/enquiries/${id}`);
+      toast.success("Enquiry deleted successfully");
+      fetchEnquiries();
+      if (selectedEnquiry && selectedEnquiry._id === id) {
+        setShowDetailModal(false);
+      }
+    } catch (error) {
+      toast.error("Failed to delete enquiry");
+    } finally {
+      setConfirmModal({ isOpen: false, id: null });
+    }
+  };
 
   const stats = {
     total: enquiries.length,
@@ -64,18 +83,8 @@ const EnquiryManagement = () => {
     }
   };
 
-  const handleDeleteEnquiry = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this enquiry?")) return;
-    try {
-      await api.delete(`/enquiries/${id}`);
-      toast.success("Enquiry deleted successfully");
-      fetchEnquiries();
-      if (selectedEnquiry && selectedEnquiry._id === id) {
-        setShowDetailModal(false);
-      }
-    } catch (error) {
-      toast.error("Failed to delete enquiry");
-    }
+  const handleDeleteEnquiry = (id) => {
+    setConfirmModal({ isOpen: true, id });
   };
 
   const statsData = [
@@ -408,6 +417,14 @@ const EnquiryManagement = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, id: null })}
+        onConfirm={executeDelete}
+        title="Delete Enquiry?"
+        message="Are you sure you want to delete this enquiry? This action cannot be undone."
+      />
     </div>
   );
 };

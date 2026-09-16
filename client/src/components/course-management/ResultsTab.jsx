@@ -11,6 +11,7 @@ import MarksheetModal from "../../components/modals/MarksheetModal";
 import BulkEditMarksModal from "../../components/modals/BulkEditMarksModal";
 import AddStudentFeeModal from "../../components/modals/AddStudentFeeModal";
 import BulkUploadPreviewModal from "../../components/modals/BulkUploadPreviewModal";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import Select from "react-select";
 const templates = [
   { id: 'rg_modern', name: 'RG MODERN COMMUNITY COLLEGE' },
@@ -51,6 +52,31 @@ const ResultsTab = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, data: null, message: "" });
+
+  const executeConfirm = async () => {
+    const { type, data } = confirmModal;
+    try {
+      if (type === "exam") {
+        await api.delete(`/exams/${data}`);
+        toast.success("Exam deleted successfully");
+      } else if (type === "mark") {
+        await api.delete(`/marks/${data}`);
+        toast.success("Mark deleted successfully");
+      } else if (type === "bulk_mark") {
+        await Promise.all(data.map(m => api.delete(`/marks/${m._id}`)));
+        toast.success("Semester marks deleted successfully");
+      } else if (type === "payment") {
+        await api.delete(`/student-fees/${data}`);
+        toast.success("Payment record deleted successfully");
+      }
+      fetchData();
+    } catch (error) {
+      toast.error("Action failed");
+    } finally {
+      setConfirmModal({ isOpen: false, type: null, data: null, message: "" });
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -192,16 +218,8 @@ const ResultsTab = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this exam?")) {
-      try {
-        await api.delete(`/exams/${id}`);
-        toast.success("Exam deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete exam");
-      }
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({ isOpen: true, type: "exam", data: id, message: "Are you sure you want to delete this exam?" });
   };
 
   const openMarkModal = (mark = null) => {
@@ -403,28 +421,12 @@ const ResultsTab = () => {
     XLSX.writeFile(wb, "sample_marks.xlsx");
   };
 
-  const handleMarkDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this mark?")) {
-      try {
-        await api.delete(`/marks/${id}`);
-        toast.success("Mark deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete mark");
-      }
-    }
+  const handleMarkDelete = (id) => {
+    setConfirmModal({ isOpen: true, type: "mark", data: id, message: "Are you sure you want to delete this mark?" });
   };
 
-  const handleBulkMarkDelete = async (groupMarks) => {
-    if (window.confirm(`Are you sure you want to delete all ${groupMarks.length} marks for this semester?`)) {
-      try {
-        await Promise.all(groupMarks.map(m => api.delete(`/marks/${m._id}`)));
-        toast.success("Semester marks deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete marks");
-      }
-    }
+  const handleBulkMarkDelete = (groupMarks) => {
+    setConfirmModal({ isOpen: true, type: "bulk_mark", data: groupMarks, message: `Are you sure you want to delete all ${groupMarks.length} marks for this semester?` });
   };
 
   const handleBulkEditSave = async (updatedMarks, groupDetails) => {
@@ -504,16 +506,8 @@ const ResultsTab = () => {
     }
   };
 
-  const handlePaymentDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this payment record?")) {
-      try {
-        await api.delete(`/student-fees/${id}`);
-        toast.success("Payment record deleted successfully");
-        fetchData();
-      } catch (error) {
-        toast.error("Failed to delete payment record");
-      }
-    }
+  const handlePaymentDelete = (id) => {
+    setConfirmModal({ isOpen: true, type: "payment", data: id, message: "Are you sure you want to delete this payment record?" });
   };
 
   const filteredStudentFees = studentFees.filter(f => {
@@ -1176,6 +1170,13 @@ const ResultsTab = () => {
         </div>,
         document.body
       )}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, type: null, data: null, message: "" })}
+        onConfirm={executeConfirm}
+        title="Are you sure?"
+        message={confirmModal.message}
+      />
     </div>
   );
 };
