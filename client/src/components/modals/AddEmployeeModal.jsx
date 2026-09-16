@@ -15,6 +15,7 @@ import {
 import api from "../../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
+import { useImagePreview } from "../../context/ImagePreviewContext";
 
 const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
   const isEdit = !!employee;
@@ -23,6 +24,7 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
   const [designations, setDesignations] = useState([]);
   const [preview, setPreview] = useState(null);
   const [centers, setCenters] = useState([]);
+  const { showPreview } = useImagePreview();
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const { sendOtp, user } = useAuth();
   const [showOtp, setShowOtp] = useState(false);
@@ -745,15 +747,14 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
                         {isEdit &&
                           employee[doc.field]?.url &&
                           !formData[doc.field] && (
-                            <a
-                              href={employee[doc.field].url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors"
+                            <button
+                              type="button"
+                              onClick={() => showPreview(employee[doc.field].url)}
+                              className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors cursor-pointer"
                               title="View Document"
                             >
                               <ExternalLink size={16} />
-                            </a>
+                            </button>
                           )}
                         <label className="text-xs font-bold text-brand-600 hover:bg-brand-50 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
                           {formData[doc.field] ||

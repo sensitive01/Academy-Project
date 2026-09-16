@@ -15,6 +15,7 @@ router.get('/', protect, async (req, res) => {
       .populate('center', 'name bankDetails')
       .populate('course', 'title')
       .populate('batch', 'name')
+      .populate('payments.approvedBy', 'name')
       .sort({ createdAt: -1 });
       
     // Dynamically apply penalties for pending fees
@@ -102,12 +103,24 @@ router.post('/bulk-upload', protect, async (req, res) => {
         ...(parsedOtherFeeType ? { otherFeeType: parsedOtherFeeType } : {})
       });
 
+      let finalPaidDate = new Date();
+      if (paidDate) {
+        const pdStr = String(paidDate).trim();
+        const mmYyyyMatch = pdStr.match(/^(\d{1,2})[-/](\d{4})$/);
+        if (mmYyyyMatch) {
+          finalPaidDate = new Date(parseInt(mmYyyyMatch[2], 10), parseInt(mmYyyyMatch[1], 10) - 1, 1);
+        } else {
+          const d = new Date(pdStr);
+          if (!isNaN(d.getTime())) finalPaidDate = d;
+        }
+      }
+
       const paymentDetail = {
         amount: Number(paidAmount),
         paymentMode: paymentMode || 'Cash',
         bankReference: bankReference || '',
         status: 'Approved',
-        paidAt: paidDate ? new Date(paidDate) : new Date()
+        paidAt: finalPaidDate
       };
 
       if (existingFee) {
@@ -472,7 +485,9 @@ router.patch('/:id/approve', protect, async (req, res) => {
 
     if (pendingPayment) {
       pendingPayment.status = approvalStatus === 'Approved' ? 'Approved' : 'Rejected';
-      pendingPayment.paidAt = new Date();
+      pendingPayment.paidAt = pendingPayment.paidAt || new Date();
+      pendingPayment.approvedBy = req.user._id;
+      pendingPayment.approvedAt = new Date();
       fee.markModified('payments');
     }
 
@@ -528,7 +543,8 @@ router.get('/:id/receipt', protect, async (req, res) => {
       .populate('student', 'studentNameEnglish studentId email phone year')
       .populate('center', 'name bankDetails')
       .populate('course', 'title')
-      .populate('batch', 'name');
+      .populate('batch', 'name')
+      .populate('payments.approvedBy', 'name');
 
     if (!fee) {
       return res.status(404).json({ message: 'Fee record not found' });

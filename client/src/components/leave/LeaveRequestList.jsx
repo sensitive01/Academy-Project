@@ -6,11 +6,13 @@ import { Eye, Trash2 } from "lucide-react";
 import LeaveApplicationForm from "./LeaveApplicationForm";
 import CustomDataTable from "../common/DataTable";
 import ReactDOM from "react-dom";
+import { useImagePreview } from "../../context/ImagePreviewContext";
 
 const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
   const [requests, setRequests] = useState([]);
   const [user, setUser] = useState(null);
   const [selectedLeave, setSelectedLeave] = useState(null);
+  const { showPreview } = useImagePreview();
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -307,14 +309,12 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
                   </span>
                 </p>
                 {selectedLeave.fileUrl && (
-                  <a
-                    href={`${(import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '')}/${selectedLeave.fileUrl}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-indigo-600 underline"
+                  <button
+                    onClick={() => showPreview(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '')}/${selectedLeave.fileUrl}`)}
+                    className="text-indigo-600 underline cursor-pointer"
                   >
                     View Attachment
-                  </a>
+                  </button>
                 )}
               </div>
             )}

@@ -89,7 +89,9 @@ const studentFeeSchema = new mongoose.Schema({
       proofOfPayment: String,
       bankReference: String,
       status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
-      paidAt: { type: Date, default: Date.now }
+      paidAt: { type: Date, default: Date.now },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      approvedAt: { type: Date }
     }
   ]
 }, { timestamps: true });

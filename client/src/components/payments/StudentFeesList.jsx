@@ -14,6 +14,7 @@ import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
+import { useImagePreview } from "../../context/ImagePreviewContext";
 
 const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const [fees, setFees] = useState([]);
@@ -23,9 +24,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const [batches, setBatches] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showCollectModal, setShowCollectModal] = useState(false);
+  const { showPreview } = useImagePreview();
   const [selectedFee, setSelectedFee] = useState(null);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [selectedPaymentsFee, setSelectedPaymentsFee] = useState(null);
+  const [selectedMonthPayments, setSelectedMonthPayments] = useState(null);
   const [showBulkUploadView, setShowBulkUploadView] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState([]);
   const [showBulkDropdown, setShowBulkDropdown] = useState(false);
@@ -146,6 +149,46 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     }
 
     return totalForMonth;
+  };
+
+  const getPaymentsForMonth = (row, targetMonth) => {
+    const monthPayments = [];
+
+    if (row.payments && row.payments.length > 0) {
+      row.payments.forEach(p => {
+        if (p.status === 'Approved' && p.paidAt) {
+          const pDate = new Date(p.paidAt);
+          if (pDate.getMonth() === targetMonth.month) {
+            if (targetMonth.year !== null) {
+              if (pDate.getFullYear() === targetMonth.year) {
+                monthPayments.push(p);
+              }
+            } else {
+              monthPayments.push(p);
+            }
+          }
+        }
+      });
+    } else if (row.status === 'paid') {
+      const pDate = row.paidAt ? new Date(row.paidAt) : new Date(row.createdAt);
+      if (pDate.getMonth() === targetMonth.month) {
+        if (targetMonth.year !== null) {
+          if (pDate.getFullYear() === targetMonth.year) {
+            monthPayments.push({
+              ...row,
+              paymentMode: row.paymentMode || 'Online'
+            });
+          }
+        } else {
+          monthPayments.push({
+            ...row,
+            paymentMode: row.paymentMode || 'Online'
+          });
+        }
+      }
+    }
+
+    return monthPayments;
   };
 
   const getRemainingBalance = (row) => {
@@ -654,7 +697,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         "Paid Amount": "25000",
         "Payment Mode": "Online",
         "Bank Reference": "TXN12345678",
-        "Paid Date": "2023-08-15"
+        "Paid Date": "08-2023"
       },
       {
         "Student ID": "STU-2023-002",
@@ -664,7 +707,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         "Paid Amount": "5000",
         "Payment Mode": "Cash",
         "Bank Reference": "",
-        "Paid Date": "2023-08-16"
+        "Paid Date": "08-2023"
       }
     ];
     const ws = XLSX.utils.json_to_sheet(sampleData);
@@ -692,6 +735,60 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             return;
           }
 
+          const parseExcelDate = (dateVal) => {
+            if (!dateVal) return null;
+            
+            const formatDate = (d) => {
+               const yy = d.getFullYear();
+               const mm = String(d.getMonth() + 1).padStart(2, '0');
+               return `${mm}-${yy}`;
+            };
+
+            if (!isNaN(dateVal) && typeof dateVal === 'number') {
+              return formatDate(new Date((dateVal - 25569) * 86400 * 1000));
+            }
+            const str = String(dateVal).trim();
+
+            const mmYyyyParts = str.match(/^(\d{1,2})[-/](\d{4})$/);
+            if (mmYyyyParts) {
+              const month = parseInt(mmYyyyParts[1], 10) - 1;
+              const year = parseInt(mmYyyyParts[2], 10);
+              return formatDate(new Date(year, month, 1));
+            }
+
+            const mmYyParts = str.match(/^(\d{1,2})[-/](\d{2})$/);
+            if (mmYyParts) {
+              const month = parseInt(mmYyParts[1], 10) - 1;
+              let year = parseInt(mmYyParts[2], 10);
+              if (year < 100) year += 2000;
+              return formatDate(new Date(year, month, 1));
+            }
+
+            const mmmYyParts = str.match(/^([a-zA-Z]{3,})[-/](\d{2,4})$/);
+            if (mmmYyParts) {
+              const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+              const monthStr = mmmYyParts[1].toLowerCase().substring(0, 3);
+              const month = monthNames.indexOf(monthStr);
+              if (month !== -1) {
+                let year = parseInt(mmmYyParts[2], 10);
+                if (year < 100) year += 2000;
+                return formatDate(new Date(year, month, 1));
+              }
+            }
+
+            const parts = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+            if (parts) {
+              const day = parseInt(parts[1], 10);
+              const month = parseInt(parts[2], 10) - 1;
+              let year = parseInt(parts[3], 10);
+              if (year < 100) year += 2000;
+              return formatDate(new Date(year, month, day));
+            }
+            const d = new Date(str);
+            if (!isNaN(d.getTime())) return formatDate(d);
+            return null;
+          };
+
           const mappedData = jsonData.map(row => ({
             studentId: row["Student ID"] ? String(row["Student ID"]).trim() : "",
             year: row["Year"] ? String(row["Year"]).trim() : "",
@@ -700,7 +797,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             paidAmount: row["Paid Amt"] || row["Paid Amount"],
             paymentMode: row["Payment Mode"] || row["Payment M..."] || "Cash",
             bankReference: row["Bank Reference"] ? String(row["Bank Reference"]).trim() : "",
-            paidDate: row["Paid Date"]
+            paidDate: parseExcelDate(row["Paid Date"])
           }));
 
           setBulkUploadData(mappedData);
@@ -886,14 +983,28 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   const monthColumns = dynamicMonths.map(targetMonth => ({
     name: targetMonth.label,
     width: "90px",
-    selector: row => getAmountForMonth(row, targetMonth),
+    selector: row => row.isSummary ? row['month_' + targetMonth.label] : getAmountForMonth(row, targetMonth),
     cell: row => {
-      const amt = getAmountForMonth(row, targetMonth);
-      return amt > 0 ? (
-        <span className="font-bold text-slate-800">₹{amt.toLocaleString('en-IN')}</span>
-      ) : (
-        <span className="text-slate-350">-</span>
-      );
+      const amt = row.isSummary ? row['month_' + targetMonth.label] : getAmountForMonth(row, targetMonth);
+      if (amt > 0) {
+        return (
+          <button
+            onClick={() => {
+              const payments = getPaymentsForMonth(row, targetMonth);
+              setSelectedMonthPayments({
+                monthLabel: targetMonth.label,
+                studentName: row.student?.studentNameEnglish || "N/A",
+                payments: payments,
+                fee: row
+              });
+            }}
+            className="font-bold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer transition-colors"
+          >
+            ₹{amt.toLocaleString('en-IN')}
+          </button>
+        );
+      }
+      return <span className="text-slate-350">-</span>;
     }
   }));
 
@@ -939,56 +1050,35 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       name: "Center",
       selector: row => row.center?.name,
       sortable: true,
+      width:"150px",
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
-    },
-    {
-      name: "Fee Type",
-      selector: row => row.feeType,
-      sortable: true,
-      cell: row => {
-        let lbl = row.feeType;
-        if (row.feeType === 'Other' && row.otherFeeType) {
-          lbl = row.otherFeeType;
-        } else if (row.feeType === 'Sem') {
-          lbl = row.otherFeeType || 'Semester Fee';
-        } else if (row.feeType === 'Term') {
-          lbl = row.otherFeeType || 'Term Fee';
-        } else if (row.feeType === 'Monthly') {
-          lbl = row.otherFeeType || 'Monthly Fee';
-        }
-        return (
-          <span className="px-2 py-0.5 bg-brand-50 text-brand-600 rounded border border-brand-100 text-[10px] font-bold uppercase tracking-wider">
-            {lbl}
-          </span>
-        );
-      }
     },
     {
       name: "Amount Paid",
       selector: row => row.amount,
       sortable: true,
+      width:"150px",
       cell: row => <span className="text-sm font-black text-slate-800">₹{row.amount?.toLocaleString("en-IN")}</span>
     },
     {
       name: "Mode",
       selector: row => row.paymentMode,
       sortable: true,
+      width:"90px",
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.paymentMode || "-"}</span>
     },
     {
-      name: "Reference / Proof",
+      name: "Proof",
       selector: row => row.bankReference || row.proofOfPayment,
       cell: row => {
         if (row.paymentMode === 'Online' && row.proofOfPayment) {
           return (
-            <a
-              href={row.proofOfPayment}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap"
+            <button
+              onClick={() => showPreview(row.proofOfPayment)}
+              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap cursor-pointer"
             >
               View Proof
-            </a>
+            </button>
           );
         }
         return <span className="font-mono text-xs text-slate-600">{row.bankReference || '-'}</span>;
@@ -1077,18 +1167,18 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         const totalDue = row.amount +
           (row.isPenaltyApplied ? row.penaltyAmount : 0) +
           (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
+        
+        const approvedPaid = row.payments?.filter(p => p.status === 'Approved').reduce((acc, p) => acc + p.amount, 0) || 0;
+        const currentBalance = row.isSummary ? row.totalRemainingBalance : Math.max(0, totalDue - approvedPaid);
 
         return (
           <div className="flex flex-col gap-1 py-1.5">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-black text-slate-800">Total: ₹{totalDue?.toLocaleString("en-IN")}</span>
-              <span className="px-1.5 py-0.5 bg-brand-50 text-brand-600 rounded border border-brand-100 text-[8px] font-bold uppercase tracking-wider">
-                {getSchemeBadgeLabel(row)}
-              </span>
             </div>
 
             <div className="text-[9px] text-slate-500">
-              Balance: ₹{row.amount?.toLocaleString("en-IN")}
+              Balance: ₹{currentBalance?.toLocaleString("en-IN")}
               {((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)) > 0 &&
                 ` + Penalty: ₹${((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}`
               }
@@ -1104,7 +1194,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         selector: row => row.courseAmount,
         cell: row => {
           const totalCourseDue = row.courseAmount + row.coursePenaltyAmount;
-          const coursePaid = row.coursePayments ? row.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const coursePaid = row.isSummary ? row.totalCoursePaid : (row.coursePayments ? row.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0);
           const courseBal = Math.max(0, totalCourseDue - coursePaid);
           return (
             <div className="flex flex-col gap-1 py-1.5">
@@ -1121,7 +1211,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         selector: row => row.councilAmount,
         cell: row => {
           const totalCouncilDue = row.councilAmount + row.councilPenaltyAmount;
-          const councilPaid = row.councilPayments ? row.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const councilPaid = row.isSummary ? row.totalCouncilPaid : (row.councilPayments ? row.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0);
           const councilBal = Math.max(0, totalCouncilDue - councilPaid);
           return (
             <div className="flex flex-col gap-1 py-1.5">
@@ -1137,10 +1227,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     {
       name: "Balance",
       width: "120px",
-      selector: row => getRemainingBalance(row),
+      selector: row => row.isSummary ? row.totalRemainingBalance : getRemainingBalance(row),
       sortable: true,
       cell: row => {
-        const bal = getRemainingBalance(row);
+        const bal = row.isSummary ? row.totalRemainingBalance : getRemainingBalance(row);
         return (
           <span className={`font-black ${bal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
             ₹{bal.toLocaleString('en-IN')}
@@ -1208,16 +1298,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       width: "100px",
       cell: row => row.isSummary ? null : (
         <div className="flex items-center gap-1">
-          {(row.status === "paid" || getRemainingBalance(row) === 0) && (
-            <button
-              onClick={() => downloadReceipt(`/student-fees/${row._id}/receipt`, `FeeReceipt_${row._id}.pdf`)}
-              className="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition-colors"
-              title="Download Receipt"
-            >
-              <Download size={16} />
-            </button>
-          )}
-          <button onClick={() => setConfirmModal({ isOpen: true, id: row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
+          <button onClick={() => setConfirmModal({ isOpen: true, id: row.originalFeeId || row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
           </button>
         </div>
@@ -1528,6 +1609,93 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               >
                 Yes, Delete
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {selectedMonthPayments && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedMonthPayments(null)}></div>
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Payments - {selectedMonthPayments.monthLabel}</h2>
+                <p className="text-sm font-medium text-slate-500 mt-1">{selectedMonthPayments.studentName}</p>
+              </div>
+              <button onClick={() => setSelectedMonthPayments(null)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              {selectedMonthPayments.payments.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider">S.No</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider">Date</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider">Mode</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider">Approved By</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider">Approved Date</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedMonthPayments.payments.map((p, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-4 text-sm font-medium text-slate-600">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-4 text-sm font-medium text-slate-600 whitespace-nowrap">
+                            {new Date(p.paidAt || p.createdAt || Date.now()).toLocaleDateString('en-GB')}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="font-bold text-slate-900">₹{p.amount?.toLocaleString('en-IN')}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-semibold">
+                              {p.paymentMode || 'Online'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm font-medium text-slate-600 whitespace-nowrap">
+                            {p.approvedBy?.name || '-'}
+                          </td>
+                          <td className="px-4 py-4 text-sm font-medium text-slate-600 whitespace-nowrap">
+                            {p.approvedAt ? new Date(p.approvedAt).toLocaleDateString('en-GB') : '-'}
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <button
+                              onClick={() => {
+                                let feeId = selectedMonthPayments.fee._id;
+                                if (selectedMonthPayments.fee.originalFees && selectedMonthPayments.fee.originalFees.length > 0) {
+                                  const parentFee = selectedMonthPayments.fee.originalFees.find(of => of.payments && of.payments.some(op => op._id === p._id));
+                                  if (parentFee) feeId = parentFee._id;
+                                  else feeId = selectedMonthPayments.fee.originalFees[0]._id;
+                                }
+                                const url = `/student-fees/${feeId}/receipt${p._id ? `?paymentId=${p._id}` : ''}`;
+                                downloadReceipt(url, `FeeReceipt_${feeId}.pdf`);
+                              }}
+                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:border-brand-300 hover:text-brand-600 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                            >
+                              <Download size={14} /> Receipt
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500 font-medium">No payment records found.</div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button onClick={() => setSelectedMonthPayments(null)} className="px-6 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold transition-colors">Close</button>
             </div>
           </div>
         </div>,

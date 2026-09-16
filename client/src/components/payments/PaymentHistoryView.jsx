@@ -1,12 +1,14 @@
 import React from 'react';
 import { ArrowLeft, Download, FileText } from 'lucide-react';
+import { useImagePreview } from "../../context/ImagePreviewContext";
 import { downloadReceipt } from '../../utils/downloadReceipt';
 import CustomDataTable from "../common/DataTable";
 
-const PaymentHistoryView = ({ onBack, fee }) => {
+const PaymentHistoryView = ({ fee, payments: propPayments, onBack, onClose, onRefresh }) => {
+  const { showPreview } = useImagePreview();
   if (!fee) return null;
 
-  const payments = fee.payments || [];
+  const payments = fee.payments || propPayments || [];
 
   const columns = [
     { 
@@ -70,9 +72,12 @@ const PaymentHistoryView = ({ onBack, fee }) => {
       cell: row => {
         if (row.paymentMode === 'Online' && row.proofOfPayment) {
           return (
-            <a href={row.proofOfPayment} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm font-semibold">
+            <button 
+              onClick={() => showPreview(row.proofOfPayment)} 
+              className="text-blue-600 hover:underline text-sm font-semibold cursor-pointer"
+            >
               View Proof
-            </a>
+            </button>
           );
         }
         return <span className="text-sm font-mono text-slate-500">{row.bankReference || '-'}</span>;

@@ -8,6 +8,7 @@ import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
+import { useImagePreview } from "../../context/ImagePreviewContext";
 
 const PendingApprovalsList = () => {
   const [fees, setFees] = useState([]);
@@ -19,6 +20,7 @@ const PendingApprovalsList = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null, status: null });
+  const { showPreview } = useImagePreview();
 
   useEffect(() => {
     fetchPendingFees();
@@ -137,6 +139,15 @@ const PendingApprovalsList = () => {
     }
   };
 
+  const formatYear = (y) => {
+    const yearStr = (y || "").toString().replace(/\D/g, "");
+    if (yearStr === "1") return "1st Year";
+    if (yearStr === "2") return "2nd Year";
+    if (yearStr === "3") return "3rd Year";
+    if (yearStr === "4") return "4th Year";
+    return y || "";
+  };
+
   const columns = [
     { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
     { 
@@ -147,7 +158,7 @@ const PendingApprovalsList = () => {
         <div>
           <div className="font-bold text-gray-800">{row.student?.studentNameEnglish || "N/A"}</div>
           <div className="text-[10px] text-gray-500 font-bold">{row.student?.studentId || ""}</div>
-          <div className="text-[10px] text-brand-600 font-bold">{row.year || row.student?.year || ""}</div>
+          <div className="text-[10px] text-brand-600 font-bold">{formatYear(row.year || row.student?.year)}</div>
         </div>
       )
     },
@@ -199,14 +210,12 @@ const PendingApprovalsList = () => {
 
         if (paymentMode === 'Online' && proofOfPayment) {
           return (
-            <a 
-              href={proofOfPayment} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm whitespace-nowrap"
+            <button 
+              onClick={() => showPreview(proofOfPayment)}
+              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm whitespace-nowrap cursor-pointer"
             >
               View Uploaded Proof
-            </a>
+            </button>
           );
         }
         return (

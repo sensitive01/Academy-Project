@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   User, BookOpen, MapPin, Users, CheckCircle, ArrowRight, ArrowLeft,
   CreditCard, Languages, ShieldCheck, Globe, GraduationCap, Phone, Mail, Home,
@@ -28,6 +28,7 @@ const StudentRegistration = () => {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [timer, setTimer] = useState(0);
+  const isSubmittingRef = useRef(false);
 
   const [formData, setFormData] = useState({
     center: (user?.role === 'center' || user?.role === 'hr') ? (user.center?._id || user.center) : "",
@@ -292,7 +293,8 @@ const StudentRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // prevent double submission
+    if (loading || isSubmittingRef.current) return; // prevent double submission
+    isSubmittingRef.current = true;
     setSubmitAttempted(true);
     setLoading(true);
 
@@ -377,6 +379,7 @@ const StudentRegistration = () => {
       }
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 

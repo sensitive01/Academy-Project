@@ -55,10 +55,10 @@ const BatchFeesDetail = ({ batch, onBack }) => {
 
       {/* CONTENT AREA */}
       <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
-        {activeTab === "course_fees" && <StudentFeesList feeType="Course" excludePaid={true} batchObj={batch} />}
-        {activeTab === "council_fees" && <StudentFeesList feeType="Council" excludePaid={true} batchObj={batch} />}
-        {activeTab === "both_fees" && <StudentFeesList feeType="Both" excludePaid={true} batchObj={batch} />}
-        {activeTab === "others" && <StudentFeesList feeType="Other" excludePaid={true} batchObj={batch} />}
+        {activeTab === "course_fees" && <StudentFeesList feeType="Course" excludePaid={false} batchObj={batch} />}
+        {activeTab === "council_fees" && <StudentFeesList feeType="Council" excludePaid={false} batchObj={batch} />}
+        {activeTab === "both_fees" && <StudentFeesList feeType="Both" excludePaid={false} batchObj={batch} />}
+        {activeTab === "others" && <StudentFeesList feeType="Other" excludePaid={false} batchObj={batch} />}
       </div>
     </div>
   );

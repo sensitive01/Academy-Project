@@ -6,6 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ImagePreviewProvider } from "./context/ImagePreviewContext";
 import { Toaster } from "react-hot-toast";
 
 // Layouts
@@ -142,7 +143,8 @@ const DashboardRedirect = () => {
 function App() {
   return (
     <AuthProvider>
-      <Toaster position="top-right" reverseOrder={false} />
+      <ImagePreviewProvider>
+      <Toaster position="top-right" reverseOrder={false} containerStyle={{ zIndex: 999999 }} />
       <Router>
         <Routes>
 
@@ -350,6 +352,7 @@ function App() {
 
         </Routes>
       </Router>
+      </ImagePreviewProvider>
     </AuthProvider>
   );
 }
