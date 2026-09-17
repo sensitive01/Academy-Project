@@ -60,7 +60,18 @@ connectDB().then(async () => {
 });
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://academy-project-iota.vercel.app',
+    'http://drrgacademy.com',
+    'https://drrgacademy.com',
+    'https://www.drrgacademy.com',
+    'http://www.drrgacademy.com' 
+  ],
+  credentials: true
+}));
 
 // 🔐 Razorpay Webhook RAW BODY (MUST BE BEFORE JSON)
 app.use(
