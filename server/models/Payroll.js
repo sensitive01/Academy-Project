@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const adjustmentSchema = new mongoose.Schema({
-  type: { type: String, enum: ["allowance", "deduction", "advance"], required: true },
+  type: { type: String, enum: ["allowance", "deduction", "advance", "course_fee", "council_fee", "exam_fee"], required: true },
   amount: { type: Number, required: true },
   note: { type: String, default: "" },
   createdAt: { type: Date, default: Date.now },
@@ -23,6 +23,11 @@ const payrollSchema = new mongoose.Schema(
     totalDeductions: { type: Number, default: 0 },
 
     advance: { type: Number, default: 0 },
+    
+    // Fee deductions
+    totalCourseFee: { type: Number, default: 0 },
+    totalCouncilFee: { type: Number, default: 0 },
+    totalExamFee: { type: Number, default: 0 },
 
     totalDays: { type: Number, default: 30 },
     present: { type: Number, default: 0 },

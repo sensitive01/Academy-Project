@@ -1105,6 +1105,9 @@ router.post("/bulk-upload", protect, async (req, res) => {
             role: "student",
           });
 
+          const courseFeeAmount = Number(record["Course Fee"]);
+          const councilFeeAmount = Number(record["Council Fee"]);
+
           const newStudent = await Student.create({
             user: user._id,
             studentId,
@@ -1113,6 +1116,8 @@ router.post("/bulk-upload", protect, async (req, res) => {
             email: finalEmail,
             center: centerId,
             year,
+            courseFee: !isNaN(courseFeeAmount) ? courseFeeAmount : 0,
+            councilFee: !isNaN(councilFeeAmount) ? councilFeeAmount : 0,
             enrolledCourses: [{
               course: courseId,
               batch: batchId,
@@ -1127,7 +1132,6 @@ router.post("/bulk-upload", protect, async (req, res) => {
             await batch.save();
           }
 
-          const courseFeeAmount = Number(record["Course Fee"]);
           if (!isNaN(courseFeeAmount) && courseFeeAmount > 0) {
             await StudentFee.create({
               student: newStudent._id,
@@ -1135,14 +1139,13 @@ router.post("/bulk-upload", protect, async (req, res) => {
               course: courseId,
               batch: batchId,
               feeType: 'Other',
-              otherFeeType: 'Course Fee',
+              otherFeeType: 'Course Fees',
               amount: courseFeeAmount,
               status: 'pending',
               year: year
             });
           }
 
-          const councilFeeAmount = Number(record["Council Fee"]);
           if (!isNaN(councilFeeAmount) && councilFeeAmount > 0) {
             await StudentFee.create({
               student: newStudent._id,

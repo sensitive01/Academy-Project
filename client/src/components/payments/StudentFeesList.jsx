@@ -297,12 +297,15 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       // Filter by feeType prop and batchObj
       let filteredData = res.data.filter(f => {
         if (!f.student) return false;
-        if (batchObj && f.batch?._id !== batchObj._id) return false;
+        if (batchObj) {
+          const feeBatchId = f.batch?._id || f.batch;
+          if (String(feeBatchId) !== String(batchObj._id)) return false;
+        }
         if (feeType === 'All') return true;
-        if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
-        if (feeType === 'Course') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
-        if (feeType === 'Both') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees') || f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
-        if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees' && f.otherFeeType !== 'Course Fees';
+        if (feeType === 'Council') return f.feeType === 'Council' || (f.feeType === 'Other' && (f.otherFeeType === 'Council Fees' || f.otherFeeType === 'Council Fee'));
+        if (feeType === 'Course') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && (f.otherFeeType === 'Course Fees' || f.otherFeeType === 'Course Fee'));
+        if (feeType === 'Both') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && (f.otherFeeType === 'Course Fees' || f.otherFeeType === 'Course Fee')) || f.feeType === 'Council' || (f.feeType === 'Other' && (f.otherFeeType === 'Council Fees' || f.otherFeeType === 'Council Fee'));
+        if (feeType === 'Other') return f.feeType === 'Other' && f.otherFeeType !== 'Council Fees' && f.otherFeeType !== 'Council Fee' && f.otherFeeType !== 'Course Fees' && f.otherFeeType !== 'Course Fee';
         return f.feeType === feeType;
       });
 

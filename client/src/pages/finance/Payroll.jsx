@@ -316,18 +316,18 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
 
             Object.keys(row).forEach(key => {
               if (key.match(/^Allowance(\s*\d+)?$/i)) {
-                 const numVal = Number(row[key]);
-                 if (numVal > 0) {
-                    let reasonKeyMatch = Object.keys(row).find(k => k.toLowerCase() === `${key.toLowerCase()} reason`);
-                    allowancesFound.push({ amount: numVal, reason: reasonKeyMatch ? row[reasonKeyMatch] : "" });
-                 }
+                const numVal = Number(row[key]);
+                if (numVal > 0) {
+                  let reasonKeyMatch = Object.keys(row).find(k => k.toLowerCase() === `${key.toLowerCase()} reason`);
+                  allowancesFound.push({ amount: numVal, reason: reasonKeyMatch ? row[reasonKeyMatch] : "" });
+                }
               }
               if (key.match(/^Deduction(\s*\d+)?$/i)) {
-                 const numVal = Number(row[key]);
-                 if (numVal > 0) {
-                    let reasonKeyMatch = Object.keys(row).find(k => k.toLowerCase() === `${key.toLowerCase()} reason`);
-                    deductionsFound.push({ amount: numVal, reason: reasonKeyMatch ? row[reasonKeyMatch] : "" });
-                 }
+                const numVal = Number(row[key]);
+                if (numVal > 0) {
+                  let reasonKeyMatch = Object.keys(row).find(k => k.toLowerCase() === `${key.toLowerCase()} reason`);
+                  deductionsFound.push({ amount: numVal, reason: reasonKeyMatch ? row[reasonKeyMatch] : "" });
+                }
               }
             });
 
@@ -335,23 +335,26 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
             const maxLen = Math.max(allowancesFound.length, deductionsFound.length, hasAttendance ? 1 : 0);
 
             for (let i = 0; i < maxLen; i++) {
-               const allow = allowancesFound[i] || { amount: 0, reason: "" };
-               const ded = deductionsFound[i] || { amount: 0, reason: "" };
-               const isFirst = i === 0;
+              const allow = allowancesFound[i] || { amount: 0, reason: "" };
+              const ded = deductionsFound[i] || { amount: 0, reason: "" };
+              const isFirst = i === 0;
 
-               adjustments.push({
-                 employeeId: empId,
-                 month: Number(month),
-                 year: Number(year),
-                 internshipId,
-                 allowance: allow.amount,
-                 allowanceReason: allow.reason,
-                 deduction: ded.amount,
-                 deductionReason: ded.reason,
-                 totalDays: isFirst ? totalDays : undefined,
-                 present: isFirst ? present : undefined,
-                 absent: isFirst ? absent : undefined
-               });
+              adjustments.push({
+                employeeId: empId,
+                month: Number(month),
+                year: Number(year),
+                internshipId,
+                allowance: allow.amount,
+                allowanceReason: allow.reason,
+                deduction: ded.amount,
+                deductionReason: ded.reason,
+                totalDays: isFirst ? totalDays : undefined,
+                present: isFirst ? present : undefined,
+                absent: isFirst ? absent : undefined,
+                courseFee: (isFirst && row["Course Fee Deduction"]) ? Number(row["Course Fee Deduction"]) : undefined,
+                councilFee: (isFirst && row["Council Fee Deduction"]) ? Number(row["Council Fee Deduction"]) : undefined,
+                examFee: (isFirst && row["Exam Fee Deduction"]) ? Number(row["Exam Fee Deduction"]) : undefined
+              });
             }
           });
 
@@ -439,7 +442,15 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         "Deduction 1": 0,
         "Deduction 1 Reason": "",
         "Deduction 2": 0,
-        "Deduction 2 Reason": ""
+        "Deduction 2 Reason": "",
+        ...(internOnly ? {
+          "Course Fee Balance (Info)": p.courseBalance || 0,
+          "Council Fee Balance (Info)": p.councilBalance || 0,
+          "Exam Fee Balance (Info)": p.examBalance || 0,
+          "Course Fee Deduction": 0,
+          "Council Fee Deduction": 0,
+          "Exam Fee Deduction": 0
+        } : {})
       }));
 
       if (templateData.length === 0) {
@@ -456,7 +467,15 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
           "Deduction 1": 0,
           "Deduction 1 Reason": "",
           "Deduction 2": 0,
-          "Deduction 2 Reason": ""
+          "Deduction 2 Reason": "",
+          ...(internOnly ? {
+            "Course Fee Balance (Info)": 0,
+            "Council Fee Balance (Info)": 0,
+            "Exam Fee Balance (Info)": 0,
+            "Course Fee Deduction": 0,
+            "Council Fee Deduction": 0,
+            "Exam Fee Deduction": 0
+          } : {})
         });
       }
 
@@ -555,12 +574,18 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         [internOnly ? "Intern Name" : "Employee Name"]: p.name || "-",
         Department: p.department || "-",
         "Basic Salary": p.basic || 0,
+        ...(internOnly ? { "Gross Salary": p.grossSalary || 0 } : {}),
         "Total Days": p.totalDays || 0,
         "Present": p.present || 0,
         "Leave": p.absent || 0,
         "Late Days": p.lateDays || 0,
         "Allowances": p.allowances || 0,
         "Deductions": p.deductions || 0,
+        ...(internOnly ? {
+          "Course Fee Deduction": p.courseFeeDeduction || 0,
+          "Council Fee Deduction": p.councilFeeDeduction || 0,
+          "Exam Fee Deduction": p.examFeeDeduction || 0,
+        } : {}),
         "Advance": p.advance || 0,
         "Net Salary": p.netSalary || 0,
         Status: p.status || "process"
@@ -582,9 +607,23 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         : `Employee Payroll - ${selectedMonth}`;
       doc.text(title, 14, 15);
 
-      const tableColumn = [
+      const tableColumn = internOnly ? [
         "S.No",
-        internOnly ? "Intern Name" : "Employee Name",
+        "Intern Name",
+        "Dept",
+        "Basic",
+        "Gross",
+        "Days",
+        "Present",
+        "Allowances",
+        "Deductions",
+        "Fee Deds",
+        "Advance",
+        "Net Salary",
+        "Status"
+      ] : [
+        "S.No",
+        "Employee Name",
         "Dept",
         "Basic",
         "Days",
@@ -657,23 +696,47 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
       name: 'Employee', selector: row => row.name, sortable: true, width: '160px',
       cell: row => <div onClick={() => fetchAttendance(row, "all")} className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 truncate">{row.name}</div>
     },
-    {
+    ...(internOnly ? [] : [{
       name: 'Dept', selector: row => row.department, center: "true", width: '180px',
       cell: row => <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{row.department || "-"}</span>
-    },
-    { name: 'Basic Salary', selector: row => row.basic, sortable: true, width: "145px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
+    }]),
+    { name: internOnly ? 'Stipend' : 'Basic Salary', selector: row => row.basic, sortable: true, width: internOnly ? "110px" : "145px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
+    ...(internOnly ? [{ name: 'Gross Salary', selector: row => row.grossSalary, sortable: true, width: "110px", center: "true", cell: row => <div className="text-blue-700 font-bold text-center w-full"><span className="text-blue-400 mr-1">₹</span>{row.grossSalary?.toLocaleString("en-IN") || "0"}</div> }] : []),
     { name: 'Days', selector: row => row.totalDays, center: "true", width: '80px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
     { name: 'Present', selector: row => row.present, center: "true", width: '95px', cell: row => <div className="font-bold text-green-600 cursor-pointer hover:bg-green-50 p-1 rounded" onClick={() => fetchAttendance(row, "present")}>{row.present ?? "-"}</div> },
-    { name: 'Leave', selector: row => row.absent, center: "true", width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
-    {
-      name: 'Late Info', center: "true", width: '110px',
-      cell: row => (
-        <div className="flex flex-col items-center cursor-pointer hover:bg-orange-50 p-1 rounded" onClick={() => fetchAttendance(row, "all")}>
-          <span className="text-xs font-semibold text-orange-600">{row.lateDays} {row.lateDays === 1 ? 'day' : 'days'}</span>
-          <span className="text-[10px] text-gray-500">{row.lateTime}</span>
-        </div>
-      )
-    },
+    ...(internOnly ? [] : [
+      { name: 'Leave', selector: row => row.absent, center: "true", width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
+      {
+        name: 'Late Info', center: "true", width: '110px',
+        cell: row => (
+          <div className="flex flex-col items-center cursor-pointer hover:bg-orange-50 p-1 rounded" onClick={() => fetchAttendance(row, "all")}>
+            <span className="text-xs font-semibold text-orange-600">{row.lateDays} {row.lateDays === 1 ? 'day' : 'days'}</span>
+            <span className="text-[10px] text-gray-500">{row.lateTime}</span>
+          </div>
+        )
+      }
+    ]),
+    ...(internOnly ? [
+      {
+        name: 'Fees Bal', center: "true", width: '140px', cell: row => (
+          <div className="flex flex-col text-[10px] items-center text-gray-600 font-medium whitespace-nowrap">
+            <span className="text-orange-600">Cou: ₹{row.councilBalance || 0}</span>
+            <span className="text-blue-600">Crs: ₹{row.courseBalance || 0}</span>
+            <span className="text-purple-600">Ex: ₹{row.examBalance || 0}</span>
+          </div>
+        )
+      },
+      {
+        name: 'Fee Deds', center: "true", width: '110px', cell: row => (
+          <div className="flex flex-col text-[10px] items-center font-bold text-red-500 whitespace-nowrap">
+            {(row.councilFeeDeduction > 0) && <span>Cou: -₹{row.councilFeeDeduction}</span>}
+            {(row.courseFeeDeduction > 0) && <span>Crs: -₹{row.courseFeeDeduction}</span>}
+            {(row.examFeeDeduction > 0) && <span>Ex: -₹{row.examFeeDeduction}</span>}
+            {(!row.councilFeeDeduction && !row.courseFeeDeduction && !row.examFeeDeduction) && <span className="text-gray-400">-</span>}
+          </div>
+        )
+      },
+    ] : []),
     { name: 'Allowances', selector: row => row.allowances, center: "true", width: '130px', cell: row => <div className="font-bold text-blue-600 cursor-pointer hover:bg-blue-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "allowance")}>{row.allowances > 0 ? <><span className="text-blue-300 mr-1">+ ₹</span>{row.allowances.toLocaleString("en-IN")}</> : '-'}</div> },
     { name: 'Deductions', selector: row => row.deductions, center: "true", width: '130px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "deduction")}>{row.deductions > 0 ? <><span className="text-red-300 mr-1">- ₹</span>{row.deductions.toLocaleString("en-IN")}</> : '-'}</div> },
     { name: 'Advance', selector: row => row.advance, center: "true", width: '100px', cell: row => <div className="font-bold text-orange-600 cursor-pointer hover:bg-orange-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "advance")}>{row.advance > 0 ? <><span className="text-orange-300 mr-1">₹</span>{row.advance.toLocaleString("en-IN")}</> : '-'}</div> },
@@ -701,12 +764,12 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               value={currentStatus}
               onChange={(e) => handleStatusUpdate([{ employeeId: row.employeeId || row._id, internshipId: row.internshipId }], e.target.value)}
               className={`border px-2 py-1 rounded text-[11px] font-bold w-full outline-none focus:ring-1 cursor-pointer shadow-sm text-center ${currentStatus === 'hold'
-                  ? 'bg-orange-100 border-orange-300 text-orange-700 focus:border-orange-500 focus:ring-orange-500'
-                  : currentStatus === 'processed'
-                    ? 'bg-emerald-100 border-emerald-300 text-emerald-700 focus:border-emerald-500 focus:ring-emerald-500'
-                    : currentStatus === 'paid'
-                      ? 'bg-blue-100 border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-blue-500'
-                      : 'bg-white border-gray-300 text-slate-700 focus:border-brand-500 focus:ring-brand-500'
+                ? 'bg-orange-100 border-orange-300 text-orange-700 focus:border-orange-500 focus:ring-orange-500'
+                : currentStatus === 'processed'
+                  ? 'bg-emerald-100 border-emerald-300 text-emerald-700 focus:border-emerald-500 focus:ring-emerald-500'
+                  : currentStatus === 'paid'
+                    ? 'bg-blue-100 border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-blue-500'
+                    : 'bg-white border-gray-300 text-slate-700 focus:border-brand-500 focus:ring-brand-500'
                 }`}
             >
               <option value="process">Process</option>
@@ -873,8 +936,8 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
                         setShowMonthGrid(false);
                       }}
                       className={`px-3 py-2 rounded-md text-sm font-medium transition ${selectedMonth === m.value
-                          ? "bg-red-600 text-white shadow-md shadow-red-200"
-                          : "bg-gray-50 text-gray-700 hover:bg-red-50 hover:text-red-600"
+                        ? "bg-red-600 text-white shadow-md shadow-red-200"
+                        : "bg-gray-50 text-gray-700 hover:bg-red-50 hover:text-red-600"
                         }`}
                     >
                       {m.label}
@@ -1176,6 +1239,9 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
                   <option value="allowance">Allowance (+)</option>
                   <option value="deduction">Deduction (-)</option>
                   <option value="advance">Advance (-)</option>
+                  {internOnly && <option value="course_fee">Course Fee Deduction (-)</option>}
+                  {internOnly && <option value="council_fee">Council Fee Deduction (-)</option>}
+                  {internOnly && <option value="exam_fee">Exam Fee Deduction (-)</option>}
                 </select>
               </div>
 
@@ -1284,8 +1350,8 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               <button
                 onClick={() => setExportFormat("excel")}
                 className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "excel"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                  : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
@@ -1297,8 +1363,8 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               <button
                 onClick={() => setExportFormat("pdf")}
                 className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "pdf"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-red-500 bg-red-50 text-red-700"
+                  : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>

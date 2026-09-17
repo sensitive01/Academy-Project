@@ -4,11 +4,55 @@ const mongoose = require("mongoose");
 const router = express.Router();
 const Payroll = require("../models/Payroll");
 const Employee = require("../models/Employee");
+const StudentFee = require("../models/StudentFee");
 const Leave = require("../models/Leave");
 const Attendance = require("../models/Attendance");
 const { protect } = require("../middleware/authMiddleware");
 const PDFDocument = require("pdfkit");
 const toWords = require('number-to-words');
+
+async function applyFeeDeduction(studentId, feeTypeStr, amount) {
+  let feeRecords = await StudentFee.find({ student: studentId, status: { $ne: 'paid' } }).sort({ createdAt: 1 });
+  
+  feeRecords = feeRecords.filter(f => {
+    if (feeTypeStr === 'council_fee') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
+    if (feeTypeStr === 'course_fee') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
+    if (feeTypeStr === 'exam_fee') return f.feeType === 'Exam';
+    return false;
+  });
+
+  if (feeRecords.length === 0) return;
+
+  let remaining = Number(amount);
+  const modifiedFees = [];
+
+  for (const fee of feeRecords) {
+    if (remaining <= 0) break;
+    const due = fee.amount + (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+    const paid = (fee.payments || []).filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0);
+    const balance = Math.max(0, due - paid);
+    
+    if (balance > 0) {
+      const payAmount = Math.min(balance, remaining);
+      fee.payments.push({
+        amount: payAmount,
+        paymentMode: 'Payroll Deduction',
+        status: 'Approved',
+        paidAt: new Date(),
+      });
+      if (paid + payAmount >= due) {
+        fee.status = 'paid';
+        fee.paidAt = new Date();
+      }
+      modifiedFees.push(fee);
+      remaining -= payAmount;
+    }
+  }
+
+  for (const fee of modifiedFees) {
+    await fee.save();
+  }
+}
 
 // GET ALL PAYROLLS
 router.get("/salary/all", protect, async (req, res) => {
@@ -164,12 +208,47 @@ router.get("/salary/all", protect, async (req, res) => {
         const allowances = payroll ? payroll.totalAllowances : 0;
         const deductions = payroll ? payroll.totalDeductions : 0;
         const advance = payroll ? payroll.advance : 0;
+        const courseFeeDeduction = payroll ? (payroll.totalCourseFee || 0) : 0;
+        const councilFeeDeduction = payroll ? (payroll.totalCouncilFee || 0) : 0;
+        const examFeeDeduction = payroll ? (payroll.totalExamFee || 0) : 0;
 
         const basic = payroll && payroll.basicSalary
           ? payroll.basicSalary
           : emp.salary;
 
-        const netSalary = basic + allowances - deductions - advance;
+        let grossSalary = basic;
+        if (internOnly === "true" || internOnly === true) {
+          if (empTotalDays > 0) {
+            grossSalary = Math.round((basic * present) / empTotalDays);
+          } else {
+            grossSalary = 0;
+          }
+        }
+
+        const netSalary = grossSalary + allowances - deductions - advance - courseFeeDeduction - councilFeeDeduction - examFeeDeduction;
+
+        let courseBalance = 0;
+        let councilBalance = 0;
+        let examBalance = 0;
+
+        if ((internOnly === "true" || internOnly === true) && emp.user) {
+          const stuModel = await mongoose.model('Student').findOne({ user: emp.user });
+          if (stuModel) {
+            const pendingFees = await StudentFee.find({ student: stuModel._id, status: { $in: ['pending', 'pending_approval'] } });
+            pendingFees.forEach(f => {
+              const due = f.amount + (f.isPenaltyApplied ? f.penaltyAmount : 0) + (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
+              const paid = (f.payments || []).filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0);
+              const remaining = Math.max(0, due - paid);
+              if (f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees')) {
+                councilBalance += remaining;
+              } else if (f.feeType === 'Exam') {
+                examBalance += remaining;
+              } else if (['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees')) {
+                courseBalance += remaining;
+              }
+            });
+          }
+        }
 
         return {
           sNo: index + 1,
@@ -179,9 +258,16 @@ router.get("/salary/all", protect, async (req, res) => {
           name: `${emp.firstName} ${emp.lastName}`.trim() + (emp.vendorName ? ` (${emp.vendorName})` : ""),
           department: emp.department,
           basic: emp.salary,
+          grossSalary,
           allowances,
           deductions,
           advance,
+          courseFeeDeduction,
+          councilFeeDeduction,
+          examFeeDeduction,
+          courseBalance,
+          councilBalance,
+          examBalance,
           adjustments: payroll && payroll.adjustments ? payroll.adjustments.map(a => ({
             type: a.type,
             amount: a.amount,
@@ -402,12 +488,28 @@ router.post("/adjustment", protect, async (req, res) => {
     if (type === "allowance") payroll.totalAllowances += Number(amount);
     if (type === "deduction") payroll.totalDeductions += Number(amount);
     if (type === "advance") payroll.advance += Number(amount);
+    
+    if (type === "course_fee") {
+      payroll.totalCourseFee = (payroll.totalCourseFee || 0) + Number(amount);
+      await applyFeeDeduction(targetEmpId, type, amount);
+    }
+    if (type === "council_fee") {
+      payroll.totalCouncilFee = (payroll.totalCouncilFee || 0) + Number(amount);
+      await applyFeeDeduction(targetEmpId, type, amount);
+    }
+    if (type === "exam_fee") {
+      payroll.totalExamFee = (payroll.totalExamFee || 0) + Number(amount);
+      await applyFeeDeduction(targetEmpId, type, amount);
+    }
 
     payroll.netSalary =
       payroll.basicSalary +
       payroll.totalAllowances -
       payroll.totalDeductions -
-      payroll.advance;
+      payroll.advance -
+      (payroll.totalCourseFee || 0) -
+      (payroll.totalCouncilFee || 0) -
+      (payroll.totalExamFee || 0);
 
     await payroll.save({ validateBeforeSave: false });
 
@@ -434,7 +536,7 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
     let processedCount = 0;
 
     for (const adj of adjustments) {
-      const { employeeId, month, year, type, amount, note, internshipId, allowance, allowanceReason, deduction, deductionReason, totalDays, present, absent } = adj;
+      const { employeeId, month, year, type, amount, note, internshipId, allowance, allowanceReason, deduction, deductionReason, totalDays, present, absent, courseFee, councilFee, examFee } = adj;
 
       if (!employeeId || !month || !year) {
         continue;
@@ -516,6 +618,19 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
         if (type === "allowance") payroll.totalAllowances += Number(amount);
         if (type === "deduction") payroll.totalDeductions += Number(amount);
         if (type === "advance") payroll.advance += Number(amount);
+        
+        if (type === "course_fee") {
+          payroll.totalCourseFee = (payroll.totalCourseFee || 0) + Number(amount);
+          await applyFeeDeduction(targetEmpId, type, amount);
+        }
+        if (type === "council_fee") {
+          payroll.totalCouncilFee = (payroll.totalCouncilFee || 0) + Number(amount);
+          await applyFeeDeduction(targetEmpId, type, amount);
+        }
+        if (type === "exam_fee") {
+          payroll.totalExamFee = (payroll.totalExamFee || 0) + Number(amount);
+          await applyFeeDeduction(targetEmpId, type, amount);
+        }
         updated = true;
       }
 
@@ -540,6 +655,25 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
         updated = true;
       }
 
+      if (courseFee && Number(courseFee) > 0) {
+        payroll.adjustments.push({ type: "course_fee", amount: Number(courseFee) });
+        payroll.totalCourseFee = (payroll.totalCourseFee || 0) + Number(courseFee);
+        await applyFeeDeduction(targetEmpId, "course_fee", Number(courseFee));
+        updated = true;
+      }
+      if (councilFee && Number(councilFee) > 0) {
+        payroll.adjustments.push({ type: "council_fee", amount: Number(councilFee) });
+        payroll.totalCouncilFee = (payroll.totalCouncilFee || 0) + Number(councilFee);
+        await applyFeeDeduction(targetEmpId, "council_fee", Number(councilFee));
+        updated = true;
+      }
+      if (examFee && Number(examFee) > 0) {
+        payroll.adjustments.push({ type: "exam_fee", amount: Number(examFee) });
+        payroll.totalExamFee = (payroll.totalExamFee || 0) + Number(examFee);
+        await applyFeeDeduction(targetEmpId, "exam_fee", Number(examFee));
+        updated = true;
+      }
+
       // Attendance check
       if (totalDays !== undefined && present !== undefined && absent !== undefined) {
         payroll.totalDays = Number(totalDays);
@@ -554,7 +688,10 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
           payroll.basicSalary +
           payroll.totalAllowances -
           payroll.totalDeductions -
-          payroll.advance;
+          payroll.advance -
+          (payroll.totalCourseFee || 0) -
+          (payroll.totalCouncilFee || 0) -
+          (payroll.totalExamFee || 0);
 
         await payroll.save({ validateBeforeSave: false });
         processedCount++;

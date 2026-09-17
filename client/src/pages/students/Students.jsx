@@ -487,9 +487,9 @@ const Students = () => {
         "Student ID": "",
         "Name": "John Doe",
         "Email": "john@example.com",
-        "DOB": "2000-01-01",
+        "DOB": "01-01-2000",
         "Course ID": "CRS-XXXX",
-        "Batch ID": "B-001",
+        "Batch ID": "B-001", 
         "Center ID": "CEN-2024-XXXX",
         "Year": "1st Year",
         "Course Fee": 50000,
@@ -1172,6 +1172,8 @@ const Students = () => {
                           <th className="p-3 font-bold border-b border-slate-200">Center</th>
                           <th className="p-3 font-bold border-b border-slate-200">Course</th>
                           <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                          <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
+                          <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1185,6 +1187,8 @@ const Students = () => {
                             <td className="p-3 text-slate-600">{r["Center ID"]}</td>
                             <td className="p-3 text-slate-600">{r["Course ID"]}</td>
                             <td className="p-3 text-slate-600">{r["Batch ID"]}</td>
+                            <td className="p-3 text-slate-600 text-xs">{r["Course Fee"] ? `₹${r["Course Fee"]}` : '-'}</td>
+                            <td className="p-3 text-slate-600 text-xs">{r["Council Fee"] ? `₹${r["Council Fee"]}` : '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1216,6 +1220,8 @@ const Students = () => {
                             <th className="p-3 font-bold border-b border-slate-200">Center</th>
                             <th className="p-3 font-bold border-b border-slate-200">Course</th>
                             <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                             <th className="p-3 font-bold border-b border-slate-200">Reason</th>
                             <th className="p-3 font-bold border-b border-slate-200 text-right w-32">Action</th>
                           </tr>
@@ -1259,6 +1265,8 @@ const Students = () => {
                                 <td className="p-3 text-slate-600">{r["Center ID"]}</td>
                                 <td className="p-3 text-slate-600">{r["Course ID"]}</td>
                                 <td className="p-3 text-slate-600">{r["Batch ID"]}</td>
+                                <td className="p-3 text-slate-600 text-xs">{r["Course Fee"] ? `₹${r["Course Fee"]}` : '-'}</td>
+                                <td className="p-3 text-slate-600 text-xs">{r["Council Fee"] ? `₹${r["Council Fee"]}` : '-'}</td>
                                 <td className="p-3">
                                   <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold inline-block truncate max-w-[120px]" title={r.reason}>{r.reason}</span>
                                 </td>
@@ -1364,6 +1372,8 @@ const Students = () => {
                             <th className="p-3 font-bold border-b border-slate-200">Center</th>
                             <th className="p-3 font-bold border-b border-slate-200">Course</th>
                             <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
+                            <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                             <th className="p-3 font-bold border-b border-slate-200 text-right">Reason</th>
                           </tr>
                         </thead>
@@ -1377,6 +1387,8 @@ const Students = () => {
                               <td className="p-3 text-slate-600">{r["Center ID"] || "-"}</td>
                               <td className="p-3 text-slate-600">{r["Course ID"] || "-"}</td>
                               <td className="p-3 text-slate-600">{r["Batch ID"] || "-"}</td>
+                              <td className="p-3 text-slate-600 text-xs">{r["Course Fee"] ? `₹${r["Course Fee"]}` : '-'}</td>
+                              <td className="p-3 text-slate-600 text-xs">{r["Council Fee"] ? `₹${r["Council Fee"]}` : '-'}</td>
                               <td className="p-3 text-right">
                                 <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold inline-block">{r.reason}</span>
                               </td>
