@@ -1127,6 +1127,35 @@ router.post("/bulk-upload", protect, async (req, res) => {
             await batch.save();
           }
 
+          const courseFeeAmount = Number(record["Course Fee"]);
+          if (!isNaN(courseFeeAmount) && courseFeeAmount > 0) {
+            await StudentFee.create({
+              student: newStudent._id,
+              center: centerId,
+              course: courseId,
+              batch: batchId,
+              feeType: 'Other',
+              otherFeeType: 'Course Fee',
+              amount: courseFeeAmount,
+              status: 'pending',
+              year: year
+            });
+          }
+
+          const councilFeeAmount = Number(record["Council Fee"]);
+          if (!isNaN(councilFeeAmount) && councilFeeAmount > 0) {
+            await StudentFee.create({
+              student: newStudent._id,
+              center: centerId,
+              course: courseId,
+              batch: batchId,
+              feeType: 'Council',
+              amount: councilFeeAmount,
+              status: 'pending',
+              year: year
+            });
+          }
+
           successCount++;
         }
       } catch (err) {

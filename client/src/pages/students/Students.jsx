@@ -491,7 +491,9 @@ const Students = () => {
         "Course ID": "CRS-XXXX",
         "Batch ID": "B-001",
         "Center ID": "CEN-2024-XXXX",
-        "Year": "1st Year"
+        "Year": "1st Year",
+        "Course Fee": 50000,
+        "Council Fee": 2000
       }
     ];
     const ws = XLSX.utils.json_to_sheet(templateData);
