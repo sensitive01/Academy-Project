@@ -1132,31 +1132,43 @@ router.post("/bulk-upload", protect, async (req, res) => {
             await batch.save();
           }
 
-          if (!isNaN(courseFeeAmount) && courseFeeAmount > 0) {
-            await StudentFee.create({
-              student: newStudent._id,
-              center: centerId,
-              course: courseId,
-              batch: batchId,
-              feeType: 'Other',
-              otherFeeType: 'Course Fees',
-              amount: courseFeeAmount,
-              status: 'pending',
-              year: year
-            });
-          }
+          // Parse the year digit to create fees for all years up to the current one
+          const yearMatch = year ? String(year).match(/\d+/) : null;
+          const maxYearDigit = yearMatch ? parseInt(yearMatch[0], 10) : 1;
 
-          if (!isNaN(councilFeeAmount) && councilFeeAmount > 0) {
-            await StudentFee.create({
-              student: newStudent._id,
-              center: centerId,
-              course: courseId,
-              batch: batchId,
-              feeType: 'Council',
-              amount: councilFeeAmount,
-              status: 'pending',
-              year: year
-            });
+          for (let y = 1; y <= maxYearDigit; y++) {
+            let feeYearLabel = `${y} Year`;
+            if (y === 1) feeYearLabel = "1st Year";
+            else if (y === 2) feeYearLabel = "2nd Year";
+            else if (y === 3) feeYearLabel = "3rd Year";
+            else if (y >= 4) feeYearLabel = `${y}th Year`;
+
+            if (!isNaN(courseFeeAmount) && courseFeeAmount > 0) {
+              await StudentFee.create({
+                student: newStudent._id,
+                center: centerId,
+                course: courseId,
+                batch: batchId,
+                feeType: 'Other',
+                otherFeeType: 'Course Fees',
+                amount: courseFeeAmount,
+                status: 'pending',
+                year: feeYearLabel
+              });
+            }
+
+            if (!isNaN(councilFeeAmount) && councilFeeAmount > 0) {
+              await StudentFee.create({
+                student: newStudent._id,
+                center: centerId,
+                course: courseId,
+                batch: batchId,
+                feeType: 'Council',
+                amount: councilFeeAmount,
+                status: 'pending',
+                year: feeYearLabel
+              });
+            }
           }
 
           successCount++;

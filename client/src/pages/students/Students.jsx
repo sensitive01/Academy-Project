@@ -1167,11 +1167,12 @@ const Students = () => {
                           <th className="p-3 font-bold border-b border-slate-200 w-12">S.No</th>
                           <th className="p-3 font-bold border-b border-slate-200">Name</th>
                           <th className="p-3 font-bold border-b border-slate-200">Student ID</th>
-                          <th className="p-3 font-bold border-b border-slate-200">Email</th>
+                          <th className="p-3 font-bold border-b border-slate-200 min-w-[240px]">Email</th>
                           <th className="p-3 font-bold border-b border-slate-200">DOB</th>
                           <th className="p-3 font-bold border-b border-slate-200">Center</th>
                           <th className="p-3 font-bold border-b border-slate-200">Course</th>
                           <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                          <th className="p-3 font-bold border-b border-slate-200 min-w-[120px]">Year</th> 
                           <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
                           <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                         </tr>
@@ -1187,6 +1188,20 @@ const Students = () => {
                             <td className="p-3 text-slate-600">{r["Center ID"]}</td>
                             <td className="p-3 text-slate-600">{r["Course ID"]}</td>
                             <td className="p-3 text-slate-600">{r["Batch ID"]}</td>
+                            <td className="p-3 min-w-[120px]">
+                              <input
+                                type="text"
+                                value={r["Year"] || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setPreviewModal(prev => ({
+                                    ...prev,
+                                    validRecords: prev.validRecords.map(rec => rec.id === r.id ? { ...rec, Year: val } : rec)
+                                  }));
+                                }}
+                                className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
+                              />
+                            </td>
                             <td className="p-3 text-slate-600 text-xs">{r["Course Fee"] ? `₹${r["Course Fee"]}` : '-'}</td>
                             <td className="p-3 text-slate-600 text-xs">{r["Council Fee"] ? `₹${r["Council Fee"]}` : '-'}</td>
                           </tr>
@@ -1215,11 +1230,12 @@ const Students = () => {
                             <th className="p-3 font-bold border-b border-slate-200 w-12">S.No</th>
                             <th className="p-3 font-bold border-b border-slate-200">Name</th>
                             <th className="p-3 font-bold border-b border-slate-200 w-32">Student ID</th>
-                            <th className="p-3 font-bold border-b border-slate-200">Email</th>
+                            <th className="p-3 font-bold border-b border-slate-200 min-w-[240px]">Email</th>
                             <th className="p-3 font-bold border-b border-slate-200">DOB</th>
                             <th className="p-3 font-bold border-b border-slate-200">Center</th>
                             <th className="p-3 font-bold border-b border-slate-200">Course</th>
                             <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                            <th className="p-3 font-bold border-b border-slate-200 min-w-[120px]">Year</th>
                             <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
                             <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                             <th className="p-3 font-bold border-b border-slate-200">Reason</th>
@@ -1260,11 +1276,38 @@ const Students = () => {
                                     className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
                                   />
                                 </td>
-                                <td className="p-3 text-slate-600">{r["Email"]}</td>
+                                <td className="p-3">
+                                  <input
+                                    type="text"
+                                    value={r["Email"] || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setPreviewModal(prev => ({
+                                        ...prev,
+                                        duplicateRecords: prev.duplicateRecords.map(rec => rec.id === r.id ? { ...rec, Email: val } : rec)
+                                      }));
+                                    }}
+                                    className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
+                                  />
+                                </td>
                                 <td className="p-3 text-slate-600">{formatDOB(r["DOB"])}</td>
                                 <td className="p-3 text-slate-600">{r["Center ID"]}</td>
                                 <td className="p-3 text-slate-600">{r["Course ID"]}</td>
                                 <td className="p-3 text-slate-600">{r["Batch ID"]}</td>
+                                <td className="p-3 min-w-[120px]">
+                                  <input
+                                    type="text"
+                                    value={r["Year"] || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setPreviewModal(prev => ({
+                                        ...prev,
+                                        duplicateRecords: prev.duplicateRecords.map(rec => rec.id === r.id ? { ...rec, Year: val } : rec)
+                                      }));
+                                    }}
+                                    className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
+                                  />
+                                </td>
                                 <td className="p-3 text-slate-600 text-xs">{r["Course Fee"] ? `₹${r["Course Fee"]}` : '-'}</td>
                                 <td className="p-3 text-slate-600 text-xs">{r["Council Fee"] ? `₹${r["Council Fee"]}` : '-'}</td>
                                 <td className="p-3">
@@ -1286,9 +1329,37 @@ const Students = () => {
                                           return;
                                         }
 
+                                        const editedEmail = r["Email"] ? String(r["Email"]).trim() : "";
+                                        if (!editedEmail) {
+                                          toast.error("Email cannot be empty.");
+                                          return;
+                                        }
+                                        
+                                        // Basic email format validation
+                                        if (!/^\S+@\S+\.\S+$/.test(editedEmail)) {
+                                          toast.error("Please enter a valid email address.");
+                                          return;
+                                        }
+
+                                        const emailExistsInDB = students.some(s => s.email && String(s.email).toLowerCase() === editedEmail.toLowerCase());
+                                        if (emailExistsInDB) {
+                                          toast.error(`Email "${editedEmail}" already exists in the database.`);
+                                          return;
+                                        }
+
                                         const existsInValid = previewModal.validRecords.some(v => v["Student ID"] && String(v["Student ID"]).toLowerCase() === editedId.toLowerCase());
                                         if (existsInValid) {
                                           toast.error(`Student ID "${editedId}" already exists in the Ready section.`);
+                                          return;
+                                        }
+                                        
+                                        const emailExistsInFile = 
+                                          previewModal.validRecords.some(v => v["Email"] && String(v["Email"]).toLowerCase() === editedEmail.toLowerCase()) ||
+                                          previewModal.duplicateRecords.some(d => d.id !== r.id && d["Email"] && String(d["Email"]).toLowerCase() === editedEmail.toLowerCase()) ||
+                                          previewModal.invalidRecords.some(i => i["Email"] && String(i["Email"]).toLowerCase() === editedEmail.toLowerCase());
+
+                                        if (emailExistsInFile) {
+                                          toast.error(`Email "${editedEmail}" already exists within this uploaded file.`);
                                           return;
                                         }
 
@@ -1372,6 +1443,7 @@ const Students = () => {
                             <th className="p-3 font-bold border-b border-slate-200">Center</th>
                             <th className="p-3 font-bold border-b border-slate-200">Course</th>
                             <th className="p-3 font-bold border-b border-slate-200">Batch</th>
+                            <th className="p-3 font-bold border-b border-slate-200 min-w-[120px]">Year</th>
                             <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
                             <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                             <th className="p-3 font-bold border-b border-slate-200 text-right">Reason</th>
@@ -1387,6 +1459,20 @@ const Students = () => {
                               <td className="p-3 text-slate-600">{r["Center ID"] || "-"}</td>
                               <td className="p-3 text-slate-600">{r["Course ID"] || "-"}</td>
                               <td className="p-3 text-slate-600">{r["Batch ID"] || "-"}</td>
+                              <td className="p-3 min-w-[120px]">
+                                <input
+                                  type="text"
+                                  value={r["Year"] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setPreviewModal(prev => ({
+                                      ...prev,
+                                      invalidRecords: prev.invalidRecords.map(rec => rec.id === r.id ? { ...rec, Year: val } : rec)
+                                    }));
+                                  }}
+                                  className="border border-slate-300 rounded px-2 py-1.5 text-xs w-full focus:ring-1 focus:ring-brand-500 outline-none"
+                                />
+                              </td>
                               <td className="p-3 text-slate-600 text-xs">{r["Course Fee"] ? `₹${r["Course Fee"]}` : '-'}</td>
                               <td className="p-3 text-slate-600 text-xs">{r["Council Fee"] ? `₹${r["Council Fee"]}` : '-'}</td>
                               <td className="p-3 text-right">
@@ -1745,7 +1831,7 @@ const Students = () => {
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-indigo-700 hover:bg-indigo-50 transition-colors text-left"
                         >
-                          <Briefcase size={16} /> Bulk Promote
+                          <Briefcase size={16} /> Intern Promote
                         </button>
                         <div className="h-px bg-slate-50 w-full"></div>
                         <button

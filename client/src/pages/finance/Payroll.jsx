@@ -301,7 +301,12 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
 
           data.forEach(row => {
             const empId = row["Intern ID"] || row["Employee ID"] || row["ID"];
-            if (!empId) return;
+            let isValid = true;
+            let error = "";
+            if (!empId) {
+              isValid = false;
+              error = "Missing Intern ID";
+            }
 
             const totalDays = row["Total Days"] !== undefined ? Number(row["Total Days"]) : undefined;
             const present = row["Present"] !== undefined ? Number(row["Present"]) : undefined;
@@ -331,31 +336,30 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               }
             });
 
-            const hasAttendance = (totalDays !== undefined && present !== undefined && absent !== undefined);
-            const maxLen = Math.max(allowancesFound.length, deductionsFound.length, hasAttendance ? 1 : 0);
+            if (allowancesFound.length === 0) allowancesFound.push({ amount: 0, reason: "" });
+            if (deductionsFound.length === 0) deductionsFound.push({ amount: 0, reason: "" });
 
-            for (let i = 0; i < maxLen; i++) {
-              const allow = allowancesFound[i] || { amount: 0, reason: "" };
-              const ded = deductionsFound[i] || { amount: 0, reason: "" };
-              const isFirst = i === 0;
+            const getFeeVal = (pattern) => {
+              const key = Object.keys(row).find(k => pattern.test(k));
+              return key ? Number(row[key]) : undefined;
+            };
 
-              adjustments.push({
-                employeeId: empId,
-                month: Number(month),
-                year: Number(year),
-                internshipId,
-                allowance: allow.amount,
-                allowanceReason: allow.reason,
-                deduction: ded.amount,
-                deductionReason: ded.reason,
-                totalDays: isFirst ? totalDays : undefined,
-                present: isFirst ? present : undefined,
-                absent: isFirst ? absent : undefined,
-                courseFee: (isFirst && row["Course Fee Deduction"]) ? Number(row["Course Fee Deduction"]) : undefined,
-                councilFee: (isFirst && row["Council Fee Deduction"]) ? Number(row["Council Fee Deduction"]) : undefined,
-                examFee: (isFirst && row["Exam Fee Deduction"]) ? Number(row["Exam Fee Deduction"]) : undefined
-              });
-            }
+            adjustments.push({
+              employeeId: empId,
+              month: Number(month),
+              year: Number(year),
+              internshipId,
+              allowances: allowancesFound,
+              deductions: deductionsFound,
+              totalDays,
+              present,
+              absent,
+              courseFee: getFeeVal(/course fees? payment/i),
+              councilFee: getFeeVal(/council fees? payment/i),
+              examFee: getFeeVal(/exam fees? payment/i),
+              isValid,
+              error
+            });
           });
 
           if (adjustments.length === 0) {
@@ -386,7 +390,33 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   const confirmBulkUpload = async () => {
     const loadToast = toast.loading("Processing bulk upload...");
     try {
-      const res = await api.post("/payroll/bulk-adjustment", { adjustments: bulkPreviewData });
+      const payload = [];
+      bulkPreviewData.forEach(row => {
+        const maxLen = Math.max(row.allowances?.length || 0, row.deductions?.length || 0, 1);
+        for(let i=0; i<maxLen; i++) {
+          const allow = row.allowances[i] || { amount: 0, reason: "" };
+          const ded = row.deductions[i] || { amount: 0, reason: "" };
+          const isFirst = i === 0;
+          payload.push({
+            employeeId: row.employeeId,
+            month: row.month,
+            year: row.year,
+            internshipId: row.internshipId,
+            allowance: allow.amount,
+            allowanceReason: allow.reason,
+            deduction: ded.amount,
+            deductionReason: ded.reason,
+            totalDays: isFirst ? row.totalDays : undefined,
+            present: isFirst ? row.present : undefined,
+            absent: isFirst ? row.absent : undefined,
+            courseFee: isFirst ? row.courseFee : undefined,
+            councilFee: isFirst ? row.councilFee : undefined,
+            examFee: isFirst ? row.examFee : undefined
+          });
+        }
+      });
+
+      const res = await api.post("/payroll/bulk-adjustment", { adjustments: payload });
       toast.success(res.data.message || "Bulk upload successful", { id: loadToast });
       await fetchPayrolls();
 
@@ -432,6 +462,7 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
       const templateData = filteredPayrolls.map(p => ({
         "Intern ID": p.employeeId || p._id,
         "Intern Name": p.name || "",
+        "Basic Salary": p.basic || 0,
         "Total Days": p.totalDays || 30,
         "Present": p.present || 0,
         "Absent": p.absent || 0,
@@ -444,12 +475,14 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         "Deduction 2": 0,
         "Deduction 2 Reason": "",
         ...(internOnly ? {
-          "Course Fee Balance (Info)": p.courseBalance || 0,
-          "Council Fee Balance (Info)": p.councilBalance || 0,
-          "Exam Fee Balance (Info)": p.examBalance || 0,
-          "Course Fee Deduction": 0,
-          "Council Fee Deduction": 0,
-          "Exam Fee Deduction": 0
+          "Gross Salary": 0,
+          "Course Fee Balance": p.courseBalance || 0,
+          "Course Fee Payment": 0,
+          "Council Fees Balance": p.councilBalance || 0,
+          "Council Fees Payment": 0,
+          "Exam Fees Balance": p.examBalance || 0,
+          "Exam Fees Payment": 0,
+          "Net Salary": 0
         } : {})
       }));
 
@@ -457,6 +490,7 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         templateData.push({
           "Intern ID": "e.g., STU001",
           "Intern Name": "e.g., John Doe",
+          "Basic Salary": 10000,
           "Total Days": 30,
           "Present": 28,
           "Absent": 2,
@@ -469,32 +503,55 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
           "Deduction 2": 0,
           "Deduction 2 Reason": "",
           ...(internOnly ? {
-            "Course Fee Balance (Info)": 0,
-            "Council Fee Balance (Info)": 0,
-            "Exam Fee Balance (Info)": 0,
-            "Course Fee Deduction": 0,
-            "Council Fee Deduction": 0,
-            "Exam Fee Deduction": 0
+            "Gross Salary": 0,
+            "Course Fee Balance": 0,
+            "Course Fee Payment": 0,
+            "Council Fees Balance": 0,
+            "Council Fees Payment": 0,
+            "Exam Fees Balance": 0,
+            "Exam Fees Payment": 0,
+            "Net Salary": 0
           } : {})
         });
       }
 
       const worksheet = XLSX.utils.json_to_sheet(templateData);
 
+      if (internOnly) {
+        // Add formulas for Gross Salary (O) and Net Salary (V)
+        // Data starts at row 2 (index 1)
+        for (let i = 0; i < templateData.length; i++) {
+          const r = i + 2;
+          // Gross Salary: (Basic * Present / Total Days) + Allowance1 + Allowance2 - Deduction1 - Deduction2
+          worksheet[`O${r}`] = { t: 'n', f: `IFERROR(ROUND((C${r}*E${r})/D${r}+G${r}+I${r}-K${r}-M${r}, 2), 0)` };
+          // Net Salary: Gross Salary - Course Payment - Council Payment - Exam Payment
+          worksheet[`V${r}`] = { t: 'n', f: `O${r}-Q${r}-S${r}-U${r}` };
+        }
+      }
+
       const colWidths = [
-        { wch: 25 },
-        { wch: 30 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 25 },
-        { wch: 15 },
-        { wch: 25 },
-        { wch: 15 },
-        { wch: 25 },
-        { wch: 15 },
-        { wch: 25 }
+        { wch: 15 }, // A: ID
+        { wch: 25 }, // B: Name
+        { wch: 15 }, // C: Basic Salary
+        { wch: 12 }, // D: Total Days
+        { wch: 10 }, // E: Present
+        { wch: 10 }, // F: Absent
+        { wch: 15 }, // G: Allowance 1
+        { wch: 20 }, // H: Reason 1
+        { wch: 15 }, // I: Allowance 2
+        { wch: 20 }, // J: Reason 2
+        { wch: 15 }, // K: Deduction 1
+        { wch: 20 }, // L: Reason 1
+        { wch: 15 }, // M: Deduction 2
+        { wch: 20 }, // N: Reason 2
+        { wch: 15 }, // O: Gross Salary
+        { wch: 18 }, // P: Course Bal
+        { wch: 18 }, // Q: Course Pay
+        { wch: 18 }, // R: Council Bal
+        { wch: 18 }, // S: Council Pay
+        { wch: 18 }, // T: Exam Bal
+        { wch: 18 }, // U: Exam Pay
+        { wch: 15 }  // V: Net Salary
       ];
       worksheet['!cols'] = colWidths;
 
@@ -693,21 +750,20 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   const payrollColumns = [
     { name: 'S.No', selector: (row, i) => i + 1, width: '70px', center: "true" },
     {
-      name: 'Employee', selector: row => row.name, sortable: true, width: '160px',
+      name: internOnly ? 'Intern Name' : 'Employee Name', selector: row => row.name, sortable: true, width: '160px',
       cell: row => <div onClick={() => fetchAttendance(row, "all")} className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 truncate">{row.name}</div>
     },
-    ...(internOnly ? [] : [{
-      name: 'Dept', selector: row => row.department, center: "true", width: '180px',
+    {
+      name: 'Dept', selector: row => row.department, center: "true", width: '140px',
       cell: row => <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{row.department || "-"}</span>
-    }]),
-    { name: internOnly ? 'Stipend' : 'Basic Salary', selector: row => row.basic, sortable: true, width: internOnly ? "110px" : "145px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
-    ...(internOnly ? [{ name: 'Gross Salary', selector: row => row.grossSalary, sortable: true, width: "110px", center: "true", cell: row => <div className="text-blue-700 font-bold text-center w-full"><span className="text-blue-400 mr-1">₹</span>{row.grossSalary?.toLocaleString("en-IN") || "0"}</div> }] : []),
-    { name: 'Days', selector: row => row.totalDays, center: "true", width: '80px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
-    { name: 'Present', selector: row => row.present, center: "true", width: '95px', cell: row => <div className="font-bold text-green-600 cursor-pointer hover:bg-green-50 p-1 rounded" onClick={() => fetchAttendance(row, "present")}>{row.present ?? "-"}</div> },
+    },
+    { name: 'Basic Salary', selector: row => row.basic, sortable: true, width: "110px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
+    { name: 'Total Days', selector: row => row.totalDays, center: "true", width: '80px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
+    { name: 'Present', selector: row => row.present, center: "true", width: '90px', cell: row => <div className="font-bold text-green-600 cursor-pointer hover:bg-green-50 p-1 rounded" onClick={() => fetchAttendance(row, "present")}>{row.present ?? "-"}</div> },
+    { name: 'Absent', selector: row => row.absent, center: "true", width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
     ...(internOnly ? [] : [
-      { name: 'Leave', selector: row => row.absent, center: "true", width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
       {
-        name: 'Late Info', center: "true", width: '110px',
+        name: 'Late Info', center: "true", width: '100px',
         cell: row => (
           <div className="flex flex-col items-center cursor-pointer hover:bg-orange-50 p-1 rounded" onClick={() => fetchAttendance(row, "all")}>
             <span className="text-xs font-semibold text-orange-600">{row.lateDays} {row.lateDays === 1 ? 'day' : 'days'}</span>
@@ -716,30 +772,40 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         )
       }
     ]),
+    { name: 'Allowance', selector: row => row.allowances, center: "true", width: '110px', cell: row => <div className="font-bold text-blue-600 cursor-pointer hover:bg-blue-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "allowance")}>{row.allowances > 0 ? <><span className="text-blue-300 mr-1">+ ₹</span>{row.allowances.toLocaleString("en-IN")}</> : '-'}</div> },
+    { name: 'Deductions', selector: row => row.deductions, center: "true", width: '110px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "deduction")}>{row.deductions > 0 ? <><span className="text-red-300 mr-1">- ₹</span>{row.deductions.toLocaleString("en-IN")}</> : '-'}</div> },
+    { name: 'Advance', selector: row => row.advance, center: "true", width: '90px', cell: row => <div className="font-bold text-orange-600 cursor-pointer hover:bg-orange-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "advance")}>{row.advance > 0 ? <><span className="text-orange-300 mr-1">₹</span>{row.advance.toLocaleString("en-IN")}</> : '-'}</div> },
+    { 
+      name: 'Gross Salary', 
+      center: "true", 
+      width: '120px', 
+      cell: row => {
+        // As requested: basic salary + allowance - deduction - advance
+        const gross = (row.basic || 0) + (row.allowances || 0) - (row.deductions || 0) - (row.advance || 0);
+        return <div className="text-blue-700 font-bold text-center w-full"><span className="text-blue-400 mr-1">₹</span>{gross.toLocaleString("en-IN")}</div>
+      } 
+    },
     ...(internOnly ? [
       {
-        name: 'Fees Bal', center: "true", width: '140px', cell: row => (
+        name: 'Fees Balance', center: "true", width: '140px', cell: row => (
           <div className="flex flex-col text-[10px] items-center text-gray-600 font-medium whitespace-nowrap">
-            <span className="text-orange-600">Cou: ₹{row.councilBalance || 0}</span>
-            <span className="text-blue-600">Crs: ₹{row.courseBalance || 0}</span>
-            <span className="text-purple-600">Ex: ₹{row.examBalance || 0}</span>
+            <span className="text-blue-600">Course: ₹{row.courseBalance || 0}</span>
+            <span className="text-orange-600">Council: ₹{row.councilBalance || 0}</span>
+            <span className="text-purple-600">Exam: ₹{row.examBalance || 0}</span>
           </div>
         )
       },
       {
         name: 'Fee Deds', center: "true", width: '110px', cell: row => (
           <div className="flex flex-col text-[10px] items-center font-bold text-red-500 whitespace-nowrap">
-            {(row.councilFeeDeduction > 0) && <span>Cou: -₹{row.councilFeeDeduction}</span>}
-            {(row.courseFeeDeduction > 0) && <span>Crs: -₹{row.courseFeeDeduction}</span>}
-            {(row.examFeeDeduction > 0) && <span>Ex: -₹{row.examFeeDeduction}</span>}
+            {(row.courseFeeDeduction > 0) && <span>Course: -₹{row.courseFeeDeduction}</span>}
+            {(row.councilFeeDeduction > 0) && <span>Council: -₹{row.councilFeeDeduction}</span>}
+            {(row.examFeeDeduction > 0) && <span>Exam: -₹{row.examFeeDeduction}</span>}
             {(!row.councilFeeDeduction && !row.courseFeeDeduction && !row.examFeeDeduction) && <span className="text-gray-400">-</span>}
           </div>
         )
       },
     ] : []),
-    { name: 'Allowances', selector: row => row.allowances, center: "true", width: '130px', cell: row => <div className="font-bold text-blue-600 cursor-pointer hover:bg-blue-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "allowance")}>{row.allowances > 0 ? <><span className="text-blue-300 mr-1">+ ₹</span>{row.allowances.toLocaleString("en-IN")}</> : '-'}</div> },
-    { name: 'Deductions', selector: row => row.deductions, center: "true", width: '130px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "deduction")}>{row.deductions > 0 ? <><span className="text-red-300 mr-1">- ₹</span>{row.deductions.toLocaleString("en-IN")}</> : '-'}</div> },
-    { name: 'Advance', selector: row => row.advance, center: "true", width: '100px', cell: row => <div className="font-bold text-orange-600 cursor-pointer hover:bg-orange-50 p-1 rounded text-center w-full" onClick={() => viewAdjustments(row, "advance")}>{row.advance > 0 ? <><span className="text-orange-300 mr-1">₹</span>{row.advance.toLocaleString("en-IN")}</> : '-'}</div> },
     { name: 'Net Salary', selector: row => row.netSalary, sortable: true, center: "true", width: '130px', cell: row => <div className="font-bold text-gray-800 text-center w-full"><span className="text-green-600 mr-1">₹</span><span className="text-[15px]">{row.netSalary?.toLocaleString("en-IN")}</span></div> },
     {
       name: 'Action', center: "true", width: '120px',
@@ -907,6 +973,240 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   /* ==============================
   UI
   ================================ */
+  if (showBulkPreview) {
+    let maxAllowances = 1;
+    let maxDeductions = 1;
+    bulkPreviewData.forEach(row => {
+      if (row.allowances?.length > maxAllowances) maxAllowances = row.allowances.length;
+      if (row.deductions?.length > maxDeductions) maxDeductions = row.deductions.length;
+    });
+
+    return (
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[80vh] flex flex-col">
+        <div className="flex justify-between items-center pb-4 border-b">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Bulk Upload Preview</h2>
+            <p className="text-sm text-gray-500 mt-1">Review, edit, and fix errors before confirming the upload.</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setShowBulkPreview(false);
+                setBulkPreviewData([]);
+                setBulkPreviewFile(null);
+              }}
+              className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmBulkUpload}
+              disabled={bulkPreviewData.some(r => !r.isValid)}
+              className={`px-5 py-2 rounded-xl font-bold transition shadow-md ${bulkPreviewData.some(r => !r.isValid) ? 'bg-emerald-300 text-white cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'}`}
+            >
+              Confirm & Upload
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto flex-1 mt-4">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-gray-100/80 text-gray-600 uppercase text-[10px] font-bold tracking-wider">
+              <tr>
+                <th className="px-3 py-3 rounded-tl-lg">Status</th>
+                <th className="px-3 py-3">ID</th>
+                <th className="px-3 py-3 text-center">Days/P/A</th>
+                {Array.from({ length: maxAllowances }).map((_, i) => (
+                  <React.Fragment key={`th-allow-${i}`}>
+                    <th className="px-3 py-3 text-right">Allowance {maxAllowances > 1 ? i + 1 : ''}</th>
+                    <th className="px-3 py-3">Allowance Reason {maxAllowances > 1 ? i + 1 : ''}</th>
+                  </React.Fragment>
+                ))}
+                {Array.from({ length: maxDeductions }).map((_, i) => (
+                  <React.Fragment key={`th-ded-${i}`}>
+                    <th className="px-3 py-3 text-right">Deduction {maxDeductions > 1 ? i + 1 : ''}</th>
+                    <th className="px-3 py-3">Deduction Reason {maxDeductions > 1 ? i + 1 : ''}</th>
+                  </React.Fragment>
+                ))}
+                {internOnly && (
+                  <>
+                    <th className="px-3 py-3 text-right">Course Fee</th>
+                    <th className="px-3 py-3 text-right">Council Fee</th>
+                    <th className="px-3 py-3 text-right">Exam Fee</th>
+                  </>
+                )}
+                <th className="px-3 py-3 text-center rounded-tr-lg">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {bulkPreviewData.map((row, idx) => (
+                <tr key={idx} className={`transition-colors ${row.isValid ? 'hover:bg-blue-50/50' : 'bg-red-50'}`}>
+                  <td className="px-3 py-3">
+                    {row.isValid ? (
+                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">Valid</span>
+                    ) : (
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold">Error</span>
+                        <span className="text-[10px] text-red-600 font-medium">{row.error}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3">
+                    <input 
+                      type="text" 
+                      value={row.employeeId || ''} 
+                      onChange={(e) => {
+                        const newData = [...bulkPreviewData];
+                        newData[idx].employeeId = e.target.value;
+                        newData[idx].isValid = !!e.target.value;
+                        newData[idx].error = e.target.value ? "" : "Missing ID";
+                        setBulkPreviewData(newData);
+                      }}
+                      className={`w-32 border px-2 py-1.5 rounded text-sm outline-none font-semibold ${row.isValid ? 'border-gray-200 focus:border-blue-500' : 'border-red-300 focus:border-red-500 bg-white'}`}
+                    />
+                  </td>
+                  <td className="px-3 py-3 text-center text-gray-600 font-medium">
+                    {row.totalDays !== undefined ? `${row.totalDays} / ${row.present} / ${row.absent}` : '-'}
+                  </td>
+                  {Array.from({ length: maxAllowances }).map((_, i) => (
+                    <React.Fragment key={`td-allow-${i}`}>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end">
+                          <span className="text-gray-400 mr-1">₹</span>
+                          <input 
+                            type="number" 
+                            value={row.allowances?.[i]?.amount || ''} 
+                            onChange={(e) => {
+                              const newData = [...bulkPreviewData];
+                              if (!newData[idx].allowances[i]) newData[idx].allowances[i] = { amount: 0, reason: "" };
+                              newData[idx].allowances[i].amount = Number(e.target.value);
+                              setBulkPreviewData(newData);
+                            }}
+                            className="w-20 border border-gray-200 px-2 py-1.5 rounded text-sm text-blue-600 font-medium outline-none focus:border-blue-500 text-right"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <input 
+                          type="text" 
+                          value={row.allowances?.[i]?.reason || ''} 
+                          onChange={(e) => {
+                            const newData = [...bulkPreviewData];
+                            if (!newData[idx].allowances[i]) newData[idx].allowances[i] = { amount: 0, reason: "" };
+                            newData[idx].allowances[i].reason = e.target.value;
+                            setBulkPreviewData(newData);
+                          }}
+                          placeholder="Reason"
+                          className="w-32 border border-gray-200 px-2 py-1.5 rounded text-sm text-gray-600 outline-none focus:border-blue-500"
+                        />
+                      </td>
+                    </React.Fragment>
+                  ))}
+                  {Array.from({ length: maxDeductions }).map((_, i) => (
+                    <React.Fragment key={`td-ded-${i}`}>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end">
+                          <span className="text-gray-400 mr-1">₹</span>
+                          <input 
+                            type="number" 
+                            value={row.deductions?.[i]?.amount || ''} 
+                            onChange={(e) => {
+                              const newData = [...bulkPreviewData];
+                              if (!newData[idx].deductions[i]) newData[idx].deductions[i] = { amount: 0, reason: "" };
+                              newData[idx].deductions[i].amount = Number(e.target.value);
+                              setBulkPreviewData(newData);
+                            }}
+                            className="w-20 border border-gray-200 px-2 py-1.5 rounded text-sm text-red-500 font-medium outline-none focus:border-red-500 text-right"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <input 
+                          type="text" 
+                          value={row.deductions?.[i]?.reason || ''} 
+                          onChange={(e) => {
+                            const newData = [...bulkPreviewData];
+                            if (!newData[idx].deductions[i]) newData[idx].deductions[i] = { amount: 0, reason: "" };
+                            newData[idx].deductions[i].reason = e.target.value;
+                            setBulkPreviewData(newData);
+                          }}
+                          placeholder="Reason"
+                          className="w-32 border border-gray-200 px-2 py-1.5 rounded text-sm text-gray-600 outline-none focus:border-red-500"
+                        />
+                      </td>
+                    </React.Fragment>
+                  ))}
+                  {internOnly && (
+                    <>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end">
+                          <span className="text-gray-400 mr-1">₹</span>
+                          <input 
+                            type="number" 
+                            value={row.courseFee || ''} 
+                            onChange={(e) => {
+                              const newData = [...bulkPreviewData];
+                              newData[idx].courseFee = Number(e.target.value);
+                              setBulkPreviewData(newData);
+                            }}
+                            className="w-20 border border-gray-200 px-2 py-1.5 rounded text-sm text-emerald-600 font-medium outline-none focus:border-emerald-500 text-right"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end">
+                          <span className="text-gray-400 mr-1">₹</span>
+                          <input 
+                            type="number" 
+                            value={row.councilFee || ''} 
+                            onChange={(e) => {
+                              const newData = [...bulkPreviewData];
+                              newData[idx].councilFee = Number(e.target.value);
+                              setBulkPreviewData(newData);
+                            }}
+                            className="w-20 border border-gray-200 px-2 py-1.5 rounded text-sm text-orange-600 font-medium outline-none focus:border-orange-500 text-right"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end">
+                          <span className="text-gray-400 mr-1">₹</span>
+                          <input 
+                            type="number" 
+                            value={row.examFee || ''} 
+                            onChange={(e) => {
+                              const newData = [...bulkPreviewData];
+                              newData[idx].examFee = Number(e.target.value);
+                              setBulkPreviewData(newData);
+                            }}
+                            className="w-20 border border-gray-200 px-2 py-1.5 rounded text-sm text-purple-600 font-medium outline-none focus:border-purple-500 text-right"
+                          />
+                        </div>
+                      </td>
+                    </>
+                  )}
+                  <td className="px-3 py-3 text-center">
+                    <button 
+                      onClick={() => {
+                        const newData = bulkPreviewData.filter((_, i) => i !== idx);
+                        setBulkPreviewData(newData);
+                        if (newData.length === 0) setShowBulkPreview(false);
+                      }}
+                      className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition"
+                      title="Remove Row"
+                    >
+                      <X size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -1392,79 +1692,7 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
         </div>,
         document.body
       )}
-      {/* BULK PREVIEW MODAL */}
-      {showBulkPreview && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Bulk Upload Preview</h3>
-                <p className="text-sm text-gray-500 mt-1">Review the parsed data before confirming</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowBulkPreview(false);
-                  setBulkPreviewData([]);
-                  setBulkPreviewFile(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <X size={24} />
-              </button>
-            </div>
 
-            <div className="p-6 overflow-auto bg-gray-50/50 flex-1">
-              <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-gray-100/80 text-gray-600 uppercase text-[10px] font-bold tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3">ID</th>
-                      <th className="px-4 py-3 text-center">Days/P/A</th>
-                      <th className="px-4 py-3 text-right">Allowance</th>
-                      <th className="px-4 py-3">Allowance Reason</th>
-                      <th className="px-4 py-3 text-right">Deduction</th>
-                      <th className="px-4 py-3">Deduction Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {bulkPreviewData.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-gray-800">{row.employeeId}</td>
-                        <td className="px-4 py-3 text-center">
-                          {row.totalDays !== undefined ? `${row.totalDays} / ${row.present} / ${row.absent}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-blue-600 font-medium">{row.allowance > 0 ? `₹${row.allowance}` : '-'}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{row.allowanceReason || '-'}</td>
-                        <td className="px-4 py-3 text-right text-red-500 font-medium">{row.deduction > 0 ? `₹${row.deduction}` : '-'}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{row.deductionReason || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="p-6 border-t bg-white flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowBulkPreview(false);
-                  setBulkPreviewData([]);
-                  setBulkPreviewFile(null);
-                }}
-                className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmBulkUpload}
-                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-md shadow-emerald-200"
-              >
-                Confirm & Upload
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

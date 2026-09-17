@@ -43,7 +43,7 @@ const studentFeeSchema = new mongoose.Schema({
   },
   paymentMode: {
     type: String,
-    enum: ['Cash', 'Online', 'Bank']
+    enum: ['Cash', 'Online', 'Bank', 'Payroll Deduction']
   },
   proofOfPayment: {
     type: String
@@ -85,7 +85,7 @@ const studentFeeSchema = new mongoose.Schema({
   payments: [
     {
       amount: { type: Number, required: true },
-      paymentMode: { type: String, enum: ['Cash', 'Online', 'Bank'], required: true },
+      paymentMode: { type: String, enum: ['Cash', 'Online', 'Bank', 'Payroll Deduction'], required: true },
       proofOfPayment: String,
       bankReference: String,
       status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },

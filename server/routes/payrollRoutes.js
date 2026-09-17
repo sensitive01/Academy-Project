@@ -15,8 +15,8 @@ async function applyFeeDeduction(studentId, feeTypeStr, amount) {
   let feeRecords = await StudentFee.find({ student: studentId, status: { $ne: 'paid' } }).sort({ createdAt: 1 });
   
   feeRecords = feeRecords.filter(f => {
-    if (feeTypeStr === 'council_fee') return f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
-    if (feeTypeStr === 'course_fee') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
+    if (feeTypeStr === 'council_fee') return f.feeType === 'Council' || (f.feeType === 'Other' && (f.otherFeeType === 'Council Fees' || f.otherFeeType === 'Council Fee'));
+    if (feeTypeStr === 'course_fee') return ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && (f.otherFeeType === 'Course Fees' || f.otherFeeType === 'Course Fee'));
     if (feeTypeStr === 'exam_fee') return f.feeType === 'Exam';
     return false;
   });
@@ -239,11 +239,11 @@ router.get("/salary/all", protect, async (req, res) => {
               const due = f.amount + (f.isPenaltyApplied ? f.penaltyAmount : 0) + (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
               const paid = (f.payments || []).filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0);
               const remaining = Math.max(0, due - paid);
-              if (f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees')) {
+              if (f.feeType === 'Council' || (f.feeType === 'Other' && (f.otherFeeType === 'Council Fees' || f.otherFeeType === 'Council Fee'))) {
                 councilBalance += remaining;
               } else if (f.feeType === 'Exam') {
                 examBalance += remaining;
-              } else if (['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees')) {
+              } else if (['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && (f.otherFeeType === 'Course Fees' || f.otherFeeType === 'Course Fee'))) {
                 courseBalance += remaining;
               }
             });
@@ -615,9 +615,9 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
           amount: Number(amount),
           note: note || ""
         });
-        if (type === "allowance") payroll.totalAllowances += Number(amount);
-        if (type === "deduction") payroll.totalDeductions += Number(amount);
-        if (type === "advance") payroll.advance += Number(amount);
+        if (type === "allowance") payroll.totalAllowances = (payroll.totalAllowances || 0) + Number(amount);
+        if (type === "deduction") payroll.totalDeductions = (payroll.totalDeductions || 0) + Number(amount);
+        if (type === "advance") payroll.advance = (payroll.advance || 0) + Number(amount);
         
         if (type === "course_fee") {
           payroll.totalCourseFee = (payroll.totalCourseFee || 0) + Number(amount);
@@ -641,7 +641,7 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
           amount: Number(allowance),
           note: allowanceReason || ""
         });
-        payroll.totalAllowances += Number(allowance);
+        payroll.totalAllowances = (payroll.totalAllowances || 0) + Number(allowance);
         updated = true;
       }
 
@@ -651,7 +651,7 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
           amount: Number(deduction),
           note: deductionReason || ""
         });
-        payroll.totalDeductions += Number(deduction);
+        payroll.totalDeductions = (payroll.totalDeductions || 0) + Number(deduction);
         updated = true;
       }
 
@@ -684,11 +684,17 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
       }
 
       if (updated) {
+        let baseAmount = payroll.basicSalary;
+        // If this is an intern (has internshipId) and we have attendance data, calculate gross salary
+        if (payroll.internshipId && payroll.totalDays > 0) {
+          baseAmount = Math.round((payroll.basicSalary * (payroll.present || 0)) / payroll.totalDays);
+        }
+
         payroll.netSalary =
-          payroll.basicSalary +
-          payroll.totalAllowances -
-          payroll.totalDeductions -
-          payroll.advance -
+          (baseAmount || 0) +
+          (payroll.totalAllowances || 0) -
+          (payroll.totalDeductions || 0) -
+          (payroll.advance || 0) -
           (payroll.totalCourseFee || 0) -
           (payroll.totalCouncilFee || 0) -
           (payroll.totalExamFee || 0);
@@ -704,6 +710,7 @@ router.post("/bulk-adjustment", protect, async (req, res) => {
 
   } catch (err) {
     console.error("Payroll Bulk Adjustment Error:", err);
+    require('fs').appendFileSync('C:\\Users\\AJAY\\Videos\\Dr.Academy\\dracademy\\server\\error.log', err.stack + '\n');
     res.status(500).json({ message: err.message });
   }
 });

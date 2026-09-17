@@ -424,8 +424,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           group.originalFees.push(f);
           group.amount += f.amount || 0;
 
-          let isCourse = ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && f.otherFeeType === 'Course Fees');
-          let isCouncil = f.feeType === 'Council' || (f.feeType === 'Other' && f.otherFeeType === 'Council Fees');
+          let isCourse = ['Course', 'Sem', 'Term', 'Monthly'].includes(f.feeType) || (f.feeType === 'Other' && (f.otherFeeType === 'Course Fees' || f.otherFeeType === 'Course Fee'));
+          let isCouncil = f.feeType === 'Council' || (f.feeType === 'Other' && (f.otherFeeType === 'Council Fees' || f.otherFeeType === 'Council Fee'));
 
           if (isCourse) group.courseAmount += f.amount || 0;
           if (isCouncil) group.councilAmount += f.amount || 0;
@@ -651,7 +651,25 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
     return matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesYear && matchesStatus && matchesDate;
   });
 
-
+  // Sort by year descending by default (4th year first, then 3rd, 2nd, 1st)
+  filtered.sort((a, b) => {
+    const getYearDigit = (f) => {
+      let digit = 0;
+      if (f.year) {
+        const match = String(f.year).match(/\d+/);
+        if (match) digit = Number(match[0]);
+      } else if (f.otherFeeType) {
+        const match = String(f.otherFeeType).match(/Year\s*(\d+)/i);
+        if (match) digit = Number(match[1]);
+      }
+      if (!digit && f.student?.year) {
+        const match = String(f.student.year).match(/\d+/);
+        if (match) digit = Number(match[0]);
+      }
+      return digit;
+    };
+    return getYearDigit(b) - getYearDigit(a);
+  });
   const dataWithSummary = [...filtered];
   if (filtered.length > 0) {
     if (!paidOnly) {
@@ -1431,6 +1449,18 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
       <CustomDataTable
         columns={columns}
         data={dataWithSummary}
+        sortFunction={(rows, selector, direction) => {
+          return [...rows].sort((a, b) => {
+            if (a.isSummary) return 1;
+            if (b.isSummary) return -1;
+            const aField = selector(a);
+            const bField = selector(b);
+            let comparison = 0;
+            if (aField > bField) comparison = 1;
+            else if (aField < bField) comparison = -1;
+            return direction === 'desc' ? comparison * -1 : comparison;
+          });
+        }}
         progressPending={loading}
         pagination
         additionalHeaderContent={
