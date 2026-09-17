@@ -64,11 +64,13 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://academy-project-iota.vercel.app',
+    'https://academy-project-olive.vercel.app',
     'http://drrgacademy.com',
     'https://drrgacademy.com',
+    'http://app.drrgacademy.com',
+    'https://app.drrgacademy.com',
     'https://www.drrgacademy.com',
-    'http://www.drrgacademy.com' 
+    'http://www.drrgacademy.com'
   ],
   credentials: true
 }));
