@@ -18,7 +18,7 @@ const customStyles = {
       color: '#0f172a',
       fontSize: '0.85rem',
       fontWeight: '700',
-      textTransform: 'uppercase',
+      // textTransform: 'uppercase',
       paddingLeft: '16px',
       paddingRight: '16px',
       borderRight: '1px solid #e2e8f0',

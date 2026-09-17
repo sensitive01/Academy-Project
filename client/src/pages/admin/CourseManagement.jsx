@@ -13,9 +13,10 @@ const CourseManagement = () => {
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "online_courses", label: "Online Courses", icon: <BookOpen size={18} /> },
     { id: "center_courses", label: "Center Courses", icon: <MapPin size={18} /> },
+    { id: "centers", label: "Centers", icon: <MapPin size={18} /> },
     { id: "batch", label: "Batches", icon: <Layers size={18} /> },
     { id: "subject", label: "Subjects", icon: <BookType size={18} /> },
-    { id: "centers", label: "Centers", icon: <MapPin size={18} /> },
+    
   ];
 
   return (
@@ -51,13 +52,10 @@ const CourseManagement = () => {
         {activeTab === "dashboard" && <CourseDashboardTab />}
         {activeTab === "online_courses" && <CoursesTab courseType="Online Courses" />}
         {activeTab === "center_courses" && <CoursesTab courseType="Center Courses" />}
+        {activeTab === "centers" && ( <div className="-mt-6"> <CenterManagement isTab={true} /> </div>)}
         {activeTab === "batch" && <BatchesTab />}
         {activeTab === "subject" && <SubjectsTab />}
-        {activeTab === "centers" && (
-          <div className="-mt-6">
-            <CenterManagement isTab={true} />
-          </div>
-        )}
+        
       </div>
     </div>
   );

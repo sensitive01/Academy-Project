@@ -142,8 +142,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar, mobileOpen, closeMobile }) => {
   const adminItems = [
     { icon: <LayoutDashboard size={22} />, label: "Dashboard", path: "/dashboard" },
     { icon: <ShieldCheck size={22} />, label: "Course Mgmt", path: "/dashboard/admin/courses" },
+     { icon: <FileText size={22} />, label: "Admission Mgmt", path: "/dashboard/admissions" },
     { icon: <GraduationCap size={22} />, label: "Students", path: "/dashboard/students" },
-    { icon: <FileText size={22} />, label: "Admission Mgmt", path: "/dashboard/admissions" },
     { icon: <Receipt size={22} />, label: "Fees Collection", path: "/dashboard/fees-collection" },
     {
       icon: <CreditCard size={22} />,
