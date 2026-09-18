@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Exam = require('../models/Exam');
 const Student = require('../models/Student');
+const StudentFee = require('../models/StudentFee');
 const { protect } = require('../middleware/authMiddleware');
 const { createInAppNotification } = require('../utils/notificationUtils');
 
@@ -49,7 +50,7 @@ router.get('/:id', protect, async (req, res) => {
 // POST create a new exam (Admin only)
 router.post('/', protect, isAdmin, async (req, res) => {
   try {
-    const { name, course, semester, centers, batch, subjects } = req.body;
+    const { name, course, semester, centers, batch, subjects, examFee } = req.body;
     
     if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
       return res.status(400).json({ message: "At least one subject is required" });
@@ -61,7 +62,8 @@ router.post('/', protect, isAdmin, async (req, res) => {
       semester,
       centers: centers || [],
       batch,
-      subjects
+      subjects,
+      examFee: examFee || 0
     });
 
     // Notify enrolled students in the specific centers
@@ -85,6 +87,38 @@ router.post('/', protect, isAdmin, async (req, res) => {
       }
     }
 
+    // Generate Exam Fee for enrolled students if examFee > 0
+    if (examFee && Number(examFee) > 0) {
+      let query = {};
+      if (batch) query['enrolledCourses.batch'] = batch;
+      if (course) query['enrolledCourses.course'] = course;
+      if (centers && centers.length > 0) query.center = { $in: centers };
+
+      const enrolledStudents = await Student.find(query);
+      
+      const feeDocs = enrolledStudents.map(student => {
+        const studentCourse = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : course;
+        const studentBatch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : batch;
+        
+        return {
+          student: student._id,
+          center: student.center,
+          course: studentCourse,
+          batch: studentBatch,
+          year: String(student.year || "1"),
+          feeType: 'Exam',
+          otherFeeType: name,
+          amount: Number(examFee),
+          status: 'pending',
+          payments: []
+        };
+      });
+
+      if (feeDocs.length > 0) {
+        await StudentFee.insertMany(feeDocs);
+      }
+    }
+
     res.status(201).json(exam);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -94,7 +128,7 @@ router.post('/', protect, isAdmin, async (req, res) => {
 // PUT update an exam (Admin only)
 router.put('/:id', protect, isAdmin, async (req, res) => {
   try {
-    const { name, course, semester, centers, batch, subjects } = req.body;
+    const { name, course, semester, centers, batch, subjects, examFee } = req.body;
     const exam = await Exam.findById(req.params.id);
     
     if (!exam) {
@@ -107,6 +141,7 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
     if (centers) exam.centers = centers;
     if (batch) exam.batch = batch;
     if (subjects) exam.subjects = subjects;
+    if (examFee !== undefined) exam.examFee = examFee;
 
     await exam.save();
 

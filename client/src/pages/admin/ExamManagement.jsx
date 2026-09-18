@@ -96,6 +96,7 @@ const ExamManagement = () => {
   const [deleteHallTicketConfirm, setDeleteHallTicketConfirm] = useState({ isOpen: false, id: null });
 
   const [selectedGroupData, setSelectedGroupData] = useState(null);
+  const [selectedPaymentExam, setSelectedPaymentExam] = useState(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
@@ -111,6 +112,7 @@ const ExamManagement = () => {
     semester: 1,
     centers: [],
     batch: "",
+    examFee: "",
     subjects: [] // array of { subject, date, totalMark, passMark, internalMark, externalMark, theoryMark }
   });
 
@@ -326,6 +328,7 @@ const ExamManagement = () => {
         semester: exam.semester,
         centers: exam.centers?.map(c => c._id) || [],
         batch: exam.batch?._id || "",
+        examFee: exam.examFee || "",
         subjects: exam.subjects?.map(s => ({
           subject: s.subject?._id || s.subject,
           date: s.date ? new Date(s.date).toISOString().split('T')[0] : "",
@@ -345,6 +348,7 @@ const ExamManagement = () => {
         semester: 1,
         centers: [],
         batch: "",
+        examFee: "",
         subjects: []
       });
       setCurrentId(null);
@@ -1100,6 +1104,70 @@ const ExamManagement = () => {
       )
     });
   }
+
+  const paymentExamColumns = [
+    { name: "S.No", selector: (row, i) => i + 1, width: "70px", center: true },
+    {
+      name: "Exam Name",
+      selector: row => row.name,
+      sortable: true,
+      cell: row => (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+            <FileText size={20} />
+          </div>
+          <div>
+            <button onClick={() => setSelectedPaymentExam(row)} className="font-bold text-brand-600 hover:underline text-left cursor-pointer">
+              {row.name || "N/A"}
+            </button>
+            <div className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1">
+              <Calendar size={12} /> {new Date(row.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      name: "Course",
+      selector: row => row.course?.title,
+      sortable: true,
+      cell: row => (
+        <div>
+          <div className="font-semibold text-slate-700">{row.course?.title || "N/A"}</div>
+          <div className="text-xs text-slate-500">Sem {row.semester}</div>
+        </div>
+      )
+    },
+    {
+      name: "Batch",
+      selector: row => row.batch?.name || row.batch,
+      sortable: true,
+      cell: row => {
+        const batchName = row.batch?.name || batches.find(b => b._id === row.batch)?.name || "N/A";
+        return <div className="font-semibold text-slate-700">{batchName}</div>;
+      }
+    },
+    {
+      name: "Exam Fee",
+      selector: row => row.examFee,
+      sortable: true,
+      cell: row => (
+        <span className="font-bold text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+          ₹{row.examFee || 0}
+        </span>
+      )
+    },
+    {
+      name: "Action",
+      center: true,
+      width: "140px",
+      cell: row => (
+        <button onClick={() => setSelectedPaymentExam(row)} className="bg-brand-50 text-brand-700 hover:bg-brand-600 hover:text-white px-4 py-2 rounded-lg font-bold text-xs transition-all shadow-sm">
+          Collect Fees
+        </button>
+      )
+    }
+  ];
 
   const groupedMarksMap = {};
   marks.forEach(m => {
@@ -1880,7 +1948,53 @@ const ExamManagement = () => {
               searchPlaceholder="Search exams by name or course..."
             />
           ) : activeTab === "payments_list" ? (
-            <StudentFeesList feeType="Exam" />
+            <div className="p-6">
+              {selectedPaymentExam ? (
+                <div>
+                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-brand-50 text-brand-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <DollarSign size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{selectedPaymentExam.name} - Fee Collection</h3>
+                        <p className="text-sm font-medium text-slate-500 flex items-center gap-2 mt-0.5">
+                          <span>{selectedPaymentExam.course?.title}</span>
+                          <span className="text-slate-300">•</span>
+                          <span>{selectedPaymentExam.batch?.name || batches.find(b => b._id === selectedPaymentExam.batch)?.name}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md font-bold">Sem {selectedPaymentExam.semester}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedPaymentExam(null)}
+                      className="text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors border border-slate-200"
+                    >
+                      <ArrowLeft size={18} /> Back
+                    </button>
+                  </div>
+                  <StudentFeesList feeType="Exam" examFilter={selectedPaymentExam.name} />
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-6 flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Exam Fee Collection</h3>
+                      <p className="text-sm text-slate-500 font-medium">Select an exam to collect fees from enrolled students</p>
+                    </div>
+                  </div>
+                  <CustomDataTable
+                    columns={paymentExamColumns}
+                    data={filteredExams}
+                    progressPending={loading}
+                    search={searchQuery}
+                    setSearch={setSearchQuery}
+                    searchPlaceholder="Search exams by name or course..."
+                  />
+                </div>
+              )}
+            </div>
           ) : activeTab === "upload_progress" ? (
             <div className="p-6">
               <BatchProgressTab />
@@ -2181,6 +2295,10 @@ const ExamManagement = () => {
                     <select required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.semester} onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}>
                       {getAvailableSemesters(formData.batch).map(s => <option key={s} value={s}>Semester {s}</option>)}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Exam Fee (₹)</label>
+                    <input type="number" min="0" placeholder="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.examFee} onChange={(e) => setFormData({ ...formData, examFee: e.target.value })} />
                   </div>
                 </div>
 

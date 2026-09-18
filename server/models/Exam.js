@@ -24,6 +24,10 @@ const examSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Center',
   }],
+  examFee: {
+    type: Number,
+    default: 0
+  },
   subjects: [{
     subject: {
       type: mongoose.Schema.Types.ObjectId,

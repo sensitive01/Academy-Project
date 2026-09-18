@@ -16,7 +16,7 @@ import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
 import { useImagePreview } from "../../context/ImagePreviewContext";
 
-const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
+const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter }) => {
   const [fees, setFees] = useState([]);
   const [students, setStudents] = useState([]);
   const [centers, setCenters] = useState([]);
@@ -578,6 +578,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
 
     const fBatchId = f.batch?._id ? f.batch._id.toString() : f.batch ? f.batch.toString() : "";
     const matchesBatch = selectedBatch === "all" || fBatchId === selectedBatch || (f.batch?.name || f.batch?.batchId) === selectedBatch;
+
+    if (examFilter && f.otherFeeType !== examFilter) {
+      return false;
+    }
 
     let matchesYear = true;
     let rowYearDigit = null;
@@ -1354,58 +1358,58 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-6 overflow-hidden">
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
-        <h2 className="text-xl font-bold text-slate-800 shrink-0">{feeType === 'All' ? 'All' : feeType} Fees</h2>
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end">
+    <div className={`bg-white rounded-3xl shadow-sm border border-slate-100 ${examFilter ? 'p-0 border-0 shadow-none' : 'p-4 sm:p-6'} overflow-hidden`}>
+      {!examFilter && (
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
+          <h2 className="text-xl font-bold text-slate-800 shrink-0">{feeType === 'All' ? 'All' : feeType} Fees</h2>
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end">
+            <div className="relative w-full sm:w-64 group shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={16} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`Search ${feeType} fees...`}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-sm font-semibold text-slate-700"
+              />
+            </div>
 
-          <div className="relative w-full sm:w-64 group shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={16} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${feeType} fees...`}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-sm font-semibold text-slate-700"
-            />
-          </div>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+              />
+            </div>
 
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
-            />
-          </div>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">To</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
+              />
+            </div>
 
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">To</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="px-2 py-1.5 bg-transparent text-xs font-semibold focus:outline-none text-slate-700 cursor-pointer"
-            />
-          </div>
-
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer shrink-0"
-          >
-            <Download size={16} /> Export
-          </button>
-          {!paidOnly && (
-            <div className="flex gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowBulkDropdown(!showBulkDropdown)}
-                  className="bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
-                >
-                  <Upload size={16} /> Bulk Upload
-                </button>
-                {showBulkDropdown && (
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer shrink-0"
+            >
+              <Download size={16} /> Export
+            </button>
+            {!paidOnly && (
+              <div className="flex gap-2">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowBulkDropdown(!showBulkDropdown)}
+                    className="bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
+                  >
+                    <Upload size={16} /> Bulk Upload
+                  </button>
+                  {showBulkDropdown && (
                   <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in slide-in-from-top-2">
                     <button
                       onClick={() => {
@@ -1446,6 +1450,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
           )}
         </div>
       </div>
+      )}
       <CustomDataTable
         columns={columns}
         data={dataWithSummary}
@@ -1464,11 +1469,47 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
         progressPending={loading}
         pagination
         additionalHeaderContent={
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto py-1">
-            <select
+          <div className="flex flex-col gap-4 w-full py-2">
+            {examFilter && (
+              <div className="flex items-center justify-between gap-4 flex-wrap w-full">
+                <div className="relative w-full sm:w-[400px] group shrink-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={16} />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={`Search students...`}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-sm font-semibold text-slate-700 h-[40px]"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 shrink-0 h-[40px]">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">From</span>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="bg-transparent text-sm font-semibold focus:outline-none text-slate-700 cursor-pointer h-full"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 shrink-0 h-[40px]">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">To</span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="bg-transparent text-sm font-semibold focus:outline-none text-slate-700 cursor-pointer h-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={`flex items-center gap-2 flex-wrap ${examFilter ? '' : 'sm:flex-nowrap overflow-x-auto'} w-full`}>
+              <select
               value={selectedCenter}
               onChange={(e) => setSelectedCenter(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
             >
               <option value="all">All Centers</option>
               {Array.from(new Map(centers.map(c => [c.name, { label: c.name, value: c._id }])).values()).map(c => (
@@ -1479,7 +1520,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             <select
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
             >
               <option value="all">All Courses</option>
               {Array.from(new Map(courses.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values()).map(c => (
@@ -1491,7 +1532,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               <select
                 value={selectedBatch}
                 onChange={(e) => setSelectedBatch(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
               >
                 <option value="all">All Batches</option>
                 {Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values()).map(b => (
@@ -1503,7 +1544,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
             <select
               value={selectedFeeYear}
               onChange={(e) => setSelectedFeeYear(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
             >
               <option value="all">All Years</option>
               <option value="1">Year 1</option>
@@ -1516,7 +1557,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
               >
                 <option value="all">All Statuses</option>
                 {!excludePaid && <option value="paid">Paid</option>}
@@ -1536,11 +1577,21 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj }) => {
                   setFromDate("");
                   setToDate("");
                 }}
-                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in h-[40px]"
               >
                 Reset Filters
               </button>
             )}
+
+            {examFilter && (
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer shrink-0 ml-auto h-[40px]"
+              >
+                <Download size={16} /> Export
+              </button>
+            )}
+            </div>
           </div>
         }
       />

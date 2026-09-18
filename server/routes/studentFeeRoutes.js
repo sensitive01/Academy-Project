@@ -95,70 +95,98 @@ router.post('/bulk-upload', protect, async (req, res) => {
       }
 
       const academicYear = year ? String(year) : (student.year || "1");
+      const targetYearNum = parseInt(academicYear, 10);
+      const limitYear = (!isNaN(targetYearNum) && targetYearNum > 0) ? targetYearNum : 1;
 
-      let existingFee = await StudentFee.findOne({
-        student: student._id,
-        year: academicYear,
-        feeType: parsedFeeType,
-        ...(parsedOtherFeeType ? { otherFeeType: parsedOtherFeeType } : {})
-      });
+      for (let y = 1; y <= limitYear; y++) {
+        const loopYearStr = String(y);
 
-      let finalPaidDate = new Date();
-      if (paidDate) {
-        const pdStr = String(paidDate).trim();
-        const mmYyyyMatch = pdStr.match(/^(\d{1,2})[-/](\d{4})$/);
-        if (mmYyyyMatch) {
-          finalPaidDate = new Date(parseInt(mmYyyyMatch[2], 10), parseInt(mmYyyyMatch[1], 10) - 1, 1);
-        } else {
-          const d = new Date(pdStr);
-          if (!isNaN(d.getTime())) finalPaidDate = d;
-        }
-      }
-
-      const paymentDetail = {
-        amount: Number(paidAmount),
-        paymentMode: paymentMode || 'Cash',
-        bankReference: bankReference || '',
-        status: 'Approved',
-        paidAt: finalPaidDate
-      };
-
-      if (existingFee) {
-        if (!existingFee.course || !existingFee.batch) {
-          existingFee.course = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
-          existingFee.batch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
-        }
-
-        existingFee.payments.push(paymentDetail);
-        
-        const totalPaid = existingFee.payments.filter(p => p.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0);
-        const totalDue = existingFee.amount + 
-                         (existingFee.isPenaltyApplied ? existingFee.penaltyAmount : 0) + 
-                         (existingFee.isFinalPenaltyApplied ? existingFee.finalPenaltyAmount : 0);
-                         
-        if (totalPaid >= totalDue) {
-          existingFee.status = 'paid';
-        } else {
-          existingFee.status = 'pending';
-        }
-        await existingFee.save();
-      } else {
-        const studentCourse = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
-        const studentBatch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
-
-        const newFee = new StudentFee({
+        let existingFee = await StudentFee.findOne({
           student: student._id,
-          center: student.center,
-          course: studentCourse,
-          batch: studentBatch,
-          year: academicYear,
+          year: loopYearStr,
           feeType: parsedFeeType,
-          otherFeeType: parsedOtherFeeType,
-          amount: Number(totalAmount),
-          status: Number(paidAmount) >= Number(totalAmount) ? 'paid' : 'pending',
-          payments: [paymentDetail]
+          ...(parsedOtherFeeType ? { otherFeeType: parsedOtherFeeType } : {})
         });
-        await newFee.save();
+
+        if (y === limitYear) {
+          let finalPaidDate = new Date();
+          if (paidDate) {
+            const pdStr = String(paidDate).trim();
+            const mmYyyyMatch = pdStr.match(/^(\d{1,2})[-/](\d{4})$/);
+            if (mmYyyyMatch) {
+              finalPaidDate = new Date(parseInt(mmYyyyMatch[2], 10), parseInt(mmYyyyMatch[1], 10) - 1, 1);
+            } else {
+              const d = new Date(pdStr);
+              if (!isNaN(d.getTime())) finalPaidDate = d;
+            }
+          }
+
+          const paymentDetail = {
+            amount: Number(paidAmount),
+            paymentMode: paymentMode || 'Cash',
+            bankReference: bankReference || '',
+            status: 'Approved',
+            paidAt: finalPaidDate
+          };
+
+          if (existingFee) {
+            if (!existingFee.course || !existingFee.batch) {
+              existingFee.course = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
+              existingFee.batch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
+            }
+
+            existingFee.payments.push(paymentDetail);
+            
+            const totalPaid = existingFee.payments.filter(p => p.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0);
+            const totalDue = existingFee.amount + 
+                             (existingFee.isPenaltyApplied ? existingFee.penaltyAmount : 0) + 
+                             (existingFee.isFinalPenaltyApplied ? existingFee.finalPenaltyAmount : 0);
+                             
+            if (totalPaid >= totalDue) {
+              existingFee.status = 'paid';
+            } else {
+              existingFee.status = 'pending';
+            }
+            await existingFee.save();
+          } else {
+            const studentCourse = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
+            const studentBatch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
+
+            const newFee = new StudentFee({
+              student: student._id,
+              center: student.center,
+              course: studentCourse,
+              batch: studentBatch,
+              year: loopYearStr,
+              feeType: parsedFeeType,
+              otherFeeType: parsedOtherFeeType,
+              amount: Number(totalAmount),
+              status: Number(paidAmount) >= Number(totalAmount) ? 'paid' : 'pending',
+              payments: [paymentDetail]
+            });
+            await newFee.save();
+          }
+        } else {
+          // Previous years: create if not exists
+          if (!existingFee) {
+            const studentCourse = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].course : null;
+            const studentBatch = student.enrolledCourses && student.enrolledCourses.length > 0 ? student.enrolledCourses[0].batch : null;
+
+            const newFee = new StudentFee({
+              student: student._id,
+              center: student.center,
+              course: studentCourse,
+              batch: studentBatch,
+              year: loopYearStr,
+              feeType: parsedFeeType,
+              otherFeeType: parsedOtherFeeType,
+              amount: Number(totalAmount),
+              status: 'pending',
+              payments: []
+            });
+            await newFee.save();
+          }
+        }
       }
       
       successCount++;
