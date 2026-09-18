@@ -106,26 +106,28 @@ const StudentRegistration = () => {
     const generatedFees = [];
 
     const currentYearMatch = formData.year?.match(/\d+/);
-    const currentYear = currentYearMatch ? currentYearMatch[0] : "1";
+    const currentYearNum = currentYearMatch ? parseInt(currentYearMatch[0], 10) : 1;
 
-    if (cFee > 0) {
-      generatedFees.push({
-        feeType: 'Other',
-        otherFeeType: 'Council Fees',
-        amount: cFee,
-        name: `Council Fees - Year ${currentYear}`,
-        year: currentYear
-      });
-    }
+    for (let i = 1; i <= currentYearNum; i++) {
+      if (cFee > 0) {
+        generatedFees.push({
+          feeType: 'Other',
+          otherFeeType: 'Council Fees',
+          amount: cFee,
+          name: `Council Fees - Year ${i}`,
+          year: String(i)
+        });
+      }
 
-    if (crsFee > 0 && scheme) {
-      generatedFees.push({
-        feeType: 'Course',
-        otherFeeType: 'Course Fees',
-        amount: crsFee,
-        name: `Course Fees - Year ${currentYear}`,
-        year: currentYear
-      });
+      if (crsFee > 0 && scheme) {
+        generatedFees.push({
+          feeType: 'Course',
+          otherFeeType: 'Course Fees',
+          amount: crsFee,
+          name: `Course Fees - Year ${i}`,
+          year: String(i)
+        });
+      }
     }
 
     setAdminEnrollment(prev => ({
@@ -368,7 +370,7 @@ const StudentRegistration = () => {
 
       const res = await api.post("/students/public-registration", payload);
       toast.success("Application Submitted Successfully!");
-      setCurrentStep(hasFeesStep ? 7 : 6);
+      setCurrentStep(hasFeesStep ? 6 : 5);
     } catch (err) {
       console.error(err);
       if (err.response?.data?.errors) {
@@ -1014,6 +1016,7 @@ const StudentRegistration = () => {
                   <SelectBox 
                     label="Assign Batch" 
                     value={adminEnrollment.batch} 
+                    defaultOption="Select a Batch"
                     onChange={(e) => {
                       const batchId = e.target.value;
                       const selectedBatchObj = batches.find(b => b._id === batchId);
@@ -1038,17 +1041,18 @@ const StudentRegistration = () => {
                         course: finalCourseId
                       }));
                     }} 
-                    options={[{value: '', label: 'Select a Batch'}, ...getFilteredBatches().map(b => ({value: b._id, label: b.name}))]} 
+                    options={getFilteredBatches().map(b => ({value: b._id, label: b.name}))} 
                     isObjectOptions 
                   />
                   <SelectBox 
                     label="Assign Course" 
                     value={adminEnrollment.course} 
+                    defaultOption={!adminEnrollment.batch ? "Select a batch first" : "Select a Course"}
                     onChange={(e) => setAdminEnrollment(prev => ({ ...prev, course: e.target.value }))} 
                     options={
                       !adminEnrollment.batch 
-                        ? [{value: '', label: 'Select a batch first'}]
-                        : [{value: '', label: 'Select a Course'}, ...getAvailableCoursesForBatch().map(c => ({value: c._id, label: c.title || "Unknown Course"}))]
+                        ? []
+                        : getAvailableCoursesForBatch().map(c => ({value: c._id, label: c.title || "Unknown Course"}))
                     } 
                     isObjectOptions 
                   />
@@ -1237,14 +1241,14 @@ const FormInput = ({ label, className = "", ...props }) => (
   </div>
 );
 
-const SelectBox = ({ label, options, isObjectOptions, className = "", ...props }) => (
+const SelectBox = ({ label, options, isObjectOptions, className = "", defaultOption = "Select Option", ...props }) => (
   <div className="group space-y-1">
     {label && <label className="text-xs font-black tracking-widest text-slate-700 ml-1 group-focus-within:text-brand-700 transition-colors">{label}</label>}
     <select
       {...props}
       className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl outline-none transition-all text-xs font-bold text-slate-900 appearance-none cursor-pointer focus:bg-white focus:border-brand-700 focus:ring-2 focus:ring-brand-700/10 shadow-sm disabled:bg-slate-100 disabled:text-slate-500 ${className}`}
     >
-      <option value="">Select Option</option>
+      <option value="">{defaultOption}</option>
       {options.map((opt, i) => (
         <option key={i} value={isObjectOptions ? opt.value : opt}>{isObjectOptions ? opt.label : opt}</option>
       ))}

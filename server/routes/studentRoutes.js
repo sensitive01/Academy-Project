@@ -214,7 +214,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
               otherFeeType: fee.otherFeeType || (validFeeType === 'Other' ? (fee.feeType || 'Fee') : undefined),
               amount: Number(fee.amount),
               status: 'pending',
-              year: student.year
+              year: fee.year || student.year
             });
           }
         }

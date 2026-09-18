@@ -1277,13 +1277,6 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               </div>
             )}
 
-            <button
-              onClick={openPayrollForm}
-              className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2.5 rounded-lg hover:from-red-600 hover:to-red-700 transition shadow-md shadow-red-200 font-medium"
-            >
-              <Plus size={18} />
-              Add Adjustment
-            </button>
             <input
               type="file"
               accept=".xlsx, .xls, .csv"
@@ -1291,26 +1284,46 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               ref={fileInputRef}
               onChange={handleBulkUpload}
             />
+
+            {/* Bulk Actions Dropdown */}
+            <div className="relative group">
+              <button className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200">
+                <FileSpreadsheet size={18} className="text-emerald-600" />
+                Bulk Actions
+                <ChevronDown size={16} className="text-gray-500 ml-1" />
+              </button>
+              
+              <div className="absolute right-0 top-full mt-1 bg-white border shadow-xl rounded-lg w-48 overflow-hidden z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition border-b"
+                >
+                  <FileSpreadsheet size={16} className="text-emerald-600" />
+                  Bulk Upload
+                </button>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition border-b"
+                >
+                  <Download size={16} className="text-blue-600" />
+                  Template
+                </button>
+                <button
+                  onClick={() => navigate('/dashboard/bulk-history', { state: { module: 'Payroll' } })}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition"
+                >
+                  <FileText size={16} className="text-slate-600" />
+                  View History
+                </button>
+              </div>
+            </div>
+
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200"
+              onClick={openPayrollForm}
+              className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-5 py-2.5 rounded-lg hover:from-red-600 hover:to-red-700 transition shadow-md shadow-red-200 font-medium"
             >
-              <FileSpreadsheet size={18} className="text-emerald-600" />
-              Bulk Upload
-            </button>
-            <button
-              onClick={handleDownloadTemplate}
-              className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200"
-            >
-              <Download size={18} className="text-blue-600" />
-              Template
-            </button>
-            <button
-              onClick={() => navigate('/dashboard/bulk-history', { state: { module: 'Payroll' } })}
-              className="flex items-center gap-2 bg-slate-100 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition shadow-sm font-medium border border-slate-200"
-            >
-              <FileText size={18} className="text-slate-600" />
-              View History
+              <Plus size={18} />
+              Add Adjustment
             </button>
 
           </div>
