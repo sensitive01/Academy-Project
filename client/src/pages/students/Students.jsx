@@ -457,7 +457,7 @@ const Students = () => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/students");
+      const { data } = await api.get("/students?includeInactive=true");
       setStudents(data.students || []);
       setFiltered(data.students || []);
     } catch {
@@ -489,7 +489,7 @@ const Students = () => {
         "Email": "john@example.com",
         "DOB": "01-01-2000",
         "Course ID": "CRS-XXXX",
-        "Batch ID": "B-001", 
+        "Batch ID": "B-001",
         "Center ID": "CEN-2024-XXXX",
         "Year": "1st Year",
         "Course Fee": 50000,
@@ -568,7 +568,7 @@ const Students = () => {
     const recordsToProcess = [
       ...previewModal.validRecords
     ];
-    
+
     const currentFile = previewModal.originalFile;
 
     if (recordsToProcess.length === 0) {
@@ -581,14 +581,14 @@ const Students = () => {
     setUploadProgress({ isUploading: true, current: 0, total, statusText: "Uploading Data..." });
 
     try {
-    // Duplicates that were NOT moved to valid are skipped
-    const skippedDuplicates = previewModal.duplicateRecords.map(d => ({
-      name: d["Name"] || d.studentNameEnglish || "Unknown",
-      studentId: d["Student ID"] || d.studentId || "",
-      reason: d.reason || "Duplicate entry"
-    }));
+      // Duplicates that were NOT moved to valid are skipped
+      const skippedDuplicates = previewModal.duplicateRecords.map(d => ({
+        name: d["Name"] || d.studentNameEnglish || "Unknown",
+        studentId: d["Student ID"] || d.studentId || "",
+        reason: d.reason || "Duplicate entry"
+      }));
 
-    let finalResult = { totalProcessed: 0, successCount: 0, skippedRecords: [...skippedDuplicates] };
+      let finalResult = { totalProcessed: 0, successCount: 0, skippedRecords: [...skippedDuplicates] };
       const chunkSize = 10;
 
       for (let i = 0; i < total; i += chunkSize) {
@@ -653,7 +653,7 @@ const Students = () => {
     } catch (error) {
       toast.error(error.response?.data?.message || "Error uploading records.");
       setUploadProgress({ isUploading: false, current: 0, total: 0, statusText: "" });
-      
+
       try {
         if (currentFile) {
           const formData = new FormData();
@@ -816,11 +816,11 @@ const Students = () => {
       "_mongoId": s._id,
 
       // ── Basic Identity
-      "Student ID":                  s.studentId || "",
-      "Name (English)":              s.studentNameEnglish || s.user?.name || "",
+      "Student ID": s.studentId || "",
+      "Name (English)": s.studentNameEnglish || s.user?.name || "",
       // "Name (Mother Tongue)":        s.studentNameMotherTongue || "",
-      "Father Name":                 s.fatherName || "",
-      "DOB":                         s.dob ? (() => {
+      "Father Name": s.fatherName || "",
+      "DOB": s.dob ? (() => {
         const d = new Date(s.dob);
         if (isNaN(d)) return "";
         const day = String(d.getDate()).padStart(2, '0');
@@ -828,59 +828,59 @@ const Students = () => {
         const year = d.getFullYear();
         return `${day}/${month}/${year}`;
       })() : "",
-      "Age":                         s.age || "",
-      "Gender":                      s.gender || "",
-      "Nationality":                 s.nationality || "",
-      "Religion":                    s.religion || "",
-      "Community":                   s.community || "",
-      "Marital Status":              s.maritalStatus || "",
-      "Year":                        s.year || "",
-      "Department":                  s.department || "",
-      "Status":                      s.status || "",
+      "Age": s.age || "",
+      "Gender": s.gender || "",
+      "Nationality": s.nationality || "",
+      "Religion": s.religion || "",
+      "Community": s.community || "",
+      "Marital Status": s.maritalStatus || "",
+      "Year": s.year || "",
+      "Department": s.department || "",
+      "Status": s.status || "",
 
       // ── IDs
-      "Aadhar No":                   s.aadharNo || "",
-      "KCET Reg No":                 s.kcetRegNo || "",
-      "NEET Reg No":                 s.neetRegNo || "",
-      "APAAR ID":                    s.apaarId || "",
-      "DEB ID":                      s.debId || "",
-      "ABC ID":                      s.abcId || "",
+      "Aadhar No": s.aadharNo || "",
+      "KCET Reg No": s.kcetRegNo || "",
+      "NEET Reg No": s.neetRegNo || "",
+      "APAAR ID": s.apaarId || "",
+      "DEB ID": s.debId || "",
+      "ABC ID": s.abcId || "",
 
       // ── Contact
-      "Email":                       s.email || s.user?.email || "",
-      "Phone":                       s.phone || "",
-      "WhatsApp":                    s.whatsapp || "",
-      "English Fluency (Fluent/Intermediate/Basic)":  s.englishFluency || "",
-      "Languages Known":             (s.languagesKnown || []).join(", "),
+      "Email": s.email || s.user?.email || "",
+      "Phone": s.phone || "",
+      "WhatsApp": s.whatsapp || "",
+      "English Fluency (Fluent/Intermediate/Basic)": s.englishFluency || "",
+      "Languages Known": (s.languagesKnown || []).join(", "),
 
       // ── Address
-      "Address Village":             s.address?.village || "",
-      "Address Post":                s.address?.post || "",
-      "Address Taluk":               s.address?.taluk || "",
-      "Address District":            s.address?.district || "",
-      "Address PIN":                 s.address?.pin || "",
+      "Address Village": s.address?.village || "",
+      "Address Post": s.address?.post || "",
+      "Address Taluk": s.address?.taluk || "",
+      "Address District": s.address?.district || "",
+      "Address PIN": s.address?.pin || "",
 
       // ── Bank Details
-      "Bank Account Holder":         s.bankDetails?.accountHolderName || "",
-      "Bank Account Number":         s.bankDetails?.accountNumber || "",
-      "Bank IFSC Code":              s.bankDetails?.ifscCode || "",
-      "Bank Name & Branch":          s.bankDetails?.bankNameBranch || "",
+      "Bank Account Holder": s.bankDetails?.accountHolderName || "",
+      "Bank Account Number": s.bankDetails?.accountNumber || "",
+      "Bank IFSC Code": s.bankDetails?.ifscCode || "",
+      "Bank Name & Branch": s.bankDetails?.bankNameBranch || "",
 
       // ── SSLC Details
-      "SSLC Register No":            s.sslcDetails?.registerNo || "",
-      "SSLC Year of Passing":        s.sslcDetails?.yearOfPassing || "",
-      "SSLC School Name":            s.sslcDetails?.schoolName || "",
-      "SSLC Place of School":        s.sslcDetails?.placeOfSchool || "",
-      "SSLC Board of Examination":   s.sslcDetails?.boardOfExamination || "",
-      "SSLC Percentage":             s.sslcDetails?.percentage || "",
+      "SSLC Register No": s.sslcDetails?.registerNo || "",
+      "SSLC Year of Passing": s.sslcDetails?.yearOfPassing || "",
+      "SSLC School Name": s.sslcDetails?.schoolName || "",
+      "SSLC Place of School": s.sslcDetails?.placeOfSchool || "",
+      "SSLC Board of Examination": s.sslcDetails?.boardOfExamination || "",
+      "SSLC Percentage": s.sslcDetails?.percentage || "",
 
       // ── HSC Details
-      "HSC Register No":             s.hscDetails?.registerNo || "",
-      "HSC Year of Passing":         s.hscDetails?.yearOfPassing || "",
-      "HSC School Name":             s.hscDetails?.schoolName || "",
-      "HSC Place of School":         s.hscDetails?.placeOfSchool || "",
-      "HSC Board of Examination":    s.hscDetails?.boardOfExamination || "",
-      "HSC Percentage":              s.hscDetails?.percentage || "",
+      "HSC Register No": s.hscDetails?.registerNo || "",
+      "HSC Year of Passing": s.hscDetails?.yearOfPassing || "",
+      "HSC School Name": s.hscDetails?.schoolName || "",
+      "HSC Place of School": s.hscDetails?.placeOfSchool || "",
+      "HSC Board of Examination": s.hscDetails?.boardOfExamination || "",
+      "HSC Percentage": s.hscDetails?.percentage || "",
 
       // ── Education Background (serialized, multi-record)
       // "Education Background (JSON)": s.educationBackground?.length
@@ -911,12 +911,12 @@ const Students = () => {
 
       // ── Enrollment (primary)
       // Names are for reference only. Edit the ID columns to change enrollment.
-      "Center ID":                   s.center?.centerId || "",
-      "Center Name":                 s.center?.name || "",
-      "Batch ID":                   s.enrolledCourses?.[0]?.batch?.batchId || "",
-      "Batch Name":                  s.enrolledCourses?.[0]?.batch?.name || "",
-      "Course ID":                   s.enrolledCourses?.[0]?.course?.courseId || "",
-      "Course Name":                 s.enrolledCourses?.[0]?.course?.title || "",
+      "Center ID": s.center?.centerId || "",
+      "Center Name": s.center?.name || "",
+      "Batch ID": s.enrolledCourses?.[0]?.batch?.batchId || "",
+      "Batch Name": s.enrolledCourses?.[0]?.batch?.name || "",
+      "Course ID": s.enrolledCourses?.[0]?.course?.courseId || "",
+      "Course Name": s.enrolledCourses?.[0]?.course?.title || "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -1172,7 +1172,7 @@ const Students = () => {
                           <th className="p-3 font-bold border-b border-slate-200">Center</th>
                           <th className="p-3 font-bold border-b border-slate-200">Course</th>
                           <th className="p-3 font-bold border-b border-slate-200">Batch</th>
-                          <th className="p-3 font-bold border-b border-slate-200 min-w-[120px]">Year</th> 
+                          <th className="p-3 font-bold border-b border-slate-200 min-w-[120px]">Year</th>
                           <th className="p-3 font-bold border-b border-slate-200">Course Fee</th>
                           <th className="p-3 font-bold border-b border-slate-200">Council Fee</th>
                         </tr>
@@ -1334,7 +1334,7 @@ const Students = () => {
                                           toast.error("Email cannot be empty.");
                                           return;
                                         }
-                                        
+
                                         // Basic email format validation
                                         if (!/^\S+@\S+\.\S+$/.test(editedEmail)) {
                                           toast.error("Please enter a valid email address.");
@@ -1352,8 +1352,8 @@ const Students = () => {
                                           toast.error(`Student ID "${editedId}" already exists in the Ready section.`);
                                           return;
                                         }
-                                        
-                                        const emailExistsInFile = 
+
+                                        const emailExistsInFile =
                                           previewModal.validRecords.some(v => v["Email"] && String(v["Email"]).toLowerCase() === editedEmail.toLowerCase()) ||
                                           previewModal.duplicateRecords.some(d => d.id !== r.id && d["Email"] && String(d["Email"]).toLowerCase() === editedEmail.toLowerCase()) ||
                                           previewModal.invalidRecords.some(i => i["Email"] && String(i["Email"]).toLowerCase() === editedEmail.toLowerCase());
@@ -1797,12 +1797,12 @@ const Students = () => {
               search={search}
               setSearch={setSearch}
               selectableRows={true}
+              selectableRowDisabled={(row) => row.status === 'inactive'}
               onSelectedRowsChange={({ selectedRows }) => setSelectedStudents(selectedRows)}
               clearSelectedRows={clearSelectedRows}
               tableHeaderActions={
                 selectedStudents.length > 0 ? (
                   <div className="flex gap-3 animate-in fade-in zoom-in-95 duration-200">
-                   
 
                     <button
                       onClick={handleExportSelected}
@@ -1845,7 +1845,7 @@ const Students = () => {
                       </div>
                     </div>
 
-                     <button
+                    <button
                       onClick={() => setConfirmBulkDelete(true)}
                       className="flex items-center gap-2 px-5 py-2.5 font-bold text-white bg-red-600 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 cursor-pointer"
                     >
@@ -1928,7 +1928,7 @@ const Students = () => {
         </div>
       ) : activeTab === "leaves" ? (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
-          <LeaveRequestList />
+          <LeaveRequestList context="student" />
         </div>
       ) : activeTab === "parent_mgmt" ? (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-2 overflow-hidden">
@@ -1955,7 +1955,7 @@ const Students = () => {
 
             <form onSubmit={async (e) => {
               e.preventDefault();
-      if (loading) return; // prevent double submission
+              if (loading) return; // prevent double submission
               try {
                 if (promoteConfig.isBulk) {
                   const studentIds = selectedStudents.map(s => s._id);
@@ -2128,8 +2128,8 @@ const Students = () => {
               <button
                 onClick={() => setExportFormat("excel")}
                 className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "excel"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                  : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "excel" ? "bg-emerald-500 text-white" : "bg-slate-50 text-slate-400"}`}>
@@ -2141,8 +2141,8 @@ const Students = () => {
               <button
                 onClick={() => setExportFormat("pdf")}
                 className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${exportFormat === "pdf"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
+                  ? "border-red-500 bg-red-50 text-red-700"
+                  : "border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 <div className={`p-2.5 rounded-xl ${exportFormat === "pdf" ? "bg-red-500 text-white" : "bg-slate-50 text-slate-400"}`}>

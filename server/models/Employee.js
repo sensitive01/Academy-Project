@@ -67,6 +67,12 @@ const employeeSchema = new mongoose.Schema(
       enum: ["active", "inactive", "on-leave"],
       default: "active",
     },
+
+    leaveBalances: {
+      privilegedLeave: { type: Number, default: 0 },
+      sickLeave: { type: Number, default: 0 },
+      casualLeave: { type: Number, default: 0 }
+    }
   },
   { timestamps: true }
 );

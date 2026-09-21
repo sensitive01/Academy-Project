@@ -14,8 +14,9 @@ import {
   Briefcase,
   AlertCircle
 } from "lucide-react";
+import Select from "react-select";
 
-const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
+const LeaveApplicationForm = ({ onSuccess, onCancel, context = null }) => {
   const today = new Date().toISOString().split("T")[0];
   
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -25,7 +26,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
     localStorage.getItem("name") || ""
   );
   const [reason, setReason] = useState("");
-  const [leaveType, setLeaveType] = useState("casual");
+  const [leaveType, setLeaveType] = useState("Casual Leave");
   const [otherLeaveType, setOtherLeaveType] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -35,6 +36,36 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
   const [mode, setMode] = useState("leave");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  
+  const [targetUserType, setTargetUserType] = useState("student"); 
+  const [targetList, setTargetList] = useState([]);
+  const [appliedFor, setAppliedFor] = useState("");
+  
+  // Fetch users if admin is applying on behalf
+  useEffect(() => {
+    const fetchTargets = async () => {
+      if (!isAdmin || !context) return;
+      try {
+        if (context === "employee") {
+          const { data } = await api.get("/employees");
+          setTargetList(data);
+        } else if (context === "student") {
+          const { data } = await api.get("/students");
+          const studentsArray = data.students || data;
+          // Filter by type if needed
+          const filtered = studentsArray.filter(student => 
+            targetUserType === "intern" 
+              ? (student.internships && student.internships.length > 0) 
+              : (!student.internships || student.internships.length === 0)
+          );
+          setTargetList(filtered);
+        }
+      } catch (err) {
+        console.error("Failed to fetch targets:", err);
+      }
+    };
+    fetchTargets();
+  }, [isAdmin, context, targetUserType]);
 
   // Calculate number of days
   useEffect(() => {
@@ -84,6 +115,11 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
       return toast.error("Please specify the leave type");
 
     const formData = new FormData();
+
+    if (isAdmin && context && appliedFor) {
+      formData.append("appliedFor", appliedFor);
+      // We don't overwrite employeeName here; backend will handle it
+    }
 
     formData.append("userId", userId);
     formData.append("employeeName", employeeName);
@@ -174,6 +210,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
 
       {/* FORM */}
       <form onSubmit={handleSubmit} className="p-8 space-y-8">
+
         {/* MODE TOGGLE */}
         <div className="flex p-1 bg-slate-100 rounded-xl">
           <button
@@ -203,24 +240,92 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
         </div>
 
         {/* BASIC INFO */}
-        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500 delay-150">
+        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500 delay-150 relative z-50">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className={labelClasses}>
-                <User size={16} className="text-red-500" />
-                Employee Name
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={employeeName}
-                  readOnly
-                  className={`${inputClasses} bg-slate-100 cursor-not-allowed`}
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <Info size={16} />
-                </div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  <User size={16} className="text-red-500" />
+                  {context === "student" ? "Student Name" : "Employee Name"}
+                </label>
+                
+                {isAdmin && context === "student" && (
+                  <div className="flex gap-3">
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="targetUserType" 
+                        value="student" 
+                        checked={targetUserType === "student"}
+                        onChange={() => setTargetUserType("student")}
+                        className="text-red-600 focus:ring-red-500 w-3 h-3"
+                      />
+                      Student
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="targetUserType" 
+                        value="intern" 
+                        checked={targetUserType === "intern"}
+                        onChange={() => setTargetUserType("intern")}
+                        className="text-red-600 focus:ring-red-500 w-3 h-3"
+                      />
+                      Intern
+                    </label>
+                  </div>
+                )}
               </div>
+
+              {isAdmin && context ? (
+                <Select
+                  value={targetList.map(t => ({
+                    value: t.user?._id || t.user,
+                    label: context === "employee" ? `${t.firstName} ${t.lastName}` : t.studentNameEnglish
+                  })).find(opt => opt.value === appliedFor) || null}
+                  onChange={(selectedOption) => {
+                    setAppliedFor(selectedOption ? selectedOption.value : "")
+                    if (selectedOption) {
+                      setEmployeeName(selectedOption.label);
+                    } else {
+                      setEmployeeName(localStorage.getItem("name") || "");
+                    }
+                  }}
+                  options={targetList.map(t => ({
+                    value: t.user?._id || t.user,
+                    label: context === "employee" ? `${t.firstName} ${t.lastName}` : t.studentNameEnglish
+                  }))}
+                  placeholder={`-- Search ${context === "student" ? targetUserType : "employee"} --`}
+                  isClearable
+                  isSearchable
+                  className="text-slate-800 text-sm"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      padding: "4px",
+                      borderRadius: "0.75rem",
+                      borderColor: "#e2e8f0",
+                      boxShadow: "none",
+                      "&:hover": { borderColor: "#cbd5e1" },
+                      backgroundColor: "#f8fafc"
+                    }),
+                    menu: (base) => ({ ...base, zIndex: 9999 })
+                  }}
+                  required
+                />
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={employeeName}
+                    readOnly
+                    className={`${inputClasses} bg-slate-100 cursor-not-allowed`}
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Info size={16} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -233,12 +338,11 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
                 onChange={(e) => setLeaveType(e.target.value)}
                 className={inputClasses}
               >
-                <option value="casual">Casual</option>
-                <option value="sick">Sick</option>
-                {mode === "leave" ? (
-                  <option value="vacation">Vacation</option>
-                ) : (
-                  <option value="emergency">Emergency</option>
+                <option value="Casual Leave">Casual Leave</option>
+                <option value="Sick Leave">Sick Leave</option>
+                <option value="Privileged Leave">Privileged Leave</option>
+                {mode === "permission" && (
+                  <option value="Emergency">Emergency</option>
                 )}
                 <option value="other">Other</option>
               </select>
@@ -260,7 +364,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
         </div>
 
         {/* DATES & TIMES */}
-        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500 delay-300">
+        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500 delay-300 relative z-40">
           <div className="flex items-center gap-2 text-slate-800 font-semibold text-lg border-b border-slate-100 pb-2">
             {mode === "leave" ? <Calendar size={20} className="text-red-600" /> : <Clock size={20} className="text-red-600" />}
             {mode === "leave" ? "Leave Schedule" : "Permission Schedule"}
@@ -336,7 +440,7 @@ const LeaveApplicationForm = ({ onSuccess, onCancel }) => {
         </div>
 
         {/* ADDITIONAL DETAILS */}
-        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500 delay-500">
+        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500 delay-500 relative z-30">
           <div className="flex items-center gap-2 text-slate-800 font-semibold text-lg border-b border-slate-100 pb-2">
             <FileText size={20} className="text-red-600" />
             Additional Information

@@ -39,6 +39,9 @@ router.post(
         shiftStart,
         shiftEnd,
         center,
+        privilegedLeave,
+        sickLeave,
+        casualLeave,
       } = req.body;
 
       //////////////////////////////////////////////////////
@@ -114,6 +117,11 @@ router.post(
         designation,
         employmentType,
         center: (req.user.role === 'center' || req.user.role === 'hr') ? req.user.center : (center || null),
+        leaveBalances: {
+          privilegedLeave: Number(privilegedLeave) || 0,
+          sickLeave: Number(sickLeave) || 0,
+          casualLeave: Number(casualLeave) || 0,
+        },
 
         salary:
           salary !== undefined && salary !== ""
@@ -268,6 +276,9 @@ router.put(
         shiftStart,
         shiftEnd,
         center,
+        privilegedLeave,
+        sickLeave,
+        casualLeave,
       } = req.body;
 
       //////////////////////////////////////////////////////
@@ -354,14 +365,16 @@ router.put(
           employee.shift = {};
         }
 
-        if (shiftStart) {
-          employee.shift.start = shiftStart;
-        }
-
-        if (shiftEnd) {
-          employee.shift.end = shiftEnd;
-        }
+        if (shiftStart !== undefined) employee.shift.start = shiftStart;
+        if (shiftEnd !== undefined) employee.shift.end = shiftEnd;
       }
+
+      if (!employee.leaveBalances) {
+        employee.leaveBalances = { privilegedLeave: 0, sickLeave: 0, casualLeave: 0 };
+      }
+      if (privilegedLeave !== undefined) employee.leaveBalances.privilegedLeave = Number(privilegedLeave) || 0;
+      if (sickLeave !== undefined) employee.leaveBalances.sickLeave = Number(sickLeave) || 0;
+      if (casualLeave !== undefined) employee.leaveBalances.casualLeave = Number(casualLeave) || 0;
 
       //////////////////////////////////////////////////////
       // SALARY UPDATE

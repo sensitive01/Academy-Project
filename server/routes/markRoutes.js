@@ -49,7 +49,12 @@ const validateMarkLimits = async (courseId, semester, batchId, subjectId, theory
 router.get('/', protect, async (req, res) => {
   try {
     let marks = await Mark.find()
-      .populate({ path: 'student', select: 'studentNameEnglish studentId center year dob', populate: { path: 'center', select: 'name centerId' } })
+      .populate({ 
+        path: 'student', 
+        select: 'studentNameEnglish studentId center year dob', 
+        match: { status: { $ne: 'inactive' } },
+        populate: { path: 'center', select: 'name centerId' } 
+      })
       .populate('course', 'title')
       .populate('batch', 'name')
       .populate('subject', 'name code type')
@@ -57,6 +62,7 @@ router.get('/', protect, async (req, res) => {
       .lean()
       .sort({ createdAt: -1 });
 
+    marks = marks.filter(m => m.student != null);
     const exams = await Exam.find().sort({ createdAt: -1 }).lean();
 
     marks = marks.map(mark => {

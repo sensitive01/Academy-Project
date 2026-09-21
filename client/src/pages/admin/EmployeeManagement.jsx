@@ -635,7 +635,7 @@ const EmployeeManagement = () => {
         )}
         {activeTab === "leave" && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 overflow-hidden">
-             <LeaveRequestList showApplyButton={true} onlyMine={false} />
+             <LeaveRequestList showApplyButton={true} onlyMine={false} context="employee" />
           </div>
         )}
         {activeTab === "department" && <DepartmentTab />}

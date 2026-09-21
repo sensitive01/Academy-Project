@@ -750,15 +750,29 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   const payrollColumns = [
     { name: 'S.No', selector: (row, i) => i + 1, width: '70px', center: "true" },
     {
-      name: internOnly ? 'Intern Name' : 'Employee Name', selector: row => row.name, sortable: true, width: '160px',
-      cell: row => <div onClick={() => fetchAttendance(row, "all")} className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 truncate">{row.name}</div>
+      name: internOnly ? 'Intern Name' : 'Employee Name', selector: row => row.name, sortable: true, width: '200px',
+      cell: row => {
+        let displayName = row.name || "";
+        let bracketText = "";
+        const match = displayName.match(/(.*?)\((.*?)\)/);
+        if (match) {
+          displayName = match[1].trim();
+          bracketText = match[2].trim();
+        }
+        return (
+          <div onClick={() => fetchAttendance(row, "all")} className="flex flex-col justify-center cursor-pointer hover:text-blue-600">
+            <span className="font-semibold text-gray-800 truncate" title={displayName}>{displayName}</span>
+            {bracketText && <span className="text-[10px] text-brand-600 font-bold truncate" title={bracketText}>{bracketText}</span>}
+          </div>
+        );
+      }
     },
     {
-      name: 'Dept', selector: row => row.department, center: "true", width: '140px',
+      name: 'Dept', selector: row => row.department, center: "true", width: '100px',
       cell: row => <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">{row.department || "-"}</span>
     },
-    { name: 'Basic Salary', selector: row => row.basic, sortable: true, width: "110px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
-    { name: 'Total Days', selector: row => row.totalDays, center: "true", width: '80px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
+    { name: 'Basic Salary', selector: row => row.basic, sortable: true, width: "150px", center: "true", cell: row => <div className="text-gray-700 font-medium text-center w-full"><span className="text-gray-400 mr-1">₹</span>{row.basic?.toLocaleString("en-IN") || "0"}</div> },
+    { name: 'Total Days', selector: row => row.totalDays, center: "true", width: '120px', cell: row => <span className="text-gray-600 font-medium">{row.totalDays || "-"}</span> },
     { name: 'Present', selector: row => row.present, center: "true", width: '90px', cell: row => <div className="font-bold text-green-600 cursor-pointer hover:bg-green-50 p-1 rounded" onClick={() => fetchAttendance(row, "present")}>{row.present ?? "-"}</div> },
     { name: 'Absent', selector: row => row.absent, center: "true", width: '80px', cell: row => <div className="font-bold text-red-500 cursor-pointer hover:bg-red-50 p-1 rounded" onClick={() => fetchAttendance(row, "leave")}>{row.absent ?? "-"}</div> },
     ...(internOnly ? [] : [

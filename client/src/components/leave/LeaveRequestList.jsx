@@ -7,8 +7,9 @@ import LeaveApplicationForm from "./LeaveApplicationForm";
 import CustomDataTable from "../common/DataTable";
 import ReactDOM from "react-dom";
 import { useImagePreview } from "../../context/ImagePreviewContext";
+import ConfirmationModal from "../modals/ConfirmationModal";
 
-const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
+const LeaveRequestList = ({ showApplyButton = true, onlyMine = false, context = null }) => {
   const [requests, setRequests] = useState([]);
   const [user, setUser] = useState(null);
   const [selectedLeave, setSelectedLeave] = useState(null);
@@ -16,8 +17,12 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [openStatusId, setOpenStatusId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
   const location = useLocation();
 
   // ================= FETCH LOGGED IN USER =================
@@ -74,14 +79,23 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
   };
 
   // ================= DELETE LEAVE =================
-  const handleDelete = async (id) => {
+  const confirmDelete = (id) => {
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteId) return;
     try {
-      await api.delete(`/leave/${id}`);
+      await api.delete(`/leave/${deleteId}`);
       toast.success("Leave deleted successfully");
       fetchRequests(user.role);
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || "Failed to delete leave");
+    } finally {
+      setShowDeleteModal(false);
+      setDeleteId(null);
     }
   };
 
@@ -104,6 +118,23 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
     if (onlyMine && user && user.role !== "admin") {
       list = list.filter(req => req.userId === user._id);
     }
+    
+    if (fromDate) {
+      list = list.filter(req => {
+        const reqDate = new Date(req.startDate || req.permissionDate || req.createdAt);
+        return reqDate >= new Date(fromDate);
+      });
+    }
+    
+    if (toDate) {
+      list = list.filter(req => {
+        const reqDate = new Date(req.startDate || req.permissionDate || req.createdAt);
+        const endDay = new Date(toDate);
+        endDay.setDate(endDay.getDate() + 1);
+        return reqDate < endDay;
+      });
+    }
+
     if (searchTerm) {
       list = list.filter(req =>
         req.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,13 +143,30 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
       );
     }
     return list;
-  }, [requests, searchTerm, onlyMine, user]);
+  }, [requests, searchTerm, onlyMine, user, fromDate, toDate]);
 
   const columns = [
     { name: 'S.No', selector: (row, i) => i + 1, width: '70px', center: true },
     { name: 'Employee', selector: row => row.employeeName, sortable: true, cell: row => <span className="font-medium text-slate-700">{row.employeeName || "Unknown"}</span> },
     { name: 'Category', selector: row => row.mode, sortable: true, cell: row => <span className="text-slate-600">{row.mode === "permission" ? "Permission" : "Leave"}</span> },
     { name: 'Type', selector: row => row.leaveType, sortable: true },
+    { 
+      name: 'Balances', 
+      selector: row => row.leaveBalanceInfo ? row.leaveBalanceInfo.remaining : 0, 
+      width: '120px',
+      cell: row => (
+        <div className="flex flex-col text-xs space-y-1 my-1">
+          {row.leaveBalanceInfo ? (
+            <>
+              <span className="text-slate-600 font-medium">Available: {row.leaveBalanceInfo.maxAllowed} Day(s)</span>
+              <span className="text-amber-600">Applied: {row.leaveBalanceInfo.alreadyAppliedCount} Day(s)</span>
+            </>
+          ) : (
+            <span className="text-slate-400 italic">N/A</span>
+          )}
+        </div>
+      )
+    },
     { name: 'Reason', selector: row => row.reason, wrap: true, cell: row => <span className="text-slate-600">{row.reason}</span> },
     { name: 'Applied Date', selector: row => row.createdAt, width: '150px', sortable: true, cell: row => <span className="text-slate-600">{new Date(row.createdAt).toLocaleDateString()}</span> },
     {
@@ -183,7 +231,7 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
             <Eye size={18} />
           </button>
           {(user?.role === "admin" || (row.userId === user?._id && row.status === "pending")) && (
-            <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-700 transition">
+            <button onClick={() => confirmDelete(row._id)} className="text-red-500 hover:text-red-700 transition">
               <Trash2 size={18} />
             </button>
           )}
@@ -230,6 +278,36 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
             search={searchTerm}
             setSearch={setSearchTerm}
             searchPlaceholder="Search by employee, leave type or reason..."
+            additionalHeaderContent={
+              <div className="flex gap-3 items-center w-full sm:w-auto mt-3 sm:mt-0">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-medium px-1 mb-0.5">From Date</span>
+                  <input 
+                    type="date" 
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 w-full sm:min-w-[130px] h-[38px]"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-medium px-1 mb-0.5">To Date</span>
+                  <input 
+                    type="date" 
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 w-full sm:min-w-[130px] h-[38px]"
+                  />
+                </div>
+                {(fromDate || toDate) && (
+                  <button 
+                    onClick={() => { setFromDate(""); setToDate(""); }}
+                    className="mt-4 text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 bg-red-50 rounded-lg hover:bg-red-100 transition whitespace-nowrap h-[32px]"
+                  >
+                    Clear Filter
+                  </button>
+                )}
+              </div>
+            }
           />
         </div>
       </div>
@@ -245,6 +323,7 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <LeaveApplicationForm
+              context={context}
               onSuccess={() => {
                 fetchRequests(user.role);
                 setShowForm(false);
@@ -273,6 +352,31 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
               <div className="space-y-2 text-sm text-slate-600">
                 <p><strong>Employee:</strong> {selectedLeave.employeeName}</p>
                 <p><strong>Type:</strong> {selectedLeave.leaveType}</p>
+                {selectedLeave.leaveBalanceInfo && (
+                  <div className="bg-slate-100 p-3 rounded-lg my-2 border border-slate-200">
+                    <p className="font-semibold text-slate-800 mb-1">Leave Balance ({selectedLeave.leaveType})</p>
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                      <div className="bg-white p-2 rounded border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span className="block text-slate-500 mb-0.5">Allowed</span>
+                        <span className="block font-bold text-slate-800 text-sm">{selectedLeave.leaveBalanceInfo.maxAllowed} Days</span>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span className="block text-slate-500 mb-0.5">Approved</span>
+                        <span className="block font-bold text-green-600 text-sm">{selectedLeave.leaveBalanceInfo.approvedCount ?? 0} Days</span>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span className="block text-slate-500 mb-0.5">Pending</span>
+                        <span className="block font-bold text-amber-600 text-sm">{selectedLeave.leaveBalanceInfo.pendingCount ?? 0} Days</span>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <span className="block text-slate-500 mb-0.5">Remaining</span>
+                        <span className={`block font-bold text-sm ${selectedLeave.leaveBalanceInfo.remaining > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {selectedLeave.leaveBalanceInfo.remaining} Days
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <p><strong>Reason:</strong> {selectedLeave.reason}</p>
                 {selectedLeave.mode === "permission" ? (
                   <>
@@ -328,6 +432,20 @@ const LeaveRequestList = ({ showApplyButton = true, onlyMine = false }) => {
         </div>,
         document.body
       )}
+      
+      {/* ===== DELETE CONFIRMATION MODAL ===== */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeleteId(null);
+        }}
+        onConfirm={executeDelete}
+        title="Delete Leave Application"
+        message="Are you sure you want to delete this leave application? This action cannot be undone."
+        confirmText="Delete"
+        confirmStyle="danger"
+      />
     </div>
   );
 };

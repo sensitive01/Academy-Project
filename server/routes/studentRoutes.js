@@ -277,6 +277,9 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
 router.get("/", protect, async (req, res) => {
   try {
     let query = {};
+    if (req.query.includeInactive !== 'true') {
+      query.status = { $ne: 'inactive' };
+    }
     const userRole = req.user.role.toLowerCase();
 
     if (userRole === "center") {

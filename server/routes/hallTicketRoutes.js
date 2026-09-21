@@ -17,6 +17,7 @@ router.get('/', async (req, res) => {
       })
       .populate({
         path: 'students',
+        match: { status: { $ne: 'inactive' } },
         populate: [
           { path: 'enrolledCourses.course' }
         ]

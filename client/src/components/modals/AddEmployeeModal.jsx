@@ -52,6 +52,9 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
     certificateFile: null,
     contractFile: null,
     subjects: [],
+    privilegedLeave: 0,
+    sickLeave: 0,
+    casualLeave: 0,
   });
 
   const fetchConfigs = async () => {
@@ -112,6 +115,9 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
           certificateFile: null,
           contractFile: null,
           subjects: employee.user?.subjects ? employee.user.subjects.map(s => s._id || s) : [],
+          privilegedLeave: employee.leaveBalances?.privilegedLeave || 0,
+          sickLeave: employee.leaveBalances?.sickLeave || 0,
+          casualLeave: employee.leaveBalances?.casualLeave || 0,
         });
         setPreview(employee.profilePic?.url || null);
       } else {
@@ -137,6 +143,9 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
           certificateFile: null,
           contractFile: null,
           subjects: [],
+          privilegedLeave: 0,
+          sickLeave: 0,
+          casualLeave: 0,
         });
         setPreview(null);
       }
@@ -207,7 +216,7 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
       // Append all text fields
       Object.keys(formData).forEach((key) => {
         if (
-          formData[key] &&
+          formData[key] !== null && formData[key] !== undefined && formData[key] !== "" &&
           !["profilePic", "idFile", "certificateFile", "contractFile", "subjects"].includes(
             key,
           )
@@ -702,6 +711,56 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
                         }
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+              {/* Section: Leave Balances */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Calendar size={16} className="text-brand-600" /> Leave Balances
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      Privileged Leave
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                      value={formData.privilegedLeave}
+                      onChange={(e) =>
+                        setFormData({ ...formData, privilegedLeave: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      Sick Leave
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                      value={formData.sickLeave}
+                      onChange={(e) =>
+                        setFormData({ ...formData, sickLeave: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      Casual Leave
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                      value={formData.casualLeave}
+                      onChange={(e) =>
+                        setFormData({ ...formData, casualLeave: e.target.value })
+                      }
+                    />
                   </div>
                 </div>
               </div>

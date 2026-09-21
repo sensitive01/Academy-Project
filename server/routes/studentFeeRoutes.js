@@ -11,7 +11,11 @@ const { createInAppNotification } = require('../utils/notificationUtils');
 router.get('/', protect, async (req, res) => {
   try {
     let fees = await StudentFee.find()
-      .populate('student', 'studentNameEnglish studentId year')
+      .populate({
+        path: 'student',
+        select: 'studentNameEnglish studentId year',
+        match: { status: { $ne: 'inactive' } }
+      })
       .populate('center', 'name bankDetails')
       .populate('course', 'title')
       .populate('batch', 'name')
@@ -22,6 +26,7 @@ router.get('/', protect, async (req, res) => {
     const now = new Date();
     let updatedFees = false;
 
+    fees = fees.filter(f => f.student != null);
     fees = await Promise.all(fees.map(async (fee) => {
       let needsSave = false;
       

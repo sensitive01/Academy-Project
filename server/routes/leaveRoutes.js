@@ -8,6 +8,7 @@ const path = require("path");
 const { protect, admin } = require("../middleware/authMiddleware"); 
 const User = require("../models/User");
 const Student = require("../models/Student");
+const Employee = require("../models/Employee");
 
 // Multer setup for file uploads
 const storage = multer.diskStorage({
@@ -29,6 +30,7 @@ router.post("/apply", protect, upload.single("file"), async (req, res) => {
       permissionDate,
       startTime,
       endTime,
+      appliedFor, // New field from admin form
     } = req.body;
 
     if (!mode || !leaveType || !reason) {
@@ -41,17 +43,66 @@ router.post("/apply", protect, upload.single("file"), async (req, res) => {
         return res.status(400).json({ message: "Leave fields required" });
       }
     }
-
     if (mode === "permission") {
       if (!permissionDate || !startTime || !endTime) {
         return res.status(400).json({ message: "Permission fields required" });
       }
     }
 
+    // ===== LEAVE BALANCE CHECK FOR EMPLOYEES =====
+    let targetUserId = req.user._id;
+    let targetUserName = req.body.employeeName;
+
+    if (appliedFor && req.user.role === "admin") {
+      const targetUser = await User.findById(appliedFor);
+      if (targetUser) {
+        targetUserId = targetUser._id;
+        targetUserName = targetUser.name || targetUserName;
+      }
+    }
+
+    if (mode === "leave") {
+      const employee = await Employee.findOne({ user: targetUserId });
+      if (employee) {
+        const leaveKeyMap = {
+          "Privileged Leave": "privilegedLeave",
+          "Sick Leave": "sickLeave",
+          "Casual Leave": "casualLeave"
+        };
+        const leaveKey = leaveKeyMap[leaveType];
+        
+        if (leaveKey) {
+          const maxAllowed = employee.leaveBalances ? employee.leaveBalances[leaveKey] : 0;
+          
+          // Filter by the month of the start date
+          const targetStartDate = new Date(startDate);
+          const startOfMonth = new Date(targetStartDate.getFullYear(), targetStartDate.getMonth(), 1);
+          const endOfMonth = new Date(targetStartDate.getFullYear(), targetStartDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
+          // Calculate already applied (pending or approved) for THIS MONTH
+          const existingLeaves = await Leave.find({
+            userId: targetUserId,
+            mode: "leave",
+            leaveType: leaveType,
+            status: { $in: ["pending", "approved"] },
+            startDate: { $gte: startOfMonth, $lte: endOfMonth }
+          });
+          
+          const alreadyAppliedCount = existingLeaves.reduce((acc, curr) => acc + (curr.numDays || 0), 0);
+          
+          if (alreadyAppliedCount + Number(numDays) > maxAllowed) {
+            return res.status(400).json({ 
+              message: "Leave limit reached so contact the administration" 
+            });
+          }
+        }
+      }
+    }
+
     // ===== CREATE DATA =====
     const leave = new Leave({
-      userId: req.user._id,  // Now stores as ObjectId reference
-      employeeName: req.user.name,
+      userId: targetUserId,  // Now stores as target ObjectId reference
+      employeeName: targetUserName,
       mode,
       leaveType,
       reason,
@@ -88,9 +139,10 @@ router.post("/apply", protect, upload.single("file"), async (req, res) => {
     );
 
     // ✅ IF APPLICANT IS A STUDENT, ALSO NOTIFY THE PARENT
-    const applicantUser = await User.findById(req.user._id);
-    if (applicantUser.role === "student") {
-      const student = await Student.findOne({ user: req.user._id });
+    // ? IF APPLICANT IS A STUDENT, ALSO NOTIFY THE PARENT
+    const applicantUser = await User.findById(targetUserId);
+    if (applicantUser && applicantUser.role === "student") {
+      const student = await Student.findOne({ user: targetUserId });
       if (student && student.parent) {
         notificationPromises.push(
           Notification.create({
@@ -122,11 +174,65 @@ router.post("/apply", protect, upload.single("file"), async (req, res) => {
 });
 
 
+// Helper function to append balances
+async function appendLeaveBalances(leaves) {
+  const allEmployees = await Employee.find({});
+  const allActiveLeaves = await Leave.find({ status: { $in: ["pending", "approved"] }, mode: "leave" });
+
+  const empMap = {};
+  allEmployees.forEach(emp => {
+    if (emp.user) empMap[emp.user.toString()] = emp;
+  });
+
+  const leaveStatsMap = {};
+  allActiveLeaves.forEach(l => {
+    if (!l.userId || !l.startDate) return;
+    const leaveDate = new Date(l.startDate);
+    const monthKey = `${leaveDate.getFullYear()}_${leaveDate.getMonth()}`;
+    const key = `${l.userId.toString()}_${l.leaveType}_${monthKey}`;
+    if (!leaveStatsMap[key]) leaveStatsMap[key] = { approved: 0, pending: 0 };
+    if (l.status === 'approved') leaveStatsMap[key].approved += (l.numDays || 0);
+    if (l.status === 'pending') leaveStatsMap[key].pending += (l.numDays || 0);
+  });
+
+  const leaveKeyMap = {
+    "Privileged Leave": "privilegedLeave",
+    "Sick Leave": "sickLeave",
+    "Casual Leave": "casualLeave"
+  };
+
+  return leaves.map(leave => {
+    let leaveBalanceInfo = null;
+    if (leave.mode === "leave" && leave.userId && leave.startDate) {
+      const emp = empMap[leave.userId.toString()];
+      if (emp) {
+        const leaveDate = new Date(leave.startDate);
+        const monthKey = `${leaveDate.getFullYear()}_${leaveDate.getMonth()}`;
+        const leaveKey = leaveKeyMap[leave.leaveType];
+        if (leaveKey) {
+          const maxAllowed = emp.leaveBalances ? (emp.leaveBalances[leaveKey] || 0) : 0;
+          const stats = leaveStatsMap[`${leave.userId.toString()}_${leave.leaveType}_${monthKey}`] || { approved: 0, pending: 0 };
+          const alreadyAppliedCount = stats.approved + stats.pending;
+          leaveBalanceInfo = {
+            maxAllowed,
+            alreadyAppliedCount,
+            approvedCount: stats.approved,
+            pendingCount: stats.pending,
+            remaining: maxAllowed - alreadyAppliedCount
+          };
+        }
+      }
+    }
+    return { ...leave.toObject(), leaveBalanceInfo };
+  });
+}
+
 // =================== GET ALL LEAVES (All Users) ===================
 router.get("/all", protect, admin, async (req, res) => {
   try {
     const leaves = await Leave.find().sort({ createdAt: -1 });
-    res.json(leaves);
+    const leavesWithBalances = await appendLeaveBalances(leaves);
+    res.json(leavesWithBalances);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -142,7 +248,49 @@ router.get("/:id", protect, async (req, res) => {
       return res.status(404).json({ message: "Leave not found" });
     }
 
-    res.json(leave);
+    let leaveBalanceInfo = null;
+    if (leave.mode === "leave") {
+      const employee = await Employee.findOne({ user: leave.userId });
+      if (employee) {
+        const leaveKeyMap = {
+          "Privileged Leave": "privilegedLeave",
+          "Sick Leave": "sickLeave",
+          "Casual Leave": "casualLeave"
+        };
+        const leaveKey = leaveKeyMap[leave.leaveType];
+        
+        if (leaveKey) {
+          const maxAllowed = employee.leaveBalances ? employee.leaveBalances[leaveKey] : 0;
+          
+          const existingLeaves = await Leave.find({
+            userId: leave.userId,
+            mode: "leave",
+            leaveType: leave.leaveType,
+            status: { $in: ["pending", "approved"] }
+          });
+          
+          const approvedCount = existingLeaves
+            .filter(l => l.status === "approved")
+            .reduce((acc, curr) => acc + (curr.numDays || 0), 0);
+
+          const pendingCount = existingLeaves
+            .filter(l => l.status === "pending")
+            .reduce((acc, curr) => acc + (curr.numDays || 0), 0);
+          
+          const alreadyAppliedCount = approvedCount + pendingCount;
+          
+          leaveBalanceInfo = {
+            maxAllowed,
+            alreadyAppliedCount,
+            approvedCount,
+            pendingCount,
+            remaining: maxAllowed - alreadyAppliedCount
+          };
+        }
+      }
+    }
+
+    res.json({ ...leave.toObject(), leaveBalanceInfo });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -154,7 +302,8 @@ router.get("/", protect, async (req, res) => {
   try {
     // Optional: only fetch leaves of logged-in user
     const leaves = await Leave.find({ userId: req.user._id });
-    res.json(leaves);
+    const leavesWithBalances = await appendLeaveBalances(leaves);
+    res.json(leavesWithBalances);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });

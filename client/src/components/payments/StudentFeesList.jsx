@@ -65,12 +65,56 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     sessionStorage.setItem(`fees_${feeType}_${paidOnly}_toDate`, JSON.stringify(toDate));
   }, [search, selectedCenter, selectedCourse, selectedBatch, selectedFeeYear, selectedStatus, fromDate, toDate, feeType, paidOnly]);
 
+  let maxYearInDataset = -1;
+  if (selectedFeeYear === "all") {
+    fees.forEach(f => {
+      const term = search.toLowerCase();
+      const matchesSearch = !term ||
+        f.student?.studentNameEnglish?.toLowerCase().includes(term) ||
+        f.student?.studentId?.toLowerCase().includes(term) ||
+        f.course?.title?.toLowerCase().includes(term) ||
+        f.center?.name?.toLowerCase().includes(term) ||
+        f.batch?.name?.toLowerCase().includes(term);
+
+      const fCenterId = f.center?._id ? f.center._id.toString() : f.center ? f.center.toString() : "";
+      const matchesCenter = selectedCenter === "all" || fCenterId === selectedCenter || f.center?.name === selectedCenter;
+
+      const fCourseId = f.course?._id ? f.course._id.toString() : f.course ? f.course.toString() : "";
+      const matchesCourse = selectedCourse === "all" || fCourseId === selectedCourse || f.course?.title === selectedCourse;
+
+      const fBatchId = f.batch?._id ? f.batch._id.toString() : f.batch ? f.batch.toString() : "";
+      const matchesBatch = selectedBatch === "all" || fBatchId === selectedBatch || (f.batch?.name || f.batch?.batchId) === selectedBatch;
+
+      const matchesExam = !(examFilter && f.otherFeeType !== examFilter);
+
+      if (matchesSearch && matchesCenter && matchesCourse && matchesBatch && matchesExam) {
+        let rowYearDigit = null;
+        if (f.year) {
+          const match = String(f.year).match(/\d+/);
+          if (match) rowYearDigit = Number(match[0]);
+        } else if (f.otherFeeType) {
+          const match = String(f.otherFeeType).match(/Year\s*(\d+)/i);
+          if (match) rowYearDigit = Number(match[1]);
+        }
+        if (rowYearDigit === null && f.student?.year) {
+          const match = String(f.student.year).match(/\d+/);
+          if (match) rowYearDigit = Number(match[0]);
+        }
+        if (rowYearDigit !== null && rowYearDigit > maxYearInDataset) {
+          maxYearInDataset = rowYearDigit;
+        }
+      }
+    });
+  }
+
+  const effectiveYear = selectedFeeYear !== "all" ? Number(selectedFeeYear) : (maxYearInDataset !== -1 ? maxYearInDataset : 1);
+
   const getDynamicMonths = () => {
     let currentStartDate = "";
     let currentEndDate = "";
 
     if (batchObj && batchObj.periods && batchObj.periods.length > 0) {
-      const currentPeriod = batchObj.periods.find(p => p.year === (selectedFeeYear !== "all" ? Number(selectedFeeYear) : 1)) || batchObj.periods[0];
+      const currentPeriod = batchObj.periods.find(p => p.year === effectiveYear) || batchObj.periods[0];
       if (currentPeriod) {
         currentStartDate = currentPeriod.startDate;
         currentEndDate = currentPeriod.endDate;
@@ -603,6 +647,14 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         matchesYear = rowYearDigit === Number(selectedFeeYear);
       } else {
         matchesYear = false;
+      }
+    } else {
+      if (maxYearInDataset !== -1) {
+        if (rowYearDigit !== null) {
+          matchesYear = rowYearDigit === maxYearInDataset;
+        } else {
+          matchesYear = false;
+        }
       }
     }
 

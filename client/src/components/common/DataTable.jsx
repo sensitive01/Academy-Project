@@ -106,18 +106,18 @@ const CustomDataTable = ({
         </div>
       )}
 
-      <div className="flex-1 w-full relative overflow-auto z-10 min-h-0">
+      <div className={`flex-1 w-full relative overflow-auto z-10 min-h-0 table-sticky-column ${props.selectableRows ? 'has-selectable' : ''}`}>
         <DataTable
           columns={columns}
           data={data}
           pagination
-          paginationPerPage={10}
-          paginationRowsPerPageOptions={[5, 10, 20, 50]}
+          paginationPerPage={50}
+          paginationRowsPerPageOptions={[50, 100, 200, 500]}
           customStyles={customStyles}
           highlightOnHover
           pointerOnHover={false}
           responsive
-          persistTableHead
+          persistTableHead 
           noDataComponent={
             <div className="p-12 text-center text-slate-500 bg-white w-full border-b border-slate-200">
               <span className="text-4xl block mb-2">📄</span>

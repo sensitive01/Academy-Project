@@ -124,3 +124,81 @@ body {
     white-space: nowrap;
     animation: marquee 30s linear infinite;
 }
+
+/* Sticky Columns for DataTables - Normal Tables */
+.table-sticky-column:not(.has-selectable) .rdt_TableHeadRow .rdt_TableCol:nth-child(1),
+.table-sticky-column:not(.has-selectable) .rdt_TableRow .rdt_TableCell:nth-child(1) {
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 2;
+}
+
+.table-sticky-column:not(.has-selectable) .rdt_TableHeadRow .rdt_TableCol:nth-child(1) {
+    z-index: 3;
+    background-color: #f1f5f9;
+}
+
+.table-sticky-column:not(.has-selectable) .rdt_TableHeadRow .rdt_TableCol:nth-child(2),
+.table-sticky-column:not(.has-selectable) .rdt_TableRow .rdt_TableCell:nth-child(2) {
+    position: sticky;
+    left: 70px;
+    background-color: white;
+    z-index: 2;
+    border-right: 2px solid #e2e8f0;
+}
+
+.table-sticky-column:not(.has-selectable) .rdt_TableHeadRow .rdt_TableCol:nth-child(2) {
+    z-index: 3;
+    background-color: #f1f5f9;
+}
+
+.table-sticky-column:not(.has-selectable) .rdt_TableRow:hover .rdt_TableCell:nth-child(1),
+.table-sticky-column:not(.has-selectable) .rdt_TableRow:hover .rdt_TableCell:nth-child(2) {
+    background-color: #f8fafc;
+}
+
+/* Sticky Columns for DataTables - With Selectable Rows (Checkbox) */
+.table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(1),
+.table-sticky-column.has-selectable .rdt_TableRow .rdt_TableCell:nth-child(1) {
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 2;
+}
+.table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(1) {
+    z-index: 3;
+    background-color: #f1f5f9;
+}
+
+.table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(2),
+.table-sticky-column.has-selectable .rdt_TableRow .rdt_TableCell:nth-child(2) {
+    position: sticky;
+    left: 48px; /* Checkbox default width */
+    background-color: white;
+    z-index: 2;
+}
+.table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(2) {
+    z-index: 3;
+    background-color: #f1f5f9;
+}
+
+.table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(3),
+.table-sticky-column.has-selectable .rdt_TableRow .rdt_TableCell:nth-child(3) {
+    position: sticky;
+    left: 118px; /* 48px + 70px */
+    background-color: white;
+    z-index: 2;
+    border-right: 2px solid #e2e8f0;
+}
+.table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(3) {
+    z-index: 3;
+    background-color: #f1f5f9;
+}
+
+.table-sticky-column.has-selectable .rdt_TableRow:hover .rdt_TableCell:nth-child(1),
+.table-sticky-column.has-selectable .rdt_TableRow:hover .rdt_TableCell:nth-child(2),
+.table-sticky-column.has-selectable .rdt_TableRow:hover .rdt_TableCell:nth-child(3) {
+    background-color: #f8fafc;
+}
+
