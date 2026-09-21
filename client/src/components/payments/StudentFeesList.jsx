@@ -6,6 +6,7 @@ import AddStudentFeeModal from "../modals/AddStudentFeeModal";
 import CollectPaymentModal from "./CollectPaymentModal";
 import PaymentHistoryView from "./PaymentHistoryView";
 import BulkUploadFeeView from "./BulkUploadFeeView";
+import BulkUploadHistoryModal from "../modals/BulkUploadHistoryModal";
 import { Upload } from "lucide-react";
 import { downloadReceipt } from "../../utils/downloadReceipt";
 import { Download, FileSpreadsheet, FileText, Search } from "lucide-react";
@@ -31,7 +32,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
   const [selectedMonthPayments, setSelectedMonthPayments] = useState(null);
   const [showBulkUploadView, setShowBulkUploadView] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState([]);
+  const [isTemplateUpload, setIsTemplateUpload] = useState(false);
   const [showBulkDropdown, setShowBulkDropdown] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [breakdownModal, setBreakdownModal] = useState({ isOpen: false, studentName: "", breakdown: [] });
   const fileInputRef = React.useRef(null);
 
   const getSessionValue = (key, defaultVal) => {
@@ -726,8 +730,77 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     };
     return getYearDigit(b) - getYearDigit(a);
   });
-  const dataWithSummary = [...filtered];
-  if (filtered.length > 0) {
+
+  const filteredWithUnified = filtered.map(f => {
+    const studentFees = fees.filter(tf => {
+      const studentMatch = tf.student && f.student && tf.student._id === f.student._id;
+      const typeMatch = tf.feeType === f.feeType;
+      return studentMatch && typeMatch;
+    });
+
+    const breakdown = studentFees.map(sf => {
+      const sfTotalDue = (sf.amount || 0) +
+        (sf.isPenaltyApplied ? (sf.penaltyAmount || 0) : 0) +
+        (sf.isFinalPenaltyApplied ? (sf.finalPenaltyAmount || 0) : 0);
+      const sfApprovedPaid = sf.payments?.filter(p => p.status === 'Approved').reduce((acc, p) => acc + (p.amount || 0), 0) || 0;
+      const sfBalance = Math.max(0, sfTotalDue - sfApprovedPaid);
+
+      const sfCourseTotal = (sf.courseAmount || 0) + (sf.coursePenaltyAmount || 0);
+      const sfCoursePaid = sf.coursePayments ? sf.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+      const sfCourseBalance = Math.max(0, sfCourseTotal - sfCoursePaid);
+
+      const sfCouncilTotal = (sf.councilAmount || 0) + (sf.councilPenaltyAmount || 0);
+      const sfCouncilPaid = sf.councilPayments ? sf.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+      const sfCouncilBalance = Math.max(0, sfCouncilTotal - sfCouncilPaid);
+
+      let yearLabel = sf.year || sf.otherFeeType || sf.student?.year || "Unknown";
+      const match = String(yearLabel).match(/\d+/);
+      if (match) {
+        const n = match[0];
+        if (n === "1") yearLabel = "1st Year";
+        else if (n === "2") yearLabel = "2nd Year";
+        else if (n === "3") yearLabel = "3rd Year";
+        else yearLabel = `${n}th Year`;
+      }
+
+      return {
+        yearLabel,
+        totalDue: sfTotalDue,
+        balance: sfBalance,
+        courseBalance: sfCourseBalance,
+        councilBalance: sfCouncilBalance,
+        courseTotal: sfCourseTotal,
+        councilTotal: sfCouncilTotal
+      };
+    });
+
+    breakdown.sort((a, b) => {
+      const aN = String(a.yearLabel).match(/\d+/) ? Number(String(a.yearLabel).match(/\d+/)[0]) : 0;
+      const bN = String(b.yearLabel).match(/\d+/) ? Number(String(b.yearLabel).match(/\d+/)[0]) : 0;
+      return aN - bN;
+    });
+
+    const unifiedBalance = breakdown.reduce((sum, item) => sum + item.balance, 0);
+    const unifiedTotalDue = breakdown.reduce((sum, item) => sum + item.totalDue, 0);
+    const unifiedCourseTotal = breakdown.reduce((sum, item) => sum + item.courseTotal, 0);
+    const unifiedCourseBalance = breakdown.reduce((sum, item) => sum + item.courseBalance, 0);
+    const unifiedCouncilTotal = breakdown.reduce((sum, item) => sum + item.councilTotal, 0);
+    const unifiedCouncilBalance = breakdown.reduce((sum, item) => sum + item.councilBalance, 0);
+
+    return {
+      ...f,
+      unifiedTotalDue,
+      unifiedBalance,
+      unifiedCourseTotal,
+      unifiedCourseBalance,
+      unifiedCouncilTotal,
+      unifiedCouncilBalance,
+      feeBreakdown: breakdown
+    };
+  });
+
+  const dataWithSummary = [...filteredWithUnified];
+  if (filteredWithUnified.length > 0) {
     if (!paidOnly) {
       const summaryRow = {
         isSummary: true,
@@ -741,8 +814,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         totalCoursePaid: filtered.reduce((sum, f) => sum + (f.coursePayments ? f.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0), 0),
         councilAmount: filtered.reduce((sum, f) => sum + (f.councilAmount || 0), 0),
         councilPenaltyAmount: filtered.reduce((sum, f) => sum + (f.councilPenaltyAmount || 0), 0),
-        totalCouncilPaid: filtered.reduce((sum, f) => sum + (f.councilPayments ? f.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0), 0),
-        totalRemainingBalance: filtered.reduce((sum, f) => sum + getRemainingBalance(f), 0),
+        totalCouncilPaid: filteredWithUnified.reduce((sum, f) => sum + (f.councilPayments ? f.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0), 0),
+        totalRemainingBalance: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedBalance !== undefined ? f.unifiedBalance : getRemainingBalance(f)), 0),
+        unifiedCourseTotal: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedCourseTotal || 0), 0),
+        unifiedCourseBalance: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedCourseBalance || 0), 0),
+        unifiedCouncilTotal: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedCouncilTotal || 0), 0),
+        unifiedCouncilBalance: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedCouncilBalance || 0), 0),
+        unifiedTotalDue: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedTotalDue || 0), 0),
         isPenaltyApplied: true,
         isFinalPenaltyApplied: true
       };
@@ -764,36 +842,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
   }
 
 
-  const handleDownloadSample = () => {
-    const sampleData = [
-      {
-        "Student ID": "STU-2023-001",
-        "Year": "1st Year",
-        "Fee Type": "Course",
-        "Total Amount": "50000",
-        "Paid Amount": "25000",
-        "Payment Mode": "Online",
-        "Bank Reference": "TXN12345678",
-        "Paid Date": "08-2023"
-      },
-      {
-        "Student ID": "STU-2023-002",
-        "Year": "1st Year",
-        "Fee Type": "Council",
-        "Total Amount": "5000",
-        "Paid Amount": "5000",
-        "Payment Mode": "Cash",
-        "Bank Reference": "",
-        "Paid Date": "08-2023"
-      }
-    ];
-    const ws = XLSX.utils.json_to_sheet(sampleData);
-    const wscols = Object.keys(sampleData[0]).map(key => ({ wch: Math.max(key.length, 15) }));
-    ws['!cols'] = wscols;
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sample Format");
-    XLSX.writeFile(wb, "Bulk_Fees_Import_Sample.xlsx");
-  };
+
 
   const handleBulkFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -805,7 +854,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: "" });
 
           if (jsonData.length === 0) {
             toast.error("The uploaded file is empty");
@@ -814,11 +863,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
 
           const parseExcelDate = (dateVal) => {
             if (!dateVal) return null;
-            
+
             const formatDate = (d) => {
-               const yy = d.getFullYear();
-               const mm = String(d.getMonth() + 1).padStart(2, '0');
-               return `${mm}-${yy}`;
+              const yy = d.getFullYear();
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              return `${mm}-${yy}`;
             };
 
             if (!isNaN(dateVal) && typeof dateVal === 'number') {
@@ -866,17 +915,97 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
             return null;
           };
 
-          const mappedData = jsonData.map(row => ({
-            studentId: row["Student ID"] ? String(row["Student ID"]).trim() : "",
-            year: row["Year"] ? String(row["Year"]).trim() : "",
-            feeType: row["Fee Type"] ? String(row["Fee Type"]).trim() : "",
-            totalAmount: row["Total Amt"] || row["Total Amount"],
-            paidAmount: row["Paid Amt"] || row["Paid Amount"],
-            paymentMode: row["Payment Mode"] || row["Payment M..."] || "Cash",
-            bankReference: row["Bank Reference"] ? String(row["Bank Reference"]).trim() : "",
-            paidDate: parseExcelDate(row["Paid Date"])
-          }));
+          const mappedData = [];
 
+          let isTemplateUpload = false;
+          if (jsonData.length > 0) {
+            const firstRow = jsonData[0];
+            const hasStandardColumns = Object.keys(firstRow).some(k => {
+              const lower = k.toLowerCase();
+              return lower.includes('total amt') || lower.includes('paid amt') || lower.includes('total amount');
+            });
+            isTemplateUpload = !hasStandardColumns;
+          }
+
+          jsonData.forEach(row => {
+            // Skip TOTALS row if it exists
+            if (row["Student Name"] === "TOTALS" || row["Student ID"] === "TOTALS") return;
+
+            let isTemplate = isTemplateUpload;
+
+            if (isTemplate) {
+              const sId = row["Student ID"] ? String(row["Student ID"]).trim() : "";
+              const fType = row["Fee Type"] ? String(row["Fee Type"]).trim() : "";
+
+              let yearVal = "";
+              if (row["Year"]) {
+                const match = String(row["Year"]).match(/\d+/);
+                if (match) yearVal = match[0];
+              }
+
+              if (!sId || !fType) return; // Skip invalid rows
+
+              // For each month, if there's an amount, create a record
+              // Instead of relying on exact dynamicMonths keys which might mismatch if year changed,
+              // we can just look for keys that look like months or match dynamicMonths loosely
+              Object.keys(row).forEach(key => {
+                // Check if this key is a month column
+                const isMonthCol = dynamicMonths.some(m => m.label === key) ||
+                  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*['\-]?\s*\d{2,4}$/i.test(key);
+
+                if (isMonthCol) {
+                  const amtStr = String(row[key] || "").replace(/[^0-9.]/g, '');
+                  const amt = Number(amtStr);
+                  if (!isNaN(amt) && amt > 0) {
+                    // Extract month and year from the key (e.g. "Jul '27" -> 7, 2027)
+                    let mmStr = "01", yyStr = new Date().getFullYear();
+
+                    const match = dynamicMonths.find(m => m.label === key);
+                    if (match) {
+                      mmStr = String(match.month + 1).padStart(2, '0');
+                      yyStr = match.year;
+                    } else {
+                      const parts = key.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*['\-]?\s*(\d{2,4})$/i);
+                      if (parts) {
+                        const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+                        const mIndex = monthNames.indexOf(parts[1].toLowerCase());
+                        if (mIndex !== -1) mmStr = String(mIndex + 1).padStart(2, '0');
+
+                        let yNum = parseInt(parts[2], 10);
+                        if (yNum < 100) yNum += 2000;
+                        yyStr = yNum;
+                      }
+                    }
+
+                    mappedData.push({
+                      studentId: sId,
+                      year: yearVal,
+                      feeType: fType,
+                      totalAmount: amt,
+                      paidAmount: amt,
+                      paymentMode: "Cash",
+                      bankReference: "",
+                      paidDate: `${mmStr}-${yyStr}`
+                    });
+                  }
+                }
+              });
+            } else {
+              // Standard bulk upload format fallback
+              mappedData.push({
+                studentId: row["Student ID"] ? String(row["Student ID"]).trim() : "",
+                year: row["Year"] ? String(row["Year"]).trim() : "",
+                feeType: row["Fee Type"] ? String(row["Fee Type"]).trim() : "",
+                totalAmount: row["Total Amt"] || row["Total Amount"],
+                paidAmount: row["Paid Amt"] || row["Paid Amount"],
+                paymentMode: row["Payment Mode"] || row["Payment M..."] || "Cash",
+                bankReference: row["Bank Reference"] ? String(row["Bank Reference"]).trim() : "",
+                paidDate: parseExcelDate(row["Paid Date"])
+              });
+            }
+          });
+
+          setIsTemplateUpload(isTemplateUpload);
           setBulkUploadData(mappedData);
           setShowBulkUploadView(true);
         } catch (err) {
@@ -1057,6 +1186,67 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     }
   };
 
+  const handleDownloadSample = () => {
+    const data = dataWithSummary.filter(f => !f.isSummary).map((f, i) => {
+      let yearVal = f.year || (f.feeType === 'Other' ? f.otherFeeType : null) || f.student?.year || "-";
+      const yearMatch = String(yearVal).match(/Year\s*(\d+)/i) || String(yearVal).match(/\d+/);
+      let formattedYear = yearMatch ? `Year ${yearMatch[1] || yearMatch[0]}` : yearVal;
+
+      const exportRow = {
+        "S.No": i + 1,
+        "Student Name": f.student?.studentNameEnglish || "N/A",
+        "Student ID": f.student?.studentId || "-",
+        "Year": formattedYear,
+        "Fee Type": f.feeType === 'Other' && f.otherFeeType ? f.otherFeeType : f.feeType,
+      };
+
+      if (feeType !== 'Exam') {
+        dynamicMonths.forEach(m => {
+          exportRow[m.label] = "";
+        });
+      } else {
+        exportRow["Total Amt"] = "";
+        exportRow["Paid Amt"] = "";
+        exportRow["Payment Mode"] = "";
+        exportRow["Bank Reference"] = "";
+        exportRow["Paid Date"] = "";
+      }
+
+      return exportRow;
+    });
+
+    if (data.length === 0) {
+      toast.error("No students found to generate a template.");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+
+    // Set custom column widths
+    const colWidths = [
+      { wch: 8 },  // S.No
+      { wch: 35 }, // Student Name
+      { wch: 25 }, // Student ID
+      { wch: 15 }, // Year
+      { wch: 20 }, // Fee Type
+    ];
+
+    if (feeType !== 'Exam') {
+      dynamicMonths.forEach(() => {
+        colWidths.push({ wch: 12 }); // Month columns
+      });
+    } else {
+      colWidths.push({ wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 20 }, { wch: 15 });
+    }
+
+    worksheet['!cols'] = colWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, `${feeType}_Bulk_Upload_Template.xlsx`);
+    toast.success("Template downloaded successfully!");
+  };
+
   const monthColumns = dynamicMonths.map(targetMonth => ({
     name: targetMonth.label,
     width: "90px",
@@ -1127,21 +1317,21 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       name: "Center",
       selector: row => row.center?.name,
       sortable: true,
-      width:"150px",
+      width: "150px",
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
     {
       name: "Amount Paid",
       selector: row => row.amount,
       sortable: true,
-      width:"150px",
+      width: "150px",
       cell: row => <span className="text-sm font-black text-slate-800">₹{row.amount?.toLocaleString("en-IN")}</span>
     },
     {
       name: "Mode",
       selector: row => row.paymentMode,
       sortable: true,
-      width:"90px",
+      width: "90px",
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.paymentMode || "-"}</span>
     },
     {
@@ -1236,85 +1426,172 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       width: "130px",
       cell: row => <span className="text-gray-600 text-xs font-medium uppercase tracking-wider">{row.center?.name || "-"}</span>
     },
-    {
-      name: feeType === 'Both' ? "Total Fees" : "Fee Details", width: "180px",
-      selector: row => row.amount,
-      sortable: true,
-      cell: row => {
-        const totalDue = row.amount +
-          (row.isPenaltyApplied ? row.penaltyAmount : 0) +
-          (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
-        
-        const approvedPaid = row.payments?.filter(p => p.status === 'Approved').reduce((acc, p) => acc + p.amount, 0) || 0;
-        const currentBalance = row.isSummary ? row.totalRemainingBalance : Math.max(0, totalDue - approvedPaid);
-
-        return (
-          <div className="flex flex-col gap-1 py-1.5">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-black text-slate-800">Total: ₹{totalDue?.toLocaleString("en-IN")}</span>
-            </div>
-
-            <div className="text-[9px] text-slate-500">
-              Balance: ₹{currentBalance?.toLocaleString("en-IN")}
-              {((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)) > 0 &&
-                ` + Penalty: ₹${((row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)).toLocaleString("en-IN")}`
-              }
-            </div>
-          </div>
-        );
+    ...(feeType === 'Both' ? [
+      {
+        name: "Total Course", width: "120px",
+        selector: row => row.unifiedCourseTotal,
+        cell: row => <span className="text-xs font-black text-slate-800">₹{(row.unifiedCourseTotal || 0).toLocaleString("en-IN")}</span>
+      },
+      {
+        name: "Total Council", width: "120px",
+        selector: row => row.unifiedCouncilTotal,
+        cell: row => <span className="text-xs font-black text-slate-800">₹{(row.unifiedCouncilTotal || 0).toLocaleString("en-IN")}</span>
+      },
+      {
+        name: "Total Unified", width: "120px",
+        selector: row => row.unifiedTotalDue,
+        cell: row => <span className="text-xs font-black text-slate-800">₹{(row.unifiedTotalDue || 0).toLocaleString("en-IN")}</span>
       }
-    },
+    ] : [
+      {
+        name: "Fee Details", width: "160px",
+        selector: row => row.amount,
+        sortable: true,
+        cell: row => {
+          const currentYearTotal = row.amount +
+            (row.isPenaltyApplied ? row.penaltyAmount : 0) +
+            (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
+          
+          const unifiedTotal = row.isSummary ? row.amount : (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : currentYearTotal);
+
+          if (row.isSummary) {
+            return (
+              <div className="flex flex-col gap-1 py-2 justify-center h-full">
+                <span className="text-xs font-black text-slate-700">₹{unifiedTotal.toLocaleString("en-IN")}</span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Unified</span>
+                  <span className="text-[11px] font-black text-slate-700">₹{unifiedTotal.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Current</span>
+                  <span className="text-[11px] font-black text-slate-700">₹{currentYearTotal.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+      }
+    ]),
     ...(feeType !== 'Exam' ? monthColumns : []),
     ...(feeType === 'Both' ? [
       {
-        name: "Course Fees", width: "140px",
-        selector: row => row.courseAmount,
+        name: "Course Bal", width: "120px",
+        selector: row => row.unifiedCourseBalance,
         cell: row => {
-          const totalCourseDue = row.courseAmount + row.coursePenaltyAmount;
-          const coursePaid = row.isSummary ? row.totalCoursePaid : (row.coursePayments ? row.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0);
-          const courseBal = Math.max(0, totalCourseDue - coursePaid);
+          const courseBal = row.unifiedCourseBalance || 0;
           return (
-            <div className="flex flex-col gap-1 py-1.5">
-              <span className="text-xs font-black text-slate-800">Total: ₹{totalCourseDue?.toLocaleString("en-IN")}</span>
-              <span className={`text-[10px] font-bold ${courseBal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                Bal: ₹{courseBal.toLocaleString('en-IN')}
-              </span>
-            </div>
+            <button
+              onClick={() => {
+                if (!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0) {
+                  setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'course' });
+                }
+              }}
+              className={`text-left text-xs font-black ${courseBal > 0 ? "text-amber-600" : "text-emerald-600"} ${!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""}`}
+            >
+              ₹{courseBal?.toLocaleString("en-IN")}
+            </button>
           );
         }
       },
       {
-        name: "Council Fees", width: "140px",
-        selector: row => row.councilAmount,
+        name: "Council Bal", width: "120px",
+        selector: row => row.unifiedCouncilBalance,
         cell: row => {
-          const totalCouncilDue = row.councilAmount + row.councilPenaltyAmount;
-          const councilPaid = row.isSummary ? row.totalCouncilPaid : (row.councilPayments ? row.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0);
-          const councilBal = Math.max(0, totalCouncilDue - councilPaid);
+          const councilBal = row.unifiedCouncilBalance || 0;
           return (
-            <div className="flex flex-col gap-1 py-1.5">
-              <span className="text-xs font-black text-slate-800">Total: ₹{totalCouncilDue?.toLocaleString("en-IN")}</span>
-              <span className={`text-[10px] font-bold ${councilBal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                Bal: ₹{councilBal.toLocaleString('en-IN')}
-              </span>
+            <button
+              onClick={() => {
+                if (!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0) {
+                  setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'council' });
+                }
+              }}
+              className={`text-left text-xs font-black ${councilBal > 0 ? "text-amber-600" : "text-emerald-600"} ${!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""}`}
+            >
+              ₹{councilBal?.toLocaleString("en-IN")}
+            </button>
+          );
+        }
+      },
+      {
+        name: "Unified Bal", width: "120px",
+        selector: row => row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : getRemainingBalance(row)),
+        sortable: true,
+        cell: row => {
+          const totalDue = row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
+          const bal = row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : Math.max(0, totalDue - (row.payments?.filter(p => p.status === 'Approved').reduce((acc, p) => acc + p.amount, 0) || 0)));
+          return (
+            <button
+              onClick={() => {
+                if (!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0) {
+                  setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'all' });
+                }
+              }}
+              className={`text-left text-sm font-black ${bal > 0 ? "text-amber-600" : "text-emerald-600"} ${!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""}`}
+            >
+              ₹{bal.toLocaleString("en-IN")}
+            </button>
+          );
+        }
+      }
+    ] : [
+      {
+        name: "Balance",
+        width: "160px",
+        selector: row => row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : getRemainingBalance(row)),
+        sortable: true,
+        cell: row => {
+          const currentYearTotal = row.amount +
+            (row.isPenaltyApplied ? row.penaltyAmount : 0) +
+            (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
+          
+          const currentYearBalance = Math.max(0, currentYearTotal - (row.payments?.filter(p => p.status === 'Approved').reduce((acc, p) => acc + p.amount, 0) || 0));
+          const unifiedBal = row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : currentYearBalance);
+
+          if (row.isSummary) {
+            return (
+              <div className="flex flex-col gap-1 py-2 justify-center h-full">
+                <span className={`text-xs font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                  ₹{unifiedBal.toLocaleString("en-IN")}
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Unified</span>
+                  <button 
+                    onClick={() => {
+                      if (row.feeBreakdown && row.feeBreakdown.length > 0) {
+                        setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'all' });
+                      }
+                    }}
+                    className={`text-[11px] font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"} hover:underline`}
+                  >
+                    ₹{unifiedBal.toLocaleString("en-IN")}
+                  </button>
+                </div>
+                <div className="flex justify-between items-center gap-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Current</span>
+                  <span className={`text-[11px] font-black ${currentYearBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                    ₹{currentYearBalance.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
             </div>
           );
         }
       }
-    ] : []),
-    {
-      name: "Balance",
-      width: "120px",
-      selector: row => row.isSummary ? row.totalRemainingBalance : getRemainingBalance(row),
-      sortable: true,
-      cell: row => {
-        const bal = row.isSummary ? row.totalRemainingBalance : getRemainingBalance(row);
-        return (
-          <span className={`font-black ${bal > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-            ₹{bal.toLocaleString('en-IN')}
-          </span>
-        );
-      }
-    },
+    ]),
     {
       name: "Status", width: "150px",
       selector: row => row.status,
@@ -1388,6 +1665,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     return (
       <BulkUploadFeeView
         parsedData={bulkUploadData}
+        isTemplate={isTemplateUpload}
         onBack={() => setShowBulkUploadView(false)}
         onSuccess={() => {
           setShowBulkUploadView(false);
@@ -1409,12 +1687,26 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     );
   }
 
+  if (showCollectModal && selectedFee) {
+    return (
+      <CollectPaymentModal
+        fee={selectedFee}
+        schemeLabel={getSchemeBadgeLabel(selectedFee)}
+        onClose={() => {
+          setShowCollectModal(false);
+          setSelectedFee(null);
+        }}
+        onSave={handleCollectPayment}
+      />
+    );
+  }
+
   return (
     <div className={`bg-white rounded-3xl shadow-sm border border-slate-100 ${examFilter ? 'p-0 border-0 shadow-none' : 'p-4 sm:p-6'} overflow-hidden`}>
       {!examFilter && (
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
-          <h2 className="text-xl font-bold text-slate-800 shrink-0">{feeType === 'All' ? 'All' : feeType} Fees</h2>
-          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
+            <h2 className="text-xl font-bold text-slate-800 shrink-0">{feeType === 'All' ? 'All' : feeType} Fees</h2>
             <div className="relative w-full sm:w-64 group shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={16} />
               <input
@@ -1425,6 +1717,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-sm font-semibold text-slate-700"
               />
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end">
 
             <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 shrink-0">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1">From</span>
@@ -1452,56 +1746,9 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
             >
               <Download size={16} /> Export
             </button>
-            {!paidOnly && (
-              <div className="flex gap-2">
-                <div className="relative">
-                  <button
-                    onClick={() => setShowBulkDropdown(!showBulkDropdown)}
-                    className="bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
-                  >
-                    <Upload size={16} /> Bulk Upload
-                  </button>
-                  {showBulkDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in slide-in-from-top-2">
-                    <button
-                      onClick={() => {
-                        setShowBulkDropdown(false);
-                        handleDownloadSample();
-                      }}
-                      className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-100 flex items-center gap-2 cursor-pointer"
-                    >
-                      <Download size={16} /> Sample Download
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowBulkDropdown(false);
-                        fileInputRef.current?.click();
-                      }}
-                      className="w-full text-left px-4 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50 flex items-center gap-2 cursor-pointer"
-                    >
-                      <Upload size={16} /> Upload File
-                    </button>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleBulkFileChange}
-                  accept=".xlsx, .xls"
-                  className="hidden"
-                />
-              </div>
-              <button
-                onClick={() => setShowModal(true)}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-red-200"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Add Fee
-              </button>
-            </div>
-          )}
+
+          </div>
         </div>
-      </div>
       )}
       <CustomDataTable
         columns={columns}
@@ -1557,92 +1804,151 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
               </div>
             )}
 
-            <div className={`flex items-center gap-2 flex-wrap ${examFilter ? '' : 'sm:flex-nowrap overflow-x-auto'} w-full`}>
+            <div className={`flex items-center gap-2 flex-wrap sm:flex-wrap w-full`}>
               <select
-              value={selectedCenter}
-              onChange={(e) => setSelectedCenter(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
-            >
-              <option value="all">All Centers</option>
-              {Array.from(new Map(centers.map(c => [c.name, { label: c.name, value: c._id }])).values()).map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
-            >
-              <option value="all">All Courses</option>
-              {Array.from(new Map(courses.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values()).map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-
-            {!batchObj && (
-              <select
-                value={selectedBatch}
-                onChange={(e) => setSelectedBatch(e.target.value)}
+                value={selectedCenter}
+                onChange={(e) => setSelectedCenter(e.target.value)}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
               >
-                <option value="all">All Batches</option>
-                {Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values()).map(b => (
-                  <option key={b.value} value={b.value}>{b.label}</option>
+                <option value="all">All Centers</option>
+                {Array.from(new Map(centers.map(c => [c.name, { label: c.name, value: c._id }])).values()).map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
-            )}
 
-            <select
-              value={selectedFeeYear}
-              onChange={(e) => setSelectedFeeYear(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
-            >
-              <option value="all">All Years</option>
-              <option value="1">Year 1</option>
-              <option value="2">Year 2</option>
-              <option value="3">Year 3</option>
-              <option value="4">Year 4</option>
-            </select>
-
-            {!paidOnly && (
               <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
+              >
+                <option value="all">All Courses</option>
+                {Array.from(new Map(courses.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values()).map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+
+              {!batchObj && (
+                <select
+                  value={selectedBatch}
+                  onChange={(e) => setSelectedBatch(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+                >
+                  <option value="all">All Batches</option>
+                  {Array.from(new Map(batches.map(b => [b.name || b.batchId, { label: b.name || b.batchId, value: b.name || b.batchId }])).values()).map(b => (
+                    <option key={b.value} value={b.value}>{b.label}</option>
+                  ))}
+                </select>
+              )}
+
+              <select
+                value={selectedFeeYear}
+                onChange={(e) => setSelectedFeeYear(e.target.value)}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
               >
-                <option value="all">All Statuses</option>
-                {!excludePaid && <option value="paid">Paid</option>}
-                <option value="pending_approval">Pending Approval</option>
-                <option value="unpaid">Unpaid</option>
+                <option value="all">All Years</option>
+                <option value="1">Year 1</option>
+                <option value="2">Year 2</option>
+                <option value="3">Year 3</option>
+                <option value="4">Year 4</option>
               </select>
-            )}
 
-            {(selectedCenter !== "all" || selectedCourse !== "all" || selectedBatch !== "all" || selectedFeeYear !== "all" || selectedStatus !== "all" || fromDate !== "" || toDate !== "") && (
-              <button
-                onClick={() => {
-                  setSelectedCenter("all");
-                  setSelectedCourse("all");
-                  setSelectedBatch("all");
-                  setSelectedFeeYear("all");
-                  setSelectedStatus("all");
-                  setFromDate("");
-                  setToDate("");
-                }}
-                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in h-[40px]"
-              >
-                Reset Filters
-              </button>
-            )}
+              {!paidOnly && (
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[120px] truncate"
+                >
+                  <option value="all">All Statuses</option>
+                  {!excludePaid && <option value="paid">Paid</option>}
+                  <option value="pending_approval">Pending Approval</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              )}
 
-            {examFilter && (
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer shrink-0 ml-auto h-[40px]"
-              >
-                <Download size={16} /> Export
-              </button>
-            )}
+              {(selectedCenter !== "all" || selectedCourse !== "all" || selectedBatch !== "all" || selectedFeeYear !== "all" || selectedStatus !== "all" || fromDate !== "" || toDate !== "") && (
+                <button
+                  onClick={() => {
+                    setSelectedCenter("all");
+                    setSelectedCourse("all");
+                    setSelectedBatch("all");
+                    setSelectedFeeYear("all");
+                    setSelectedStatus("all");
+                    setFromDate("");
+                    setToDate("");
+                  }}
+                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in h-[40px]"
+                >
+                  Reset Filters
+                </button>
+              )}
+
+              {examFilter && (
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors cursor-pointer shrink-0 ml-auto h-[40px]"
+                >
+                  <Download size={16} /> Export
+                </button>
+              )}
+
+              {!paidOnly && feeType !== 'Both' && (
+                <div className="flex gap-2 ml-auto">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowBulkDropdown(!showBulkDropdown)}
+                      className="bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm h-[40px]"
+                    >
+                      <Upload size={16} /> Bulk Upload
+                    </button>
+                    {showBulkDropdown && (
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-[9999] overflow-hidden animate-in slide-in-from-top-2">
+                        <button
+                          onClick={() => {
+                            setShowBulkDropdown(false);
+                            handleDownloadSample();
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Download size={16} /> Template Download
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowBulkDropdown(false);
+                            fileInputRef.current?.click();
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-brand-600 hover:bg-brand-50 border-b border-slate-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Upload size={16} /> Bulk Upload
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowBulkDropdown(false);
+                            setShowHistoryModal(true);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                          History
+                        </button>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleBulkFileChange}
+                      accept=".xlsx, .xls"
+                      className="hidden"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-red-200 h-[40px]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Add Fee
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         }
@@ -1656,17 +1962,6 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           courses={courses}
           batches={batches}
           initialFeeType={feeType}
-        />
-      )}
-      {showCollectModal && selectedFee && (
-        <CollectPaymentModal
-          fee={selectedFee}
-          schemeLabel={getSchemeBadgeLabel(selectedFee)}
-          onClose={() => {
-            setShowCollectModal(false);
-            setSelectedFee(null);
-          }}
-          onSave={handleCollectPayment}
         />
       )}
 
@@ -1761,10 +2056,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
                 <p className="text-sm font-medium text-slate-500 mt-1">{selectedMonthPayments.studentName}</p>
               </div>
               <button onClick={() => setSelectedMonthPayments(null)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
             </div>
-            
+
             <div className="p-6 max-h-[60vh] overflow-y-auto">
               {selectedMonthPayments.payments.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -1829,13 +2124,62 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
                 <div className="text-center py-8 text-slate-500 font-medium">No payment records found.</div>
               )}
             </div>
-            
+
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button onClick={() => setSelectedMonthPayments(null)} className="px-6 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold transition-colors">Close</button>
             </div>
           </div>
         </div>,
         document.body
+      )}
+      {breakdownModal.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setBreakdownModal({ isOpen: false, studentName: "", breakdown: [] })}></div>
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">
+                  {breakdownModal.type === 'course' ? 'Course Fee Breakdown' : breakdownModal.type === 'council' ? 'Council Fee Breakdown' : 'Fee Breakdown'}
+                </h2>
+                <p className="text-sm font-medium text-slate-500 mt-1">{breakdownModal.studentName}</p>
+              </div>
+              <button onClick={() => setBreakdownModal({ isOpen: false, studentName: "", breakdown: [] })} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                {breakdownModal.breakdown.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="font-bold text-slate-800">{item.yearLabel}</div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-slate-500">
+                        Total: ₹{(breakdownModal.type === 'course' ? item.courseTotal : breakdownModal.type === 'council' ? item.councilTotal : item.totalDue).toLocaleString('en-IN')}
+                      </div>
+                      <div className={`text-sm font-black ${(breakdownModal.type === 'course' ? item.courseBalance : breakdownModal.type === 'council' ? item.councilBalance : item.balance) > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                        Balance: ₹{(breakdownModal.type === 'course' ? item.courseBalance : breakdownModal.type === 'council' ? item.councilBalance : item.balance).toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button onClick={() => setBreakdownModal({ isOpen: false, studentName: "", breakdown: [] })} className="px-6 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold transition-colors shadow-sm">Close</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showHistoryModal && (
+        <BulkUploadHistoryModal
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          module="Fees"
+        />
       )}
     </div>
   );

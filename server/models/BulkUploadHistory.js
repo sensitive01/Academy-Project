@@ -4,7 +4,7 @@ const bulkUploadHistorySchema = new mongoose.Schema({
   module: {
     type: String,
     required: true,
-    enum: ['Students', 'Attendance', 'Payroll', 'Marks']
+    enum: ['Students', 'Attendance', 'Payroll', 'Marks', 'Fees']
   },
   fileUrl: {
     type: String,

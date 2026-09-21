@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Upload, ArrowLeft, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import * as XLSX from 'xlsx';
 
-const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [] }) => {
+const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = false }) => {
   const [step, setStep] = useState('preview');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -60,16 +61,23 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [] }) => {
 
   const currentDisplayData = activeTab === 'all' ? processedData.all : processedData.displayInvalid;
 
-  const fieldMapping = [
-    { key: 'studentId', label: 'Student ID' },
-    { key: 'year', label: 'Year' },
-    { key: 'feeType', label: 'Fee Type' },
-    { key: 'totalAmount', label: 'Total Amt' },
-    { key: 'paidAmount', label: 'Paid Amt' },
-    { key: 'paymentMode', label: 'Payment Mode' },
-    { key: 'bankReference', label: 'Bank Ref' },
-    { key: 'paidDate', label: 'Paid Date' }
-  ];
+  const fieldMapping = isTemplate 
+    ? [
+        { key: 'studentId', label: 'Student ID' },
+        { key: 'feeType', label: 'Fee Type' },
+        { key: 'paidAmount', label: 'Paid Amt' },
+        { key: 'paidDate', label: 'Month' }
+      ]
+    : [
+        { key: 'studentId', label: 'Student ID' },
+        { key: 'year', label: 'Year' },
+        { key: 'feeType', label: 'Fee Type' },
+        { key: 'totalAmount', label: 'Total Amt' },
+        { key: 'paidAmount', label: 'Paid Amt' },
+        { key: 'paymentMode', label: 'Payment Mode' },
+        { key: 'bankReference', label: 'Bank Ref' },
+        { key: 'paidDate', label: 'Paid Date' }
+      ];
 
   const handleEditCell = (rowIndex, key, value) => {
     const newData = [...previewData];
@@ -106,6 +114,43 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [] }) => {
       setResult(response.data);
       setStep('result');
       
+      try {
+        // Generate Result Excel File
+        const resultData = dataToUpload.map((row, index) => {
+          // Assuming row numbers in failedRows correspond to index + 2 (1-based + header)
+          const failedRow = response.data.failedRows?.find(r => r.row === index + 2);
+          return {
+            ...row,
+            Status: failedRow ? 'Failed' : 'Success',
+            Reason: failedRow ? failedRow.reason : ''
+          };
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(resultData);
+        XLSX.utils.book_append_sheet(wb, ws, "Upload Result");
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const newFile = new File([excelBuffer], "Fee_Upload_Result.xlsx", { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+        const formData = new FormData();
+        formData.append('file', newFile);
+        formData.append('module', 'Fees');
+        formData.append('totalRecords', dataToUpload.length);
+        formData.append('successfulRecords', response.data.successCount);
+        formData.append('failedRecords', response.data.failedCount);
+        
+        let status = 'Success';
+        if (response.data.successCount === 0) status = 'Failed';
+        else if (response.data.failedCount > 0) status = 'Partial';
+        
+        formData.append('status', status);
+        formData.append('summary', `Uploaded ${response.data.successCount} of ${dataToUpload.length} fee records.`);
+
+        await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } catch (historyErr) {
+        console.error("Failed to log bulk upload history", historyErr);
+      }
+
       if (response.data.successCount > 0) {
         toast.success(`Successfully processed ${response.data.successCount} payments!`);
       } else {

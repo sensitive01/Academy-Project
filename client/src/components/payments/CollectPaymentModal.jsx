@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle, CreditCard, Banknote, UploadCloud, Check, Trash2 } from 'lucide-react';
+import { X, CheckCircle, CreditCard, Banknote, UploadCloud, Check, Trash2, ArrowLeft } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '../../services/api';
 
@@ -9,27 +9,54 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
   const [bankReference, setBankReference] = useState('');
   const [proofOfPayment, setProofOfPayment] = useState(null);
   
-  const totalAmount = (fee.amount || 0) + (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0);
+  const hasBreakdown = fee.feeBreakdown && fee.feeBreakdown.length > 0;
+  
+  const [selectedYearIdx, setSelectedYearIdx] = useState(() => {
+    if (!hasBreakdown) return -1;
+    
+    // Determine the year label of the current fee row
+    let currentRowYearLabel = fee.year || fee.otherFeeType || fee.student?.year || "Unknown";
+    const match = String(currentRowYearLabel).match(/\d+/);
+    if (match) {
+      const n = match[0];
+      if (n === "1") currentRowYearLabel = "1st Year";
+      else if (n === "2") currentRowYearLabel = "2nd Year";
+      else if (n === "3") currentRowYearLabel = "3rd Year";
+      else currentRowYearLabel = `${n}th Year`;
+    }
 
-  const totalApprovedPaid = fee.payments
-    ? fee.payments
-        .filter(p => p.status === 'Approved')
-        .reduce((sum, p) => sum + p.amount, 0)
-    : (fee.status === 'paid' ? fee.amount : 0);
+    // Try to find the exact year match first
+    const exactMatchIdx = fee.feeBreakdown.findIndex(b => b.yearLabel === currentRowYearLabel);
+    if (exactMatchIdx !== -1) return exactMatchIdx;
 
-  const remainingBalance = Math.max(0, totalAmount - totalApprovedPaid);
+    // Fallback: first year with a balance
+    const idx = fee.feeBreakdown.findIndex(b => b.balance > 0);
+    return idx !== -1 ? idx : 0;
+  });
+
+  const currentFeeData = hasBreakdown && selectedYearIdx >= 0 ? fee.feeBreakdown[selectedYearIdx] : fee;
+  
+  const totalAmount = currentFeeData.totalDue !== undefined ? currentFeeData.totalDue : ((fee.amount || 0) + (fee.isPenaltyApplied ? fee.penaltyAmount : 0) + (fee.isFinalPenaltyApplied ? fee.finalPenaltyAmount : 0));
+
+  const totalApprovedPaid = currentFeeData.balance !== undefined ? (currentFeeData.totalDue - currentFeeData.balance) : (fee.payments ? fee.payments.filter(p => p.status === 'Approved').reduce((sum, p) => sum + p.amount, 0) : (fee.status === 'paid' ? fee.amount : 0));
+
+  const remainingBalance = currentFeeData.balance !== undefined ? currentFeeData.balance : Math.max(0, totalAmount - totalApprovedPaid);
 
   const isBoth = fee.feeType === 'Both';
   
-  const courseTotal = (fee.courseAmount || 0) + (fee.coursePenaltyAmount || 0);
-  const coursePaid = fee.coursePayments ? fee.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
-  const courseBalance = Math.max(0, courseTotal - coursePaid);
+  const courseTotal = currentFeeData.courseTotal !== undefined ? currentFeeData.courseTotal : ((fee.courseAmount || 0) + (fee.coursePenaltyAmount || 0));
+  const courseBalance = currentFeeData.courseBalance !== undefined ? currentFeeData.courseBalance : Math.max(0, courseTotal - (fee.coursePayments ? fee.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0));
 
-  const councilTotal = (fee.councilAmount || 0) + (fee.councilPenaltyAmount || 0);
-  const councilPaid = fee.councilPayments ? fee.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
-  const councilBalance = Math.max(0, councilTotal - councilPaid);
+  const councilTotal = currentFeeData.councilTotal !== undefined ? currentFeeData.councilTotal : ((fee.councilAmount || 0) + (fee.councilPenaltyAmount || 0));
+  const councilBalance = currentFeeData.councilBalance !== undefined ? currentFeeData.councilBalance : Math.max(0, councilTotal - (fee.councilPayments ? fee.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0));
 
   const [targetFeeType, setTargetFeeType] = useState(isBoth ? (courseBalance > 0 ? 'Course' : 'Council') : fee.feeType);
+
+  useEffect(() => {
+    if (isBoth) {
+      setTargetFeeType(courseBalance > 0 ? 'Course' : 'Council');
+    }
+  }, [selectedYearIdx, courseBalance, isBoth]);
 
   const displayTotalAmount = isBoth ? (targetFeeType === 'Course' ? courseTotal : councilTotal) : totalAmount;
   const displayRemainingBalance = isBoth ? (targetFeeType === 'Course' ? courseBalance : councilBalance) : remainingBalance;
@@ -59,7 +86,14 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
       data.proofOfPayment = proofOfPayment;
     }
     const actualStudentId = fee.studentId || fee.student?._id || fee.student;
-    onSave(actualStudentId, data, isBoth ? targetFeeType : undefined, fee.year);
+    
+    // Determine which year to pass to backend collect-cascade
+    let yearToPass = fee.year;
+    if (hasBreakdown && selectedYearIdx >= 0) {
+      yearToPass = fee.feeBreakdown[selectedYearIdx].yearLabel;
+    }
+    
+    onSave(actualStudentId, data, isBoth ? targetFeeType : undefined, yearToPass);
   };
 
   const [globalBank, setGlobalBank] = useState(null);
@@ -83,21 +117,25 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
   // Generate UPI URI
   const upiUri = hasUpiId ? `upi://pay?pa=${globalBank.upiId}&pn=${encodeURIComponent(globalBank.accountName || fee.center?.name || "Center")}&am=${collectAmount}&cu=INR` : "";
 
+  const container = document.getElementById('main-scroll-container') || document.body;
+
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200 p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-              <CreditCard size={24} />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900">Collect Payment</h2>
+    <div className="absolute inset-0 z-[100] bg-slate-50 flex flex-col min-h-full animate-in fade-in duration-200">
+      {/* Page Header */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-4 sticky top-0 z-10 shadow-sm">
+        <button type="button" onClick={onClose} className="p-2 -ml-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors">
+          <ArrowLeft size={22} />
+        </button>
+        <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+            <CreditCard size={20} />
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors">
-            <X size={20} />
-          </button>
+          <h2 className="text-xl font-bold text-slate-800">Collect Payment</h2>
         </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl max-w-3xl w-full mx-auto shadow-sm border border-slate-100 p-6 sm:p-10 space-y-8">
 
         {/* Total Due Card */}
         {isBoth && (
@@ -121,6 +159,32 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
             </div>
           </div>
         )}
+        
+        {/* Outstanding Balances Summary */}
+        {hasBreakdown && fee.feeBreakdown.some(b => (isBoth ? (targetFeeType === 'Course' ? b.courseBalance : b.councilBalance) : b.balance) > 0) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5">
+            <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-3">Outstanding Balances Summary</h3>
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                {fee.feeBreakdown.filter(b => (isBoth ? (targetFeeType === 'Course' ? b.courseBalance : b.councilBalance) : b.balance) > 0).map((b, idx) => {
+                  const bal = isBoth ? (targetFeeType === 'Course' ? b.courseBalance : b.councilBalance) : b.balance;
+                  return (
+                    <div key={idx} className="flex flex-col">
+                      <span className="text-xs text-amber-700 font-medium mb-0.5">{b.yearLabel} {isBoth ? targetFeeType : ''} Fees Balance</span>
+                      <span className="text-lg font-black text-amber-900">₹{bal.toLocaleString('en-IN')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col p-3 px-4 bg-amber-100/70 rounded-xl border border-amber-200/60 min-w-[160px]">
+                <span className="text-xs text-amber-800 font-bold mb-0.5">Total {isBoth ? targetFeeType : ''} Fees Balance</span>
+                <span className="text-xl font-black text-amber-900">
+                  ₹{fee.feeBreakdown.reduce((sum, b) => sum + (isBoth ? (targetFeeType === 'Course' ? b.courseBalance : b.councilBalance) : b.balance), 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 rounded-2xl text-white shadow-md flex justify-between items-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 mix-blend-overlay flex items-center justify-center pointer-events-none">
             <svg className="w-full h-full text-white" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -141,6 +205,25 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
             )}
           </div>
         </div>
+
+
+
+        {hasBreakdown && fee.feeBreakdown.length > 1 && (
+          <div className="space-y-2 mb-2">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Select Academic Year</label>
+            <select
+              value={selectedYearIdx}
+              onChange={(e) => setSelectedYearIdx(Number(e.target.value))}
+              className="w-full rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 font-bold text-slate-800 bg-white shadow-sm"
+            >
+              {fee.feeBreakdown.map((b, idx) => (
+                <option key={idx} value={idx}>
+                  {b.yearLabel}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Collection Amount Input */}
         <div className="space-y-2">
@@ -264,8 +347,9 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
           </button>
         </div>
       </form>
+      </div>
     </div>,
-    document.body
+    container
   );
 };
 
