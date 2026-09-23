@@ -34,6 +34,25 @@ const ExamManagement = () => {
 
   const [activeTab, setActiveTab] = useState("exams");
 
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#tab_')) {
+        setActiveTab(hash.replace('#tab_', ''));
+      } else {
+        setActiveTab("exams");
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    handlePopState(); // initial sync
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    window.history.pushState(null, '', `#tab_${tab}`);
+  };
+
   const [exams, setExams] = useState([]);
   const [courses, setCourses] = useState([]);
   const [centers, setCenters] = useState([]);
@@ -1897,14 +1916,14 @@ const ExamManagement = () => {
           <button
             className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "exams" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
               }`}
-            onClick={() => setActiveTab("exams")}
+            onClick={() => handleTabChange("exams")}
           >
             <FileText size={18} /> Exams
           </button>
           <button
             className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "marks" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
               }`}
-            onClick={() => setActiveTab("marks")}
+            onClick={() => handleTabChange("marks")}
           >
             <CheckSquare size={18} /> Results
           </button>
@@ -1914,21 +1933,21 @@ const ExamManagement = () => {
               <button
                 className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "hall_tickets" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
                   }`}
-                onClick={() => setActiveTab("hall_tickets")}
+                onClick={() => handleTabChange("hall_tickets")}
               >
                 <FileText size={18} /> Hall Tickets
               </button>
               <button
                 className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "payments_list" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
                   }`}
-                onClick={() => setActiveTab("payments_list")}
+                onClick={() => handleTabChange("payments_list")}
               >
                 <DollarSign size={18} /> Payments
               </button>
               <button
                 className={`pb-4 px-2 font-bold text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === "upload_progress" ? "border-brand-600 text-brand-600" : "border-transparent text-slate-500 hover:text-brand-600 hover:border-brand-600"
                   }`}
-                onClick={() => setActiveTab("upload_progress")}
+                onClick={() => handleTabChange("upload_progress")}
               >
                 <Layers size={18} /> Upload Progress
               </button>

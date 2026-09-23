@@ -155,7 +155,8 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
 
   const fetchStudents = async () => {
     try {
-      const { data } = await api.get("/dashboard-stats/recent-students");
+      const [year, month] = selectedMonth.split("-");
+      const { data } = await api.get(`/dashboard-stats/recent-students?month=${month}&year=${year}`);
       setStudents(data);
     } catch (err) {
       console.error("Failed to fetch students", err);
@@ -164,7 +165,8 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
 
   const fetchEnrollments = async () => {
     try {
-      const { data } = await api.get("/dashboard-stats/recent-enrollments");
+      const [year, month] = selectedMonth.split("-");
+      const { data } = await api.get(`/dashboard-stats/recent-enrollments?month=${month}&year=${year}`);
       setEnrollments(data);
     } catch (err) {
       console.error("Failed to fetch enrollments", err);
@@ -311,7 +313,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
               Enrolled
             </span>
-            <button className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-lg shadow-brand-600/20">
+            <button 
+              onClick={() => window.location.href = '/dashboard/enroll'}
+              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-lg shadow-brand-600/20">
               View Courses
             </button>
           </div>
@@ -403,7 +407,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
                 <h3 className="font-bold text-lg text-slate-900">
                   Recent Course Activity
                 </h3>
-                <button className="text-brand-600 text-sm font-bold hover:text-brand-700">
+                <button 
+                  onClick={() => window.location.href = '/dashboard/lms'}
+                  className="text-brand-600 text-sm font-bold hover:text-brand-700">
                   View All Activity
                 </button>
               </div>
@@ -427,7 +433,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
                   <p className="text-brand-200 text-sm mb-6">
                     Check your performance across all courses.
                   </p>
-                  <button className="bg-white text-brand-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-50 transition-colors">
+                  <button 
+                    onClick={() => window.location.href = '/dashboard/exams'}
+                    className="bg-white text-brand-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-50 transition-colors">
                     My Grades
                   </button>
                 </div>
@@ -445,7 +453,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
                   <p className="text-slate-500 text-sm mb-6">
                     Discover new courses and learning paths.
                   </p>
-                  <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors">
+                  <button 
+                    onClick={() => window.location.href = '/dashboard/enroll'}
+                    className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors">
                     Browse Courses
                   </button>
                 </div>
@@ -622,7 +632,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-lg shadow-brand-600/20">
+            <button 
+              onClick={() => window.location.href = '/dashboard/parent/child-attendance'}
+              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-lg shadow-brand-600/20">
               View Children Progress
             </button>
           </div>
@@ -670,7 +682,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
               System Online
             </span>
-            <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20">
+            <button 
+              onClick={() => window.print()}
+              className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20">
               Generate Report
             </button>
           </div>
@@ -684,23 +698,23 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
             label: "Total Students",
             value: (stats.totalStudents || 0).toLocaleString(),
             icon: Users,
-            change: "+12.5%",
-            trend: "up",
+            change: "Enrolled students",
+            trend: "neutral",
             color: "blue",
           },
           {
             label: "Total Revenue",
             value: `₹${(stats.totalRevenue || 0).toLocaleString()}`,
             icon: DollarSign,
-            change: "+8.2%",
-            trend: "up",
+            change: "Total received",
+            trend: "neutral",
             color: "green",
           },
           {
             label: "Active Courses",
             value: stats.activeCourses || 0,
             icon: BookOpen,
-            change: "0%",
+            change: "Currently running",
             trend: "neutral",
             color: "purple",
           },
@@ -708,8 +722,8 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
             label: "Course Enrollments",
             value: (stats.totalEnrollments || 0).toLocaleString(),
             icon: CheckCircle,
-            change: "+15.3%",
-            trend: "up",
+            change: "Total course seats",
+            trend: "neutral",
             color: "orange",
           },
         ].map((stat, idx) => (
@@ -763,7 +777,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
               <h3 className="font-bold text-lg text-slate-900">
                 Recent Admissions via Portal
               </h3>
-              <button className="text-brand-600 text-sm font-bold hover:text-brand-700">
+              <button 
+                onClick={() => window.location.href = '/dashboard/admissions'}
+                className="text-brand-600 text-sm font-bold hover:text-brand-700">
                 View All
               </button>
             </div>
@@ -782,7 +798,7 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
               <h3 className="font-bold text-lg text-slate-900">
                 Course Enrollments <span className="text-xs font-normal text-slate-400 ml-2">(via Payments)</span>
               </h3>
-              <button onClick={() => window.location.href='/admin/courses'} className="text-brand-600 text-sm font-bold hover:text-brand-700">
+              <button onClick={() => window.location.href='/dashboard/admin/courses'} className="text-brand-600 text-sm font-bold hover:text-brand-700">
                 Manage Courses
               </button>
             </div>
@@ -806,7 +822,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
                 <p className="text-brand-200 text-sm mb-6">
                   Add new staff, assign roles, and setup payroll.
                 </p>
-                <button className="bg-white text-brand-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-50 transition-colors">
+                <button 
+                  onClick={() => window.location.href = '/dashboard/hr'}
+                  className="bg-white text-brand-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-50 transition-colors">
                   Add Employee
                 </button>
               </div>
@@ -824,7 +842,9 @@ const [selectedMonth, setSelectedMonth] = React.useState(() => {
                 <p className="text-slate-400 text-sm mb-6">
                   Review attendance and process monthly salaries.
                 </p>
-                <button className="text-blue-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                <button 
+                  onClick={() => window.location.href = '/dashboard/finance'}
+                  className="text-blue-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
                   Go to Finance <ArrowUpRight size={16} />
                 </button>
               </div>

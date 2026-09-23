@@ -1198,6 +1198,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         "Student ID": f.student?.studentId || "-",
         "Year": formattedYear,
         "Fee Type": f.feeType === 'Other' && f.otherFeeType ? f.otherFeeType : f.feeType,
+        "Current Year Fees Balance": getRemainingBalance(f),
       };
 
       if (feeType !== 'Exam') {
@@ -1229,6 +1230,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       { wch: 25 }, // Student ID
       { wch: 15 }, // Year
       { wch: 20 }, // Fee Type
+      { wch: 25 }, // Current Year Fees Balance
     ];
 
     if (feeType !== 'Exam') {

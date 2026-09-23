@@ -5,6 +5,28 @@ import StudentFeesList from "../../components/payments/StudentFeesList";
 const BatchFeesDetail = ({ batch, onBack }) => {
   const [activeTab, setActiveTab] = useState("course_fees");
 
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#batch_')) {
+        const parts = hash.replace('#batch_', '').split('/');
+        if (parts.length > 1) {
+          setActiveTab(parts[1]);
+        } else {
+          setActiveTab("course_fees");
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    handlePopState(); // initial sync
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    window.history.pushState(null, '', `#batch_${batch._id}/${tab}`);
+  };
+
   const tabs = {
     course_fees: { label: "Course Fees", icon: <FileText size={18} /> },
     council_fees: { label: "Council Fees", icon: <FileText size={18} /> },
@@ -37,7 +59,7 @@ const BatchFeesDetail = ({ batch, onBack }) => {
         {Object.keys(tabs).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             className={`pb-4 px-2 text-sm font-bold transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
               activeTab === tab ? "text-brand-600" : "text-slate-400 hover:text-brand-600"
             }`}

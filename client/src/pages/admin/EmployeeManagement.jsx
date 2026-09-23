@@ -12,11 +12,12 @@ import LeaveRequestList from "../../components/leave/LeaveRequestList";
 import DepartmentTab from "../../components/employee-management/DepartmentTab";
 import DesignationTab from "../../components/employee-management/DesignationTab";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
+import EmployeeProfilePage from "./EmployeeProfilePage";
 import { CheckCircle, Clock } from "lucide-react";
 
 // Assuming EmployeeList is kept in the same file or a new one. I will just paste the EmployeeList code here so it works seamlessly.
 import ReactDOM from "react-dom";
-import { Mail, Phone, MoreVertical, Edit, Ban, Unlock, XCircle, Filter, RotateCcw, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Mail, Phone, MoreVertical, Edit, Ban, Unlock, XCircle, Filter, RotateCcw, Download, FileSpreadsheet, FileText, User } from "lucide-react";
 import CustomDataTable from "../../components/common/DataTable";
 import { useMemo } from "react";
 import * as XLSX from "xlsx";
@@ -24,7 +25,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
 
-const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete }) => {
+const EmployeeTable = ({ employees, loading, onEdit, onView, onToggleStatus, onDelete }) => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [search, setSearch] = useState("");
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -186,7 +187,12 @@ const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete })
             )}
           </div>
           <div>
-            <div className="font-bold text-slate-900 whitespace-nowrap leading-tight">{row.firstName} {row.lastName}</div>
+            <div 
+              className="font-bold text-brand-600 hover:text-brand-700 hover:underline whitespace-nowrap leading-tight cursor-pointer"
+              onClick={() => onView && onView(row)}
+            >
+              {row.firstName} {row.lastName}
+            </div>
             <div className="text-[11px] font-medium text-slate-500">{row.employeeId}</div>
           </div>
         </div>
@@ -251,10 +257,17 @@ const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete })
                   style={{ top: menuPosition.top, left: menuPosition.left }}
                 >
                   <button
+                    onClick={() => { onView(row); setOpenMenuId(null); }}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-slate-50"
+                  >
+                    <User size={16} className="text-brand-500" /> View / Edit Profile
+                  </button>
+
+                  <button
                     onClick={() => { onEdit(row); setOpenMenuId(null); }}
                     className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-slate-50"
                   >
-                    <Edit size={16} className="text-amber-500" /> Edit Details
+                    <Edit size={16} className="text-amber-500" /> Edit Basic Details
                   </button>
 
                   <button
@@ -427,11 +440,43 @@ const EmployeeTable = ({ employees, loading, onEdit, onToggleStatus, onDelete })
 
 const EmployeeManagement = () => {
   const [activeTab, setActiveTab] = useState("employee");
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    window.history.pushState(null, '', `#tab_${tabId}`);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#tab_')) {
+        setActiveTab(hash.replace('#tab_', ''));
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    // Initial sync
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#tab_')) {
+      setActiveTab(hash.replace('#tab_', ''));
+    }
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [viewingProfile, setViewingProfile] = useState(null);
+
+  const handleSetViewingProfile = (employee) => {
+    setViewingProfile(employee);
+    if (employee) {
+      window.history.pushState(null, '', `#view_${employee._id}`);
+    } else {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    }
+  };
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, data: null });
 
   const executeDelete = async () => {
@@ -453,6 +498,13 @@ const EmployeeManagement = () => {
       setLoading(true);
       const res = await api.get("/employees");
       setEmployees(res.data);
+      
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#view_')) {
+          const empId = hash.replace('#view_', '');
+          const emp = res.data.find(e => e._id === empId);
+          if (emp) setViewingProfile(emp);
+      }
     } catch {
       toast.error("Failed to load employees");
     } finally {
@@ -484,6 +536,22 @@ const EmployeeManagement = () => {
     fetchEmployees();
   }, []);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#view_')) {
+          const empId = hash.replace('#view_', '').split('/')[0];
+          const emp = employees.find(e => e._id === empId);
+          if (emp) setViewingProfile(emp);
+      } else {
+          setViewingProfile(null);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [employees]);
+
   const tabs = [
     { id: "employee", label: "Employee", icon: <Users size={18} /> },
     { id: "coach", label: "Coach", icon: <Briefcase size={18} /> },
@@ -510,6 +578,17 @@ const EmployeeManagement = () => {
         onClose={() => setIsAttendanceModalOpen(false)}
       />
 
+            {viewingProfile ? (
+        <EmployeeProfilePage
+          employee={viewingProfile}
+          onBack={() => handleSetViewingProfile(null)}
+          onUpdate={() => {
+            fetchEmployees();
+            // Removed handleSetViewingProfile(null) so it stays on the page
+          }}
+        />
+      ) : (
+        <>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
@@ -587,7 +666,7 @@ const EmployeeManagement = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             className={`pb-4 px-2 text-sm font-bold flex items-center gap-2 transition-colors relative whitespace-nowrap group ${
               activeTab === tab.id
                 ? "text-brand-600"
@@ -605,24 +684,27 @@ const EmployeeManagement = () => {
 
       {/* Tab Content */}
       <div className="mt-6">
-        {activeTab === "employee" && (
-          <EmployeeTable
-            employees={employees.filter(e => e.user?.role?.toLowerCase() !== "coach")}
-            loading={loading}
-            onEdit={handleEditInitiate}
-            onToggleStatus={handleToggleStatus}
-            onDelete={handleDeleteEmployee}
-          />
-        )}
-        {activeTab === "coach" && (
-          <EmployeeTable
-            employees={employees.filter(e => e.user?.role?.toLowerCase() === "coach")}
-            loading={loading}
-            onEdit={handleEditInitiate}
-            onToggleStatus={handleToggleStatus}
-            onDelete={handleDeleteEmployee}
-          />
-        )}
+
+            {activeTab === "employee" && (
+              <EmployeeTable
+                employees={employees.filter(e => e.user?.role?.toLowerCase() !== "coach")}
+                loading={loading}
+                onEdit={handleEditInitiate}
+                onView={(employee) => handleSetViewingProfile(employee)}
+                onToggleStatus={handleToggleStatus}
+                onDelete={handleDeleteEmployee}
+              />
+            )}
+            {activeTab === "coach" && (
+              <EmployeeTable
+                employees={employees.filter(e => e.user?.role?.toLowerCase() === "coach")}
+                loading={loading}
+                onEdit={handleEditInitiate}
+                onView={(employee) => handleSetViewingProfile(employee)}
+                onToggleStatus={handleToggleStatus}
+                onDelete={handleDeleteEmployee}
+              />
+            )}
         {activeTab === "attendance" && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 overflow-hidden">
              <Attendance employeeOnly={true} hideHeader={true} />
@@ -640,7 +722,11 @@ const EmployeeManagement = () => {
         )}
         {activeTab === "department" && <DepartmentTab />}
         {activeTab === "designation" && <DesignationTab />}
+
       </div>
+
+              </>
+      )}
 
       <ConfirmationModal
         isOpen={confirmModal.isOpen}

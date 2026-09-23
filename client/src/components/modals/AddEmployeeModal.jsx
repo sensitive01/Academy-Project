@@ -55,6 +55,21 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
     privilegedLeave: 0,
     sickLeave: 0,
     casualLeave: 0,
+
+    maritalStatus: "",
+    bloodGroup: "",
+    guardianName: "",
+    emergencyContactName: "",
+    emergencyContactMobile: "",
+    emergencyContactRelationship: "",
+    emergencyContactAddress: "",
+    aadhaar: "",
+    pan: "",
+    drivingLicense: "",
+    voterId: "",
+    uan: "",
+    currentAddress: "",
+    permanentAddress: "",
   });
 
   const fetchConfigs = async () => {
@@ -118,6 +133,20 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
           privilegedLeave: employee.leaveBalances?.privilegedLeave || 0,
           sickLeave: employee.leaveBalances?.sickLeave || 0,
           casualLeave: employee.leaveBalances?.casualLeave || 0,
+          maritalStatus: employee.maritalStatus || "",
+          bloodGroup: employee.bloodGroup || "",
+          guardianName: employee.guardianName || "",
+          emergencyContactName: employee.emergencyContactName || "",
+          emergencyContactMobile: employee.emergencyContactMobile || "",
+          emergencyContactRelationship: employee.emergencyContactRelationship || "",
+          emergencyContactAddress: employee.emergencyContactAddress || "",
+          aadhaar: employee.aadhaar || "",
+          pan: employee.pan || "",
+          drivingLicense: employee.drivingLicense || "",
+          voterId: employee.voterId || "",
+          uan: employee.uan || "",
+          currentAddress: employee.currentAddress || "",
+          permanentAddress: employee.permanentAddress || "",
         });
         setPreview(employee.profilePic?.url || null);
       } else {
@@ -146,6 +175,20 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
           privilegedLeave: 0,
           sickLeave: 0,
           casualLeave: 0,
+          maritalStatus: "",
+          bloodGroup: "",
+          guardianName: "",
+          emergencyContactName: "",
+          emergencyContactMobile: "",
+          emergencyContactRelationship: "",
+          emergencyContactAddress: "",
+          aadhaar: "",
+          pan: "",
+          drivingLicense: "",
+          voterId: "",
+          uan: "",
+          currentAddress: "",
+          permanentAddress: "",
         });
         setPreview(null);
       }
@@ -190,21 +233,7 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!isEdit && !showOtp) {
-      const loading = toast.loading("Sending verification OTP...");
-      try {
-        const result = await sendOtp(formData.email);
-        if (result.success) {
-          setShowOtp(true);
-          toast.success("Verification OTP sent to employee email!", { id: loading });
-        } else {
-          toast.error(result.error, { id: loading });
-        }
-      } catch (err) {
-        toast.error("Failed to send OTP", { id: loading });
-      }
-      return;
-    }
+    
 
     const loadingToast = toast.loading(
       isEdit ? "Updating employee records..." : "Creating employee and uploading documents...",
@@ -299,57 +328,7 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {showOtp ? (
-            <div className="space-y-6 flex flex-col items-center py-10">
-              <div className="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center text-brand-600">
-                <ShieldCheck size={32} />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-slate-900">Email Verification</h3>
-                <p className="text-slate-500 text-sm mt-1">Enter the 6-digit OTP sent to {formData.email}</p>
-              </div>
-              <div className="w-full max-w-xs">
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-3 text-center border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-mono text-2xl tracking-[0.5em]"
-                  placeholder="000000"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                />
-              </div>
-              <div className="flex flex-col w-full gap-3">
-                <button
-                  type="submit"
-                  disabled={otpCode.length !== 6}
-                  className="w-full py-3 rounded-xl bg-brand-600 text-white font-bold text-lg hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 disabled:opacity-50"
-                >
-                  Verify & Create
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const loading = toast.loading("Resending OTP...");
-                    const result = await sendOtp(formData.email);
-                    if (result.success) toast.success("OTP Resent!", { id: loading });
-                    else toast.error(result.error, { id: loading });
-                  }}
-                  className="text-brand-600 font-bold text-sm hover:text-brand-700"
-                >
-                  Resend OTP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowOtp(false)}
-                  className="text-slate-400 text-sm hover:text-slate-600"
-                >
-                  Edit Details
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
+          <>
               {/* Section: Profile Picture */}
               <div className="flex flex-col items-center gap-4 py-2">
                 <div className="relative group">
@@ -393,442 +372,160 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
                 />
               </div>
 
-              {/* Section: Personal Info */}
+              
+              {/* Section: Basic Details */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <User size={16} className="text-brand-600" /> Personal Information
+                  <User size={16} className="text-brand-600" /> Basic Details
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      First Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      placeholder="John"
-                      value={formData.firstName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, firstName: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Last Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      placeholder="Doe"
-                      value={formData.lastName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, lastName: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Email (Official) <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Mail
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      />
-                      <input
-                        type="email"
-                        required
-                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                        placeholder="john.doe@drrg.edu"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                      />
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Name <span className="text-red-500">*</span></label>
+                    <div className="flex gap-2">
+                        <input type="text" required className="w-1/2 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" placeholder="First Name" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} />
+                        <input type="text" required className="w-1/2 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" placeholder="Last Name" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Phone
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      />
-                      <input
-                        type="tel"
-                        required
-                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                        placeholder="+1 234 567 8900"
-                        value={formData.phone}
-                        onChange={(e) =>
-                          setFormData({ ...formData, phone: e.target.value })
-                        }
-                      />
-                    </div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Mobile Number <span className="text-red-500">*</span></label>
+                    <input type="tel" required className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" placeholder="+91 9876543210" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Date of Birth
-                    </label>
-                    <div className="relative">
-                      <Calendar
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      />
-                      <input
-                        type="date"
-                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                        value={formData.dob}
-                        onChange={(e) =>
-                          setFormData({ ...formData, dob: e.target.value })
-                        }
-                      />
-                    </div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Personal Email ID <span className="text-red-500">*</span></label>
+                    <input type="email" required className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" placeholder="email@example.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Gender
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.gender}
-                      onChange={(e) =>
-                        setFormData({ ...formData, gender: e.target.value })
-                      }
-                    >
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
+                    <input type="date" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Gender</label>
+                    <select className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
                       <option value="">Select Gender</option>
                       <option value="male">Male</option>
                       <option value="female">Female</option>
                       <option value="other">Other</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Marital Status</label>
+                    <select className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.maritalStatus} onChange={(e) => setFormData({...formData, maritalStatus: e.target.value})}>
+                      <option value="">Select Status</option>
+                      <option value="single">Single</option>
+                      <option value="married">Married</option>
+                      <option value="divorced">Divorced</option>
+                      <option value="widowed">Widowed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Blood Group</label>
+                    <select className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.bloodGroup} onChange={(e) => setFormData({...formData, bloodGroup: e.target.value})}>
+                      <option value="">Select Blood Group</option>
+                      <option value="A+">A+</option><option value="A-">A-</option>
+                      <option value="B+">B+</option><option value="B-">B-</option>
+                      <option value="O+">O+</option><option value="O-">O-</option>
+                      <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Guardian's Name</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.guardianName} onChange={(e) => setFormData({...formData, guardianName: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="h-px bg-slate-100 my-2"></div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Emergency Contact Name</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.emergencyContactName} onChange={(e) => setFormData({...formData, emergencyContactName: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Emergency Contact Mobile</label>
+                    <input type="tel" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.emergencyContactMobile} onChange={(e) => setFormData({...formData, emergencyContactMobile: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Emergency Contact Relationship</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.emergencyContactRelationship} onChange={(e) => setFormData({...formData, emergencyContactRelationship: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Emergency Contact Address</label>
+                    <textarea rows="2" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.emergencyContactAddress} onChange={(e) => setFormData({...formData, emergencyContactAddress: e.target.value})}></textarea>
+                  </div>
                 </div>
               </div>
 
               <div className="h-px bg-slate-100"></div>
 
-              {/* Section: Professional Info */}
+              {/* Section: Government IDs */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <Briefcase size={16} className="text-brand-600" /> Role &
-                  Department
+                  <FileText size={16} className="text-brand-600" /> Government IDs
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Joining Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.joiningDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, joiningDate: e.target.value })
-                      }
-                    />
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Aadhaar</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.aadhaar} onChange={(e) => setFormData({...formData, aadhaar: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Department <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.department}
-                      onChange={(e) =>
-                        setFormData({ ...formData, department: e.target.value })
-                      }
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map((dept) => (
-                        <option key={dept._id} value={dept.name}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">PAN</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.pan} onChange={(e) => setFormData({...formData, pan: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Designation <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.designation}
-                      onChange={(e) =>
-                        setFormData({ ...formData, designation: e.target.value })
-                      }
-                    >
-                      <option value="">Select Designation</option>
-                      {designations.map((desig) => (
-                        <option key={desig._id} value={desig.name}>
-                          {desig.name}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Driving License</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.drivingLicense} onChange={(e) => setFormData({...formData, drivingLicense: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Employment Type
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.employmentType}
-                      onChange={(e) =>
-                        setFormData({ ...formData, employmentType: e.target.value })
-                      }
-                    >
-                      <option value="full-time">Full Time</option>
-                      <option value="part-time">Part Time</option>
-                      <option value="contract">Contract</option>
-                      <option value="internship">Internship</option>
-                      <option value="freelance">Freelance</option>
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Voter ID</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.voterId} onChange={(e) => setFormData({...formData, voterId: e.target.value})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.role}
-                      onChange={(e) =>
-                        setFormData({ ...formData, role: e.target.value })
-                      }
-                    >
-                      <option value="">Select Role</option>
-                      <option value="sub-admin">Sub-Admin</option>
-                      {roles.map((role) => (
-                        <option key={role._id} value={role.name}>
-                          {role.name}
-                        </option>
-                      ))} 
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">UAN</label>
+                    <input type="text" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.uan} onChange={(e) => setFormData({...formData, uan: e.target.value})} />
                   </div>
+                </div>
+              </div>
 
-                  {(formData.role === "coach" || formData.role === "Coach") && (
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">
-                        Coach Subjects
-                      </label>
-                      <div className="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto bg-slate-50 space-y-2">
-                        {availableSubjects.map((subject) => {
-                          const isChecked = formData.subjects.includes(subject._id);
-                          return (
-                            <label key={subject._id} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded transition-colors">
-                              <input
-                                type="checkbox"
-                                className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setFormData({ ...formData, subjects: [...formData.subjects, subject._id] });
-                                  } else {
-                                    setFormData({ ...formData, subjects: formData.subjects.filter((id) => id !== subject._id) });
-                                  }
-                                }}
-                              />
-                              <span className="text-sm text-slate-700">{subject.name} ({subject.code})</span>
-                            </label>
-                          );
-                        })}
-                        {availableSubjects.length === 0 && (
-                          <p className="text-xs text-slate-400 italic">No subjects available.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
+              <div className="h-px bg-slate-100"></div>
+
+              {/* Section: Address Details */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Briefcase size={16} className="text-brand-600" /> Address Details
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Center <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      required
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm disabled:bg-slate-100 disabled:text-slate-500"
-                      value={formData.center}
-                      disabled={(user?.role === 'center' || user?.role === 'hr')}
-                      onChange={(e) =>
-                        setFormData({ ...formData, center: e.target.value })
-                      }
-                    >
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Current Address</label>
+                    <textarea rows="2" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.currentAddress} onChange={(e) => setFormData({...formData, currentAddress: e.target.value})}></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Address</label>
+                    <textarea rows="2" className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-500 text-sm" value={formData.permanentAddress} onChange={(e) => setFormData({...formData, permanentAddress: e.target.value})}></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-100"></div>
+
+              {/* Section: System Requirements */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck size={16} className="text-brand-600" /> System Settings (Mandatory)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50 p-4 rounded-xl border border-amber-100">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-800 mb-1">System Role <span className="text-red-500">*</span></label>
+                    <select required className="w-full px-3 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-brand-500 text-sm bg-white" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
+                      {roles.map(r => <option key={r._id} value={r.name}>{r.name}</option>)}
+                    </select>
+                    <p className="text-[10px] text-amber-600 mt-1">Determines login access</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-800 mb-1">Center Assignment <span className="text-red-500">*</span></label>
+                    <select required className="w-full px-3 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-brand-500 text-sm bg-white" value={formData.center} onChange={(e) => setFormData({...formData, center: e.target.value})}>
                       <option value="">Select Center</option>
-                      {centers.map((c) => (
-                        <option key={c._id} value={c._id}>
-                          {c.name} - {c.location}
-                        </option>
-                      ))}
+                      {centers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                     </select>
+                    <p className="text-[10px] text-amber-600 mt-1">Required for employee association</p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Shift Start
-                    </label>
-                    <input
-                      type="time"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.shiftStart}
-                      onChange={(e) =>
-                        setFormData({ ...formData, shiftStart: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Shift End
-                    </label>
-                    <input
-                      type="time"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.shiftEnd}
-                      onChange={(e) =>
-                        setFormData({ ...formData, shiftEnd: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Salary (Monthly CTC)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        className="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                        placeholder="0.00"
-                        value={formData.salary}
-                        onChange={(e) =>
-                          setFormData({ ...formData, salary: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* Section: Leave Balances */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <Calendar size={16} className="text-brand-600" /> Leave Balances
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Privileged Leave
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.privilegedLeave}
-                      onChange={(e) =>
-                        setFormData({ ...formData, privilegedLeave: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Sick Leave
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.sickLeave}
-                      onChange={(e) =>
-                        setFormData({ ...formData, sickLeave: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">
-                      Casual Leave
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                      value={formData.casualLeave}
-                      onChange={(e) =>
-                        setFormData({ ...formData, casualLeave: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Documents Upload */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <FileText size={16} className="text-brand-600" /> Documents
-                </h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { label: "Identity Proof (ID)", field: "idFile" },
-                    { label: "Educational Certificate", field: "certificateFile" },
-                    { label: "Employment Contract", field: "contractFile" },
-                  ].map((doc) => (
-                    <div
-                      key={doc.field}
-                      className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-400">
-                          {formData[doc.field] ||
-                            (isEdit && employee[doc.field]?.url) ? (
-                            <CheckCircle size={20} className="text-green-500" />
-                          ) : (
-                            <FileText size={20} />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-700">
-                            {doc.label}
-                          </p>
-                          <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
-                            {formData[doc.field]
-                              ? formData[doc.field].name
-                              : isEdit && employee[doc.field]?.name
-                                ? employee[doc.field].name
-                                : "No file selected"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isEdit &&
-                          employee[doc.field]?.url &&
-                          !formData[doc.field] && (
-                            <button
-                              type="button"
-                              onClick={() => showPreview(employee[doc.field].url)}
-                              className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors cursor-pointer"
-                              title="View Document"
-                            >
-                              <ExternalLink size={16} />
-                            </button>
-                          )}
-                        <label className="text-xs font-bold text-brand-600 hover:bg-brand-50 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
-                          {formData[doc.field] ||
-                            (isEdit && employee[doc.field]?.url)
-                            ? "Change"
-                            : "Upload"}
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => handleFileChange(e, doc.field)}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 
@@ -849,7 +546,6 @@ const AddEmployeeModal = ({ isOpen, onClose, employee = null }) => {
                 </button>
               </div>
             </>
-          )}
         </form>
       </div>
     </div>

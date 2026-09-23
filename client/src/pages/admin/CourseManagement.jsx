@@ -9,6 +9,25 @@ import CenterManagement from "./CenterManagement";
 const CourseManagement = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
 
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#tab_')) {
+        setActiveTab(hash.replace('#tab_', ''));
+      } else {
+        setActiveTab("dashboard");
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    handlePopState(); // initial sync
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    window.history.pushState(null, '', `#tab_${tabId}`);
+  };
+
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "online_courses", label: "Online Courses", icon: <BookOpen size={18} /> },
@@ -33,7 +52,7 @@ const CourseManagement = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             className={`pb-4 px-2 text-sm font-bold flex items-center gap-2 transition-colors relative whitespace-nowrap group ${activeTab === tab.id
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"

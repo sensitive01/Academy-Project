@@ -84,6 +84,13 @@ router.get("/", protect, async (req, res) => {
 router.get("/recent-students", protect, async (req, res) => {
   try {
     let query = {};
+    if (req.query.month && req.query.year) {
+      const m = parseInt(req.query.month);
+      const y = parseInt(req.query.year);
+      const startDate = new Date(y, m - 1, 1);
+      const endDate = new Date(y, m, 0, 23, 59, 59, 999);
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    }
     if (req.user.role === "center") {
       query.center = req.user.center;
     } else if (req.user.role === "coach") {
@@ -106,6 +113,13 @@ router.get("/recent-students", protect, async (req, res) => {
 router.get("/recent-enrollments", protect, async (req, res) => {
   try {
     let query = { type: "inward" };
+    if (req.query.month && req.query.year) {
+      const m = parseInt(req.query.month);
+      const y = parseInt(req.query.year);
+      const startDate = new Date(y, m - 1, 1);
+      const endDate = new Date(y, m, 0, 23, 59, 59, 999);
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    }
     if (req.user.role === "center") {
       const centerStudents = await Student.find({ center: req.user.center }).select("_id");
       const studentIds = centerStudents.map(s => s._id);
@@ -194,7 +208,9 @@ router.get("/student", protect, async (req, res) => {
         time: new Date(a.createdAt).toLocaleDateString(),
         course: "Admin", // for now
         icon: "Play",
-        color: "blue"
+        color: "blue",
+        startDate: a.startDate,
+        endDate: a.endDate
       }))
     });
   } catch (error) {

@@ -31,6 +31,15 @@ router.post(
         gender,
         employeeId,
         joiningDate,
+
+        branches,
+        departments,
+        dateOfLeaving,
+        jobTitle,
+        officialEmail,
+        esiNumber,
+        pfNumber,
+        pastEmployment,
         department,
         designation,
         role,
@@ -42,6 +51,20 @@ router.post(
         privilegedLeave,
         sickLeave,
         casualLeave,
+        maritalStatus,
+        bloodGroup,
+        guardianName,
+        emergencyContactName,
+        emergencyContactMobile,
+        emergencyContactRelationship,
+        emergencyContactAddress,
+        aadhaar,
+        pan,
+        drivingLicense,
+        voterId,
+        uan,
+        currentAddress,
+        permanentAddress,
       } = req.body;
 
       //////////////////////////////////////////////////////
@@ -81,14 +104,14 @@ router.post(
       }
 
       //////////////////////////////////////////////////////
-      // OTP VERIFICATION
+      // OTP VERIFICATION (REMOVED)
       //////////////////////////////////////////////////////
-      const otpRecord = await Otp.findOne({ email, otp });
-      if (!otpRecord) {
-        return res.status(400).json({ message: "Invalid or expired OTP" });
-      }
-      // Delete OTP after verification
-      await Otp.deleteOne({ _id: otpRecord._id });
+      // const otpRecord = await Otp.findOne({ email, otp });
+      // if (!otpRecord) {
+      //   return res.status(400).json({ message: "Invalid or expired OTP" });
+      // }
+      // // Delete OTP after verification
+      // await Otp.deleteOne({ _id: otpRecord._id });
 
       //////////////////////////////////////////////////////
       // CREATE USER
@@ -122,6 +145,21 @@ router.post(
           sickLeave: Number(sickLeave) || 0,
           casualLeave: Number(casualLeave) || 0,
         },
+
+        maritalStatus,
+        bloodGroup,
+        guardianName,
+        emergencyContactName,
+        emergencyContactMobile,
+        emergencyContactRelationship,
+        emergencyContactAddress,
+        aadhaar,
+        pan,
+        drivingLicense,
+        voterId,
+        uan,
+        currentAddress,
+        permanentAddress,
 
         salary:
           salary !== undefined && salary !== ""
@@ -279,6 +317,28 @@ router.put(
         privilegedLeave,
         sickLeave,
         casualLeave,
+        maritalStatus,
+        bloodGroup,
+        guardianName,
+        emergencyContactName,
+        emergencyContactMobile,
+        emergencyContactRelationship,
+        emergencyContactAddress,
+        aadhaar,
+        pan,
+        drivingLicense,
+        voterId,
+        uan,
+        currentAddress,
+        permanentAddress,
+        branches,
+        departments,
+        dateOfLeaving,
+        jobTitle,
+        officialEmail,
+        esiNumber,
+        pfNumber,
+        pastEmployment,
       } = req.body;
 
       //////////////////////////////////////////////////////
@@ -353,9 +413,41 @@ router.put(
       if (gender) employee.gender = gender;
       if (employeeId) employee.employeeId = employeeId;
       if (joiningDate) employee.joiningDate = joiningDate;
+
+      if (branches) employee.branches = JSON.parse(branches);
+      if (departments) employee.departments = JSON.parse(departments);
+      if (dateOfLeaving) employee.dateOfLeaving = dateOfLeaving;
+      if (jobTitle) employee.jobTitle = jobTitle;
+      if (officialEmail) employee.officialEmail = officialEmail;
+      if (esiNumber) employee.esiNumber = esiNumber;
+      if (pfNumber) employee.pfNumber = pfNumber;
+      if (pastEmployment) employee.pastEmployment = JSON.parse(pastEmployment);
+      if (req.body.bankDetails) employee.bankDetails = JSON.parse(req.body.bankDetails);
+      if (req.body.attendanceDetails) employee.attendanceDetails = JSON.parse(req.body.attendanceDetails);
+      if (req.body.salaryDetails) employee.salaryDetails = JSON.parse(req.body.salaryDetails);
+      if (req.body.leaveDetails) employee.leaveDetails = JSON.parse(req.body.leaveDetails);
+      if (req.body.penaltyDetails) employee.penaltyDetails = JSON.parse(req.body.penaltyDetails);
+
       if (department) employee.department = department;
       if (designation) employee.designation = designation;
       if (employmentType) employee.employmentType = employmentType;
+
+      if (maritalStatus) employee.maritalStatus = maritalStatus;
+      if (bloodGroup) employee.bloodGroup = bloodGroup;
+      if (guardianName) employee.guardianName = guardianName;
+      if (emergencyContactName) employee.emergencyContactName = emergencyContactName;
+      if (emergencyContactMobile) employee.emergencyContactMobile = emergencyContactMobile;
+      if (emergencyContactRelationship) employee.emergencyContactRelationship = emergencyContactRelationship;
+      if (emergencyContactAddress) employee.emergencyContactAddress = emergencyContactAddress;
+      
+      if (aadhaar) employee.aadhaar = aadhaar;
+      if (pan) employee.pan = pan;
+      if (drivingLicense) employee.drivingLicense = drivingLicense;
+      if (voterId) employee.voterId = voterId;
+      if (uan) employee.uan = uan;
+
+      if (currentAddress) employee.currentAddress = currentAddress;
+      if (permanentAddress) employee.permanentAddress = permanentAddress;
 
       //////////////////////////////////////////////////////
       // SHIFT UPDATE
@@ -436,8 +528,8 @@ router.put(
         employee,
       });
     } catch (err) {
-      console.error("Error updating employee:", err);
-      res.status(500).json({ message: "Server Error" });
+      console.error("Error updating employee:", err); require("fs").writeFileSync("error.log", err.stack || err.message || JSON.stringify(err));
+      res.status(500).json({ message: err.message || "Server Error" });
     }
   }
 );
@@ -463,7 +555,90 @@ router.patch("/:id/status", protect, async (req, res) => {
     });
   } catch (err) {
     console.error("Error updating status:", err);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: err.message || "Server Error" });
+  }
+});
+
+//////////////////////////////////////////////////////
+// UPLOAD DOCUMENT
+//////////////////////////////////////////////////////
+router.post("/:id/documents", protect, upload.single("documentFile"), async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    
+    const { documentType, customDocumentName } = req.body;
+    
+    if (!documentType) {
+      return res.status(400).json({ message: "Document type is required" });
+    }
+    
+    const newDocument = {
+      documentType,
+      customDocumentName: documentType === 'Other' ? customDocumentName : '',
+      file: {
+        url: req.file.path,
+        public_id: req.file.filename,
+        name: req.file.originalname,
+      }
+    };
+    
+    if (!employee.documents) {
+      employee.documents = [];
+    }
+    employee.documents.push(newDocument);
+    await employee.save();
+    
+    res.status(201).json({ message: "Document uploaded successfully", documents: employee.documents });
+  } catch (err) {
+    console.error("Error uploading document:", err);
+    res.status(500).json({ message: err.message || "Server Error" });
+  }
+});
+
+//////////////////////////////////////////////////////
+// DELETE DOCUMENT
+//////////////////////////////////////////////////////
+router.delete("/:id/documents/:docId", protect, async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    
+    if (!employee.documents) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    
+    const documentIndex = employee.documents.findIndex(d => d._id.toString() === req.params.docId);
+    if (documentIndex === -1) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    
+    const document = employee.documents[documentIndex];
+    
+    try {
+      const cloudinary = require('../config/cloudinary').cloudinary;
+      if (document.file && document.file.public_id) {
+        await cloudinary.uploader.destroy(document.file.public_id);
+      }
+    } catch (cErr) {
+      console.error("Cloudinary delete error:", cErr);
+    }
+    
+    employee.documents.splice(documentIndex, 1);
+    await employee.save();
+    
+    res.json({ message: "Document deleted successfully", documents: employee.documents });
+  } catch (err) {
+    console.error("Error deleting document:", err);
+    res.status(500).json({ message: err.message || "Server Error" });
   }
 });
 

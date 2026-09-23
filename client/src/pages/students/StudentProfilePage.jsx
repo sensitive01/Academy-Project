@@ -271,7 +271,7 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
       await onUpdate(payload);
       setMode("view");
-      if (onBack) onBack();
+      // Intentionally not calling onBack() so user stays on profile after saving
     } catch (err) {
       console.error(err);
     } finally {
@@ -281,11 +281,34 @@ const StudentProfilePage = ({ student, initialMode = "view", centers = [], onBac
 
   const scrollToSection = (sectionId) => {
     setActiveSection(sectionId);
+    window.history.pushState(null, '', `#student_${student._id}/${sectionId}`);
     const elem = document.getElementById(`section-${sectionId}`);
     if (elem) {
       elem.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#student_')) {
+        const parts = hash.replace('#student_', '').split('/');
+        const sectionId = parts.length > 1 ? parseInt(parts[1], 10) : 1;
+        setActiveSection(sectionId);
+        
+        // Use a short timeout to ensure DOM is ready for scrolling if this is initial load
+        setTimeout(() => {
+            const elem = document.getElementById(`section-${sectionId}`);
+            if (elem) {
+              elem.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }, 100);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    handlePopState();
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [student._id]);
 
   const steps = [
     { id: 1, title: "Identity", icon: <User size={20} /> },

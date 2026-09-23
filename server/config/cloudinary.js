@@ -26,7 +26,7 @@ const storage = new CloudinaryStorage({
         // =========================
         // EMPLOYEES
         // =========================
-        else if (['profilePic', 'idFile', 'certificateFile', 'contractFile'].includes(file.fieldname)) {
+        else if (['profilePic', 'idFile', 'certificateFile', 'contractFile', 'documentFile'].includes(file.fieldname)) {
             folder += '/employees';
             if (file.fieldname === 'profilePic') folder += '/profiles';
             else folder += '/documents';

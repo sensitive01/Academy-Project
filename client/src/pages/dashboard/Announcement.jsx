@@ -408,14 +408,20 @@ const Announcement = () => {
                 )
               },
               {
-                name: "Date Posted",
-                selector: row => row.createdAt,
+                name: "Timeline",
+                selector: row => row.startDate,
                 sortable: true,
                 width: '180px',
                 cell: row => (
-                  <div className="flex flex-col py-2">
-                    <span className="font-bold text-slate-900 text-sm">{new Date(row.createdAt).toLocaleDateString()}</span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(row.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  <div className="flex flex-col py-2 gap-1 text-xs">
+                    <div className="flex items-center gap-1">
+                       <span className="text-slate-400 font-bold w-9">Start:</span>
+                       <span className="font-bold text-slate-900">{new Date(row.startDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                       <span className="text-slate-400 font-bold w-9">End:</span>
+                       <span className="font-bold text-slate-900">{row.endDate ? new Date(row.endDate).toLocaleDateString() : 'Forever'}</span>
+                    </div>
                   </div>
                 )
               },

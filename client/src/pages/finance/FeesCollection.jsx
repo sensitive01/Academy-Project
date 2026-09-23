@@ -19,6 +19,30 @@ const FeesCollection = () => {
   const [search, setSearch] = useState("");
   const [selectedBatch, setSelectedBatch] = useState(null);
 
+  const handleSetSelectedBatch = (batch) => {
+    setSelectedBatch(batch);
+    if (batch) {
+      window.history.pushState(null, '', `#batch_${batch._id}`);
+    } else {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#batch_')) {
+        const batchId = hash.replace('#batch_', '').split('/')[0];
+        const batch = batches.find(b => b._id === batchId);
+        if (batch) setSelectedBatch(batch);
+      } else {
+        setSelectedBatch(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [batches]);
+
   useEffect(() => {
     if (activeTab === "fees_collection" && !selectedBatch) {
       fetchBatches();
@@ -30,6 +54,13 @@ const FeesCollection = () => {
     try {
       const res = await api.get("/batches");
       setBatches(res.data || []);
+      
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#batch_')) {
+        const batchId = hash.replace('#batch_', '').split('/')[0];
+        const batch = (res.data || []).find(b => b._id === batchId);
+        if (batch) setSelectedBatch(batch);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -43,7 +74,7 @@ const FeesCollection = () => {
   };
 
   if (selectedBatch) {
-    return <BatchFeesDetail batch={selectedBatch} onBack={() => setSelectedBatch(null)} />;
+    return <BatchFeesDetail batch={selectedBatch} onBack={() => handleSetSelectedBatch(null)} />;
   }
 
   const filteredBatches = batches.filter(b => 
@@ -104,7 +135,7 @@ const FeesCollection = () => {
                     selector: row => row.name,
                     sortable: true,
                     cell: row => (
-                      <div className="font-bold text-brand-600 cursor-pointer hover:underline" onClick={() => setSelectedBatch(row)}>
+                      <div className="font-bold text-brand-600 cursor-pointer hover:underline" onClick={() => handleSetSelectedBatch(row)}>
                         {row.name}
                       </div>
                     )

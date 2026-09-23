@@ -310,6 +310,28 @@ const Students = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || sessionStorage.getItem("studentsActiveTab") || "dashboard");
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    window.history.pushState(null, '', `#tab_${tab}`);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#tab_')) {
+        setActiveTab(hash.replace('#tab_', ''));
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    // Initial sync
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#tab_')) {
+      setActiveTab(hash.replace('#tab_', ''));
+    }
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [students, setStudents] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -415,6 +437,32 @@ const Students = () => {
   }, [activeTab]);
 
   const [selectedStudent, setSelectedStudent] = useState(null);
+
+  const handleSetSelectedStudent = (student) => {
+    setSelectedStudent(student);
+    if (student) {
+      window.history.pushState(null, '', `#student_${student._id}`);
+    } else {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#student_')) {
+          const studentId = hash.replace('#student_', '').split('/')[0];
+          const student = students.find(s => s._id === studentId);
+          if (student) setSelectedStudent(student);
+      } else {
+          setSelectedStudent(null);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [students]);
+
   const [studentMode, setStudentMode] = useState("view"); // "view" | "edit"
   const [centers, setCenters] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -460,6 +508,13 @@ const Students = () => {
       const { data } = await api.get("/students?includeInactive=true");
       setStudents(data.students || []);
       setFiltered(data.students || []);
+      
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#student_')) {
+          const studentId = hash.replace('#student_', '').split('/')[0];
+          const student = (data.students || []).find(s => s._id === studentId);
+          if (student) setSelectedStudent(student);
+      }
     } catch {
       toast.error("Failed to load students");
     } finally {
@@ -1077,8 +1132,11 @@ const Students = () => {
           student={selectedStudent}
           initialMode={studentMode}
           centers={centers}
-          onBack={() => setSelectedStudent(null)}
-          onUpdate={handleUpdate}
+          onBack={() => handleSetSelectedStudent(null)}
+          onUpdate={() => {
+            fetchStudents();
+            // Stays on page after update
+          }}
         />
       </div>
     );
@@ -1626,7 +1684,7 @@ const Students = () => {
         {Object.keys(tabs).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === tab
               ? "text-brand-600"
               : "text-gray-500 hover:text-brand-600"
@@ -1765,13 +1823,13 @@ const Students = () => {
               students={filtered}
               loading={loading}
               onEdit={(s) => {
-                setSelectedStudent(s);
+                handleSetSelectedStudent(s);
                 setStudentMode("edit");
               }}
               onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}
               onView={(s) => {
-                setSelectedStudent(s);
+                handleSetSelectedStudent(s);
                 setStudentMode("view");
               }}
               onPromote={(row, isNewPeriod) => {
