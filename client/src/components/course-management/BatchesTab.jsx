@@ -156,6 +156,8 @@ const BatchesTab = () => {
   const [batchStep, setBatchStep] = useState(1);
   const [showViewCentersModal, setShowViewCentersModal] = useState(false);
   const [selectedBatchCenters, setSelectedBatchCenters] = useState([]);
+  const [showViewCoursesModal, setShowViewCoursesModal] = useState(false);
+  const [selectedBatchCourses, setSelectedBatchCourses] = useState([]);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null });
 
   // Form State
@@ -791,9 +793,23 @@ const BatchesTab = () => {
         },
         {
           name: "Course(s)",
-          selector: r => r.courses ? r.courses.map(c => c.title).join(", ") : (r.course?.title || "N/A"),
+          selector: r => r.courses?.length || 1,
           sortable: true,
-          omit: activeTab !== "batches"
+          width: "120px",
+          center: true,
+          omit: activeTab !== "batches",
+          cell: r => (
+            <button
+              onClick={() => {
+                const courses = r.courses || (r.course ? [r.course] : []);
+                setSelectedBatchCourses(courses);
+                setShowViewCoursesModal(true);
+              }}
+              className="text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors border border-brand-200 shadow-sm"
+            >
+              View ({(r.courses || (r.course ? [r.course] : [])).length})
+            </button>
+          )
         },
         {
           name: "Centers",
@@ -1538,6 +1554,38 @@ const BatchesTab = () => {
                 </ul>
               ) : (
                 <p className="text-center text-slate-500 font-medium py-4">No centers assigned.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showViewCoursesModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Assigned Courses</h2>
+              <button
+                onClick={() => setShowViewCoursesModal(false)}
+                className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 max-h-[300px] overflow-y-auto">
+              {selectedBatchCourses.length > 0 ? (
+                <ul className="space-y-2">
+                  {selectedBatchCourses.map((course, idx) => (
+                    <li key={course._id || idx} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                        {course.title?.charAt(0) || "C"}
+                      </div>
+                      <span className="font-semibold text-slate-700">{course.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-slate-500 font-medium py-4">No courses assigned.</p>
               )}
             </div>
           </div>

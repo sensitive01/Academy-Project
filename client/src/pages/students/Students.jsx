@@ -1855,7 +1855,6 @@ const Students = () => {
               search={search}
               setSearch={setSearch}
               selectableRows={true}
-              selectableRowDisabled={(row) => row.status === 'inactive'}
               onSelectedRowsChange={({ selectedRows }) => setSelectedStudents(selectedRows)}
               clearSelectedRows={clearSelectedRows}
               tableHeaderActions={
@@ -1884,6 +1883,10 @@ const Students = () => {
                       <div className="absolute top-full right-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <button
                           onClick={() => {
+                            if (selectedStudents.some(s => s.status === 'inactive')) {
+                              toast.error("Inactive students cannot be promoted");
+                              return;
+                            }
                             setPromoteForm({ vendorId: "", location: "", startDate: "", endDate: "", paymentBy: "", vendorPayment: "", salary: "", referralCharge: "", isNewPeriod: false });
                             setPromoteConfig({ isOpen: true, student: null, isBulk: true });
                           }}
@@ -1894,6 +1897,10 @@ const Students = () => {
                         <div className="h-px bg-slate-50 w-full"></div>
                         <button
                           onClick={() => {
+                            if (selectedStudents.some(s => s.status === 'inactive')) {
+                              toast.error("Inactive students cannot be promoted");
+                              return;
+                            }
                             setAcademicPromoteConfig({ isOpen: true });
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
