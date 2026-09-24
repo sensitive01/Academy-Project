@@ -168,31 +168,43 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
   const getAmountForMonth = (row, targetMonth) => {
     let totalForMonth = 0;
 
+    const isFirstMonth = dynamicMonths.length > 0 && targetMonth.label === dynamicMonths[0].label;
+    const isLastMonth = dynamicMonths.length > 0 && targetMonth.label === dynamicMonths[dynamicMonths.length - 1].label;
+
+    const checkMatch = (pDate) => {
+      const pYear = pDate.getFullYear();
+      const pMonth = pDate.getMonth();
+      let matches = false;
+
+      if (targetMonth.year !== null) {
+        if (pYear === targetMonth.year && pMonth === targetMonth.month) {
+          matches = true;
+        } else if (isLastMonth && (pYear > targetMonth.year || (pYear === targetMonth.year && pMonth > targetMonth.month))) {
+          matches = true;
+        } else if (isFirstMonth && (pYear < targetMonth.year || (pYear === targetMonth.year && pMonth < targetMonth.month))) {
+          matches = true;
+        }
+      } else {
+        if (pMonth === targetMonth.month) {
+          matches = true;
+        }
+      }
+      return matches;
+    };
+
     if (row.payments && row.payments.length > 0) {
       row.payments.forEach(p => {
         if (p.status === 'Approved' && p.paidAt) {
           const pDate = new Date(p.paidAt);
-          if (pDate.getMonth() === targetMonth.month) {
-            if (targetMonth.year !== null) {
-              if (pDate.getFullYear() === targetMonth.year) {
-                totalForMonth += p.amount;
-              }
-            } else {
-              totalForMonth += p.amount;
-            }
+          if (checkMatch(pDate)) {
+            totalForMonth += p.amount;
           }
         }
       });
     } else if (row.status === 'paid') {
       const pDate = row.paidAt ? new Date(row.paidAt) : new Date(row.createdAt);
-      if (pDate.getMonth() === targetMonth.month) {
-        if (targetMonth.year !== null) {
-          if (pDate.getFullYear() === targetMonth.year) {
-            totalForMonth = row.amount;
-          }
-        } else {
-          totalForMonth = row.amount;
-        }
+      if (checkMatch(pDate)) {
+        totalForMonth = row.amount;
       }
     }
 
@@ -202,37 +214,46 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
   const getPaymentsForMonth = (row, targetMonth) => {
     const monthPayments = [];
 
+    const isFirstMonth = dynamicMonths.length > 0 && targetMonth.label === dynamicMonths[0].label;
+    const isLastMonth = dynamicMonths.length > 0 && targetMonth.label === dynamicMonths[dynamicMonths.length - 1].label;
+
+    const checkMatch = (pDate) => {
+      const pYear = pDate.getFullYear();
+      const pMonth = pDate.getMonth();
+      let matches = false;
+
+      if (targetMonth.year !== null) {
+        if (pYear === targetMonth.year && pMonth === targetMonth.month) {
+          matches = true;
+        } else if (isLastMonth && (pYear > targetMonth.year || (pYear === targetMonth.year && pMonth > targetMonth.month))) {
+          matches = true;
+        } else if (isFirstMonth && (pYear < targetMonth.year || (pYear === targetMonth.year && pMonth < targetMonth.month))) {
+          matches = true;
+        }
+      } else {
+        if (pMonth === targetMonth.month) {
+          matches = true;
+        }
+      }
+      return matches;
+    };
+
     if (row.payments && row.payments.length > 0) {
       row.payments.forEach(p => {
         if (p.status === 'Approved' && p.paidAt) {
           const pDate = new Date(p.paidAt);
-          if (pDate.getMonth() === targetMonth.month) {
-            if (targetMonth.year !== null) {
-              if (pDate.getFullYear() === targetMonth.year) {
-                monthPayments.push(p);
-              }
-            } else {
-              monthPayments.push(p);
-            }
+          if (checkMatch(pDate)) {
+            monthPayments.push(p);
           }
         }
       });
     } else if (row.status === 'paid') {
       const pDate = row.paidAt ? new Date(row.paidAt) : new Date(row.createdAt);
-      if (pDate.getMonth() === targetMonth.month) {
-        if (targetMonth.year !== null) {
-          if (pDate.getFullYear() === targetMonth.year) {
-            monthPayments.push({
-              ...row,
-              paymentMode: row.paymentMode || 'Online'
-            });
-          }
-        } else {
-          monthPayments.push({
-            ...row,
-            paymentMode: row.paymentMode || 'Online'
-          });
-        }
+      if (checkMatch(pDate)) {
+        monthPayments.push({
+          ...row,
+          paymentMode: row.paymentMode || 'Online'
+        });
       }
     }
 
@@ -1430,19 +1451,70 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     },
     ...(feeType === 'Both' ? [
       {
-        name: "Total Course", width: "120px",
+        name: "Total Course", width: "140px",
         selector: row => row.unifiedCourseTotal,
-        cell: row => <span className="text-xs font-black text-slate-800">₹{(row.unifiedCourseTotal || 0).toLocaleString("en-IN")}</span>
+        cell: row => {
+          if (row.isSummary) return <span className="text-xs font-black text-slate-800">₹{(row.unifiedCourseTotal || 0).toLocaleString("en-IN")}</span>;
+          const current = (row.courseAmount || 0) + (row.coursePenaltyAmount || 0);
+          return (
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{current.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <span className="text-[11px] font-black text-slate-700 whitespace-nowrap">₹{(row.unifiedCourseTotal || 0).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
       },
       {
-        name: "Total Council", width: "120px",
+        name: "Total Council", width: "140px",
         selector: row => row.unifiedCouncilTotal,
-        cell: row => <span className="text-xs font-black text-slate-800">₹{(row.unifiedCouncilTotal || 0).toLocaleString("en-IN")}</span>
+        cell: row => {
+          if (row.isSummary) return <span className="text-xs font-black text-slate-800">₹{(row.unifiedCouncilTotal || 0).toLocaleString("en-IN")}</span>;
+          const current = (row.councilAmount || 0) + (row.councilPenaltyAmount || 0);
+          return (
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{current.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <span className="text-[11px] font-black text-slate-700 whitespace-nowrap">₹{(row.unifiedCouncilTotal || 0).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
       },
       {
-        name: "Total Unified", width: "120px",
+        name: "Total Unified", width: "140px",
         selector: row => row.unifiedTotalDue,
-        cell: row => <span className="text-xs font-black text-slate-800">₹{(row.unifiedTotalDue || 0).toLocaleString("en-IN")}</span>
+        cell: row => {
+          if (row.isSummary) return <span className="text-xs font-black text-slate-800">₹{(row.unifiedTotalDue || 0).toLocaleString("en-IN")}</span>;
+          const current = (row.amount || 0) + (row.isPenaltyApplied ? (row.penaltyAmount || 0) : 0) + (row.isFinalPenaltyApplied ? (row.finalPenaltyAmount || 0) : 0);
+          return (
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{current.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <span className="text-[11px] font-black text-slate-700 whitespace-nowrap">₹{(row.unifiedTotalDue || 0).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
       }
     ] : [
       {
@@ -1467,13 +1539,13 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           return (
             <div className="flex flex-col justify-center py-2 w-full h-full">
               <div className="flex flex-col gap-0.5">
-                <div className="flex justify-between items-center gap-1">
-                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Unified</span>
-                  <span className="text-[11px] font-black text-slate-700">₹{unifiedTotal.toLocaleString("en-IN")}</span>
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{currentYearTotal.toLocaleString("en-IN")}</span>
                 </div>
-                <div className="flex justify-between items-center gap-1">
-                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Current</span>
-                  <span className="text-[11px] font-black text-slate-700">₹{currentYearTotal.toLocaleString("en-IN")}</span>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <span className="text-[11px] font-black text-slate-700 whitespace-nowrap">₹{unifiedTotal.toLocaleString("en-IN")}</span>
                 </div>
               </div>
             </div>
@@ -1484,61 +1556,78 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     ...(feeType !== 'Exam' ? monthColumns : []),
     ...(feeType === 'Both' ? [
       {
-        name: "Course Bal", width: "120px",
+        name: "Course Bal", width: "140px",
         selector: row => row.unifiedCourseBalance,
         cell: row => {
-          const courseBal = row.unifiedCourseBalance || 0;
+          if (row.isSummary) return <span className={`text-xs font-black ${row.unifiedCourseBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>₹{(row.unifiedCourseBalance || 0).toLocaleString("en-IN")}</span>;
+          const currentTotal = (row.courseAmount || 0) + (row.coursePenaltyAmount || 0);
+          const currentPaid = row.coursePayments ? row.coursePayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const currentBal = Math.max(0, currentTotal - currentPaid);
+          const unifiedBal = row.unifiedCourseBalance || 0;
           return (
-            <button
-              onClick={() => {
-                if (!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0) {
-                  setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'course' });
-                }
-              }}
-              className={`text-left text-xs font-black ${courseBal > 0 ? "text-amber-600" : "text-emerald-600"} ${!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""}`}
-            >
-              ₹{courseBal?.toLocaleString("en-IN")}
-            </button>
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{currentBal.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <button onClick={() => { if (row.feeBreakdown && row.feeBreakdown.length > 0) setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'course' }); }} className={`text-[11px] font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"} ${row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""} whitespace-nowrap`}>₹{unifiedBal.toLocaleString("en-IN")}</button>
+                </div>
+              </div>
+            </div>
           );
         }
       },
       {
-        name: "Council Bal", width: "120px",
+        name: "Council Bal", width: "140px",
         selector: row => row.unifiedCouncilBalance,
         cell: row => {
-          const councilBal = row.unifiedCouncilBalance || 0;
+          if (row.isSummary) return <span className={`text-xs font-black ${row.unifiedCouncilBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>₹{(row.unifiedCouncilBalance || 0).toLocaleString("en-IN")}</span>;
+          const currentTotal = (row.councilAmount || 0) + (row.councilPenaltyAmount || 0);
+          const currentPaid = row.councilPayments ? row.councilPayments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const currentBal = Math.max(0, currentTotal - currentPaid);
+          const unifiedBal = row.unifiedCouncilBalance || 0;
           return (
-            <button
-              onClick={() => {
-                if (!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0) {
-                  setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'council' });
-                }
-              }}
-              className={`text-left text-xs font-black ${councilBal > 0 ? "text-amber-600" : "text-emerald-600"} ${!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""}`}
-            >
-              ₹{councilBal?.toLocaleString("en-IN")}
-            </button>
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{currentBal.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <button onClick={() => { if (row.feeBreakdown && row.feeBreakdown.length > 0) setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'council' }); }} className={`text-[11px] font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"} ${row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""} whitespace-nowrap`}>₹{unifiedBal.toLocaleString("en-IN")}</button>
+                </div>
+              </div>
+            </div>
           );
         }
       },
       {
-        name: "Unified Bal", width: "120px",
+        name: "Unified Bal", width: "140px",
         selector: row => row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : getRemainingBalance(row)),
         sortable: true,
         cell: row => {
-          const totalDue = row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
-          const bal = row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : Math.max(0, totalDue - (row.payments?.filter(p => p.status === 'Approved').reduce((acc, p) => acc + p.amount, 0) || 0)));
+          if (row.isSummary) return <span className={`text-xs font-black ${row.totalRemainingBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>₹{(row.totalRemainingBalance || 0).toLocaleString("en-IN")}</span>;
+          const currentTotal = (row.amount || 0) + (row.isPenaltyApplied ? (row.penaltyAmount || 0) : 0) + (row.isFinalPenaltyApplied ? (row.finalPenaltyAmount || 0) : 0);
+          const currentPaid = row.payments ? row.payments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0) : 0;
+          const currentBal = Math.max(0, currentTotal - currentPaid);
+          const unifiedBal = row.unifiedBalance !== undefined ? row.unifiedBalance : Math.max(0, currentTotal - currentPaid);
           return (
-            <button
-              onClick={() => {
-                if (!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0) {
-                  setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'all' });
-                }
-              }}
-              className={`text-left text-sm font-black ${bal > 0 ? "text-amber-600" : "text-emerald-600"} ${!row.isSummary && row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""}`}
-            >
-              ₹{bal.toLocaleString("en-IN")}
-            </button>
+            <div className="flex flex-col justify-center py-2 w-full h-full">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">₹{currentBal.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
+                  <button onClick={() => { if (row.feeBreakdown && row.feeBreakdown.length > 0) setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'all' }); }} className={`text-[11px] font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"} ${row.feeBreakdown && row.feeBreakdown.length > 0 ? "hover:underline cursor-pointer" : ""} whitespace-nowrap`}>₹{unifiedBal.toLocaleString("en-IN")}</button>
+                </div>
+              </div>
+            </div>
           );
         }
       }
@@ -1569,24 +1658,24 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           return (
             <div className="flex flex-col justify-center py-2 w-full h-full">
               <div className="flex flex-col gap-0.5">
-                <div className="flex justify-between items-center gap-1">
-                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Unified</span>
+                <div className="flex justify-between items-center gap-1 bg-blue-50/50 px-1 py-0.5 rounded">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tight whitespace-nowrap">Current</span>
+                  <span className="text-[12px] font-black text-emerald-600 whitespace-nowrap">
+                    ₹{currentYearBalance.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center gap-1 px-1">
+                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight whitespace-nowrap">Unified</span>
                   <button 
                     onClick={() => {
                       if (row.feeBreakdown && row.feeBreakdown.length > 0) {
                         setBreakdownModal({ isOpen: true, studentName: row.student?.studentNameEnglish || "Student", breakdown: row.feeBreakdown, type: 'all' });
                       }
                     }}
-                    className={`text-[11px] font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"} hover:underline`}
+                    className={`text-[11px] font-black ${unifiedBal > 0 ? "text-amber-600" : "text-emerald-600"} hover:underline whitespace-nowrap`}
                   >
                     ₹{unifiedBal.toLocaleString("en-IN")}
                   </button>
-                </div>
-                <div className="flex justify-between items-center gap-1">
-                  <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tight">Current</span>
-                  <span className={`text-[11px] font-black ${currentYearBalance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                    ₹{currentYearBalance.toLocaleString("en-IN")}
-                  </span>
                 </div>
               </div>
             </div>

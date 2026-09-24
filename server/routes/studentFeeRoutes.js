@@ -106,11 +106,15 @@ router.post('/bulk-upload', protect, async (req, res) => {
       for (let y = 1; y <= limitYear; y++) {
         const loopYearStr = String(y);
 
-        let existingFee = await StudentFee.findOne({
+        const feesForType = await StudentFee.find({
           student: student._id,
-          year: loopYearStr,
           feeType: parsedFeeType,
           ...(parsedOtherFeeType ? { otherFeeType: parsedOtherFeeType } : {})
+        });
+
+        let existingFee = feesForType.find(f => {
+          const match = String(f.year || "").match(/\d+/);
+          return match && String(match[0]) === loopYearStr;
         });
 
         if (y === limitYear) {

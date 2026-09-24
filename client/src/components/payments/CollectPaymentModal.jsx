@@ -229,14 +229,23 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
         <div className="space-y-2">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Amount to Collect *</label>
           <input 
-            type="number" 
+            type="text" 
             required 
-            min="1" 
-            max={displayRemainingBalance}
             className="w-full rounded-2xl border border-slate-200 p-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 font-bold text-slate-800" 
-            value={collectAmount} 
-            onChange={(e) => setCollectAmount(parseFloat(e.target.value) || 0)} 
-            placeholder="Enter manual collection amount" 
+            value={collectAmount === '' ? '' : Number(collectAmount).toLocaleString('en-IN')} 
+            onChange={(e) => {
+              const rawValue = e.target.value.replace(/[^0-9]/g, '');
+              if (!rawValue) {
+                setCollectAmount('');
+              } else {
+                let parsed = parseInt(rawValue, 10);
+                if (parsed > displayRemainingBalance) {
+                  parsed = displayRemainingBalance;
+                }
+                setCollectAmount(parsed);
+              }
+            }} 
+            placeholder="Enter collection amount" 
           />
         </div>
 
