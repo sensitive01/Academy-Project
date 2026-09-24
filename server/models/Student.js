@@ -197,4 +197,10 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({ center: 1 });
 
+studentSchema.pre('find', function() {
+  if (!this.options.sort) {
+    this.sort({ studentNameEnglish: 1 });
+  } 
+});
+
 module.exports = mongoose.model("Student", studentSchema);

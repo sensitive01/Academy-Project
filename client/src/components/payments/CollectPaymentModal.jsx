@@ -247,7 +247,7 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
             }} 
             placeholder="Enter collection amount" 
           />
-        </div>
+        </div> 
 
         {/* Payment Mode Selection */}
         <div>

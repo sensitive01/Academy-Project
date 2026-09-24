@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, ArrowLeft, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
@@ -21,18 +22,42 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = fa
     if (!row.feeType || String(row.feeType).trim() === "") { isValid = false; errors.feeType = "Required"; }
     
     const tAmt = Number(row.totalAmount);
-    const pAmt = Number(row.paidAmount);
     
     if (isNaN(tAmt) || row.totalAmount === undefined || row.totalAmount === null || String(row.totalAmount).trim() === "") { 
       isValid = false; errors.totalAmount = "Invalid amount"; 
     }
-    if (isNaN(pAmt) || row.paidAmount === undefined || row.paidAmount === null || String(row.paidAmount).trim() === "") { 
-      isValid = false; errors.paidAmount = "Invalid amount"; 
-    }
     
-    if (!isNaN(tAmt) && !isNaN(pAmt) && pAmt > tAmt) {
-      isValid = false;
-      errors.paidAmount = "Cannot exceed total";
+    if (isTemplate) {
+      let sum = 0;
+      (row._monthKeys || []).forEach(m => {
+        const mAmt = Number(row[m.label]);
+        if (row[m.label] && isNaN(mAmt)) {
+          isValid = false;
+          errors[m.label] = "Invalid amount";
+        } else if (mAmt > 0) {
+          sum += mAmt;
+        }
+      });
+      if (!isNaN(tAmt) && sum > tAmt) {
+        isValid = false;
+        errors.totalAmount = `Sum (${sum}) > Total`;
+        (row._monthKeys || []).forEach(m => {
+          const mAmt = Number(row[m.label]);
+          if (!isNaN(mAmt) && mAmt > 0) {
+            errors[m.label] = "Exceeds total";
+          }
+        });
+      }
+    } else {
+      const pAmt = Number(row.paidAmount);
+      if (isNaN(pAmt) || row.paidAmount === undefined || row.paidAmount === null || String(row.paidAmount).trim() === "") { 
+        isValid = false; errors.paidAmount = "Invalid amount"; 
+      }
+      
+      if (!isNaN(tAmt) && !isNaN(pAmt) && pAmt > tAmt) {
+        isValid = false;
+        errors.paidAmount = "Cannot exceed total";
+      }
     }
 
     return { isValid, errors };
@@ -64,9 +89,10 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = fa
   const fieldMapping = isTemplate 
     ? [
         { key: 'studentId', label: 'Student ID' },
+        { key: 'studentName', label: 'Student Name' },
         { key: 'feeType', label: 'Fee Type' },
-        { key: 'paidAmount', label: 'Paid Amt' },
-        { key: 'paidDate', label: 'Month' }
+        { key: 'totalAmount', label: 'Total' },
+        ...(previewData[0]?._monthKeys || []).map(m => ({ key: m.label, label: m.label }))
       ]
     : [
         { key: 'studentId', label: 'Student ID' },
@@ -103,12 +129,33 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = fa
 
     setLoading(true);
     try {
-      const dataToUpload = processedData.all.map(row => {
-        const cleanRow = { ...row };
-        delete cleanRow._originalIndex;
-        delete cleanRow._errors;
-        return cleanRow;
-      });
+      let dataToUpload = [];
+      if (isTemplate) {
+        processedData.all.forEach(row => {
+          (row._monthKeys || []).forEach(m => {
+            const amt = Number(row[m.label]);
+            if (!isNaN(amt) && amt > 0) {
+              dataToUpload.push({
+                studentId: row.studentId,
+                year: row.year,
+                feeType: row.feeType,
+                totalAmount: row.totalAmount,
+                paidAmount: amt,
+                paymentMode: "Cash",
+                bankReference: "",
+                paidDate: `${m.mmStr}-${m.yyStr}`
+              });
+            }
+          });
+        });
+      } else {
+        dataToUpload = processedData.all.map(row => {
+          const cleanRow = { ...row };
+          delete cleanRow._originalIndex;
+          delete cleanRow._errors;
+          return cleanRow;
+        });
+      }
 
       const response = await api.post('/student-fees/bulk-upload', { fees: dataToUpload });
       setResult(response.data);
@@ -164,8 +211,10 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = fa
     }
   };
 
-  return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col h-[calc(100vh-100px)] animate-in fade-in duration-300">
+  const content = (
+    <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto">
+      <div className="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col min-h-[calc(100vh-64px)] animate-in fade-in duration-300">
       <div className="flex justify-between items-center mb-4 shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-700">
@@ -321,7 +370,11 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = fa
         )}
       </div>
     </div>
+  </div>
+</div>
   );
+
+  return createPortal(content, document.body);
 };
 
 export default BulkUploadFeeView;

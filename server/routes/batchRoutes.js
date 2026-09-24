@@ -51,7 +51,19 @@ router.get("/", protect, async (req, res) => {
       .populate("centers")
       .populate("semesters.subjects")
       .lean();
-    res.json(batches);
+      
+    const batchesWithCount = await Promise.all(batches.map(async (batch) => {
+      const studentCount = await Student.countDocuments({
+        "enrolledCourses.batch": batch._id,
+        status: "active"
+      });
+      return {
+        ...batch,
+        numberOfStudents: studentCount
+      };
+    }));
+
+    res.json(batchesWithCount);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

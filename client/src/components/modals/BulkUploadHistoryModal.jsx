@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download, Clock, CheckCircle, XCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -34,10 +35,10 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div>
@@ -71,7 +72,7 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                   {index !== history.length - 1 && (
                     <div className="absolute left-[11px] top-8 bottom-0 w-[2px] bg-slate-200"></div>
                   )}
-                  
+
                   {/* Timeline Dot */}
                   <div className={`absolute left-0 top-1.5 w-6 h-6 rounded-full flex items-center justify-center border-4 border-slate-50
                     ${entry.status === 'Success' ? 'bg-emerald-500' : entry.status === 'Partial' ? 'bg-amber-500' : 'bg-red-500'}`}
@@ -80,12 +81,12 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                   {/* Content Card */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      
+
                       {/* Left Info */}
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">#{index + 1}</span>
-                          <button 
+                          <button
                             onClick={() => setSelectedRecord(entry)}
                             className="font-bold text-slate-900 hover:text-brand-600 hover:underline flex items-center gap-1.5 text-left"
                           >
@@ -93,9 +94,9 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                             {entry.fileName}
                           </button>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider
-                            ${entry.status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 
-                              entry.status === 'Partial' ? 'bg-amber-100 text-amber-700' : 
-                              'bg-red-100 text-red-700'}`}
+                            ${entry.status === 'Success' ? 'bg-emerald-100 text-emerald-700' :
+                              entry.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
+                                'bg-red-100 text-red-700'}`}
                           >
                             {entry.status}
                           </span>
@@ -124,11 +125,11 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                             <div className="text-sm font-black text-slate-900">{entry.totalRecords}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-xs font-bold text-emerald-600 mb-1 flex items-center gap-1"><CheckCircle size={12}/> Success</div>
+                            <div className="text-xs font-bold text-emerald-600 mb-1 flex items-center gap-1"><CheckCircle size={12} /> Success</div>
                             <div className="text-sm font-black text-emerald-700">{entry.successfulRecords}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-xs font-bold text-red-600 mb-1 flex items-center gap-1"><XCircle size={12}/> Failed</div>
+                            <div className="text-xs font-bold text-red-600 mb-1 flex items-center gap-1"><XCircle size={12} /> Failed</div>
                             <div className="text-sm font-black text-red-700">{entry.failedRecords}</div>
                           </div>
                         </div>
@@ -143,7 +144,7 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                           </button>
                         )}
                       </div>
-                      
+
                     </div>
                   </div>
                 </div>
@@ -162,6 +163,8 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
       )}
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default BulkUploadHistoryModal;

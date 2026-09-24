@@ -22,7 +22,7 @@ const BulkUploadDataModal = ({ isOpen, onClose, historyRecord }) => {
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch file');
       const blob = await response.blob();
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const bstr = e.target.result;
@@ -30,14 +30,14 @@ const BulkUploadDataModal = ({ isOpen, onClose, historyRecord }) => {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const parsedData = XLSX.utils.sheet_to_json(ws);
-        
+
         // Add default status if missing
         const processedData = parsedData.map((row, index) => {
           let status = row['Upload Status'] || row['Upload_Status'] || row['Status'];
           if (!status) {
-             // Fallback to overall history record status if row-level status is missing
-             status = historyRecord.status === 'Success' ? 'Success' : 
-                      historyRecord.status === 'Failed' ? 'Failed' : 'Success'; 
+            // Fallback to overall history record status if row-level status is missing
+            status = historyRecord.status === 'Success' ? 'Success' :
+              historyRecord.status === 'Failed' ? 'Failed' : 'Success';
           }
           return {
             ...row,
@@ -100,25 +100,24 @@ const BulkUploadDataModal = ({ isOpen, onClose, historyRecord }) => {
 
   // Add generic Status column if not already present
   if (!columns.some(c => c.name.toLowerCase().includes('status'))) {
-     columns.push({
-        name: 'Status',
-        selector: row => row._status,
-        sortable: true,
-        width: '120px',
-        cell: row => (
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-            row._status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+    columns.push({
+      name: 'Status',
+      selector: row => row._status,
+      sortable: true,
+      width: '120px',
+      cell: row => (
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${row._status === 'Success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
           }`}>
-            {row._status}
-          </span>
-        )
-     });
+          {row._status}
+        </span>
+      )
+    });
   }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -142,24 +141,22 @@ const BulkUploadDataModal = ({ isOpen, onClose, historyRecord }) => {
         <div className="px-6 pt-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             {['all', 'success', 'failed'].map((tab) => {
-              const count = tab === 'all' ? data.length : 
-                            tab === 'success' ? data.filter(d => d._status === 'Success').length : 
-                            data.filter(d => d._status === 'Failed').length;
-              
+              const count = tab === 'all' ? data.length :
+                tab === 'success' ? data.filter(d => d._status === 'Success').length :
+                  data.filter(d => d._status === 'Failed').length;
+
               return (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`pb-4 px-1 text-sm font-bold border-b-2 transition-colors relative flex items-center gap-2 ${
-                    activeTab === tab 
-                      ? 'border-brand-600 text-brand-600' 
+                  className={`pb-4 px-1 text-sm font-bold border-b-2 transition-colors relative flex items-center gap-2 ${activeTab === tab
+                      ? 'border-brand-600 text-brand-600'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   <span className="capitalize">{tab}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                    activeTab === tab ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === tab ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
                     {count}
                   </span>
                 </button>

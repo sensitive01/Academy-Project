@@ -286,9 +286,17 @@ router.get("/salary/all", protect, async (req, res) => {
         };
       })
     );
+    data.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    data.forEach((item, index) => {
+      item.sNo = index + 1;
+    });
 
     res.json(data);
-
   } catch (err) {
     console.error("Payroll GET error:", err);
     res.status(500).json({ message: err.message });

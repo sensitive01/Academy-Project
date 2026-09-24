@@ -966,19 +966,23 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
 
               if (!sId || !fType) return; // Skip invalid rows
 
-              // For each month, if there's an amount, create a record
-              // Instead of relying on exact dynamicMonths keys which might mismatch if year changed,
-              // we can just look for keys that look like months or match dynamicMonths loosely
+              const _monthKeys = [];
+              const templateRow = {
+                  studentId: sId,
+                  studentName: row["Student Name"],
+                  year: yearVal,
+                  feeType: fType,
+                  totalAmount: Number(String(row["Current Year Fees Balance"] || "0").replace(/[^0-9.]/g, '')),
+              };
+              
               Object.keys(row).forEach(key => {
-                // Check if this key is a month column
                 const isMonthCol = dynamicMonths.some(m => m.label === key) ||
                   /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*['\-]?\s*\d{2,4}$/i.test(key);
 
                 if (isMonthCol) {
                   const amtStr = String(row[key] || "").replace(/[^0-9.]/g, '');
                   const amt = Number(amtStr);
-                  if (!isNaN(amt) && amt > 0) {
-                    // Extract month and year from the key (e.g. "Jul '27" -> 7, 2027)
+                  if (true) {
                     let mmStr = "01", yyStr = new Date().getFullYear();
 
                     const match = dynamicMonths.find(m => m.label === key);
@@ -998,19 +1002,16 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
                       }
                     }
 
-                    mappedData.push({
-                      studentId: sId,
-                      year: yearVal,
-                      feeType: fType,
-                      totalAmount: amt,
-                      paidAmount: amt,
-                      paymentMode: "Cash",
-                      bankReference: "",
-                      paidDate: `${mmStr}-${yyStr}`
-                    });
+                    _monthKeys.push({ label: key, mmStr, yyStr });
+                    templateRow[key] = !isNaN(amt) && amt > 0 ? amt : "";
                   }
                 }
               });
+
+              if (_monthKeys.length > 0) {
+                templateRow._monthKeys = _monthKeys;
+                mappedData.push(templateRow);
+              }
             } else {
               // Standard bulk upload format fallback
               mappedData.push({
@@ -1272,7 +1273,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
 
   const monthColumns = dynamicMonths.map(targetMonth => ({
     name: targetMonth.label,
-    width: "90px",
+    width: "110px",
     selector: row => row.isSummary ? row['month_' + targetMonth.label] : getAmountForMonth(row, targetMonth),
     cell: row => {
       const amt = row.isSummary ? row['month_' + targetMonth.label] : getAmountForMonth(row, targetMonth);
@@ -1280,6 +1281,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         return (
           <button
             onClick={() => {
+              if (row.isSummary) return; // Prevent clicking on totals row
               const payments = getPaymentsForMonth(row, targetMonth);
               setSelectedMonthPayments({
                 monthLabel: targetMonth.label,
@@ -1288,7 +1290,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
                 fee: row
               });
             }}
-            className="font-bold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer transition-colors"
+            className={`font-bold text-brand-600 ${!row.isSummary ? 'hover:text-brand-800 hover:underline cursor-pointer' : 'cursor-default'} transition-colors whitespace-nowrap`}
           >
             ₹{amt.toLocaleString('en-IN')}
           </button>
