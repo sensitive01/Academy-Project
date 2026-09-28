@@ -23,7 +23,8 @@ const StudentFilterBar = ({
   vendors = [],
   showVendor = false,
   showType = true,
-  onReset
+  onReset,
+  className
 }) => {
   const handleReset = () => {
     if (setFilterType) setFilterType([]);
@@ -37,7 +38,7 @@ const StudentFilterBar = ({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
+    <div className={className || "flex flex-wrap items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6"}>
       {showType && setFilterType && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown

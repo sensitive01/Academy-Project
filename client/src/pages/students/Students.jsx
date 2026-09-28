@@ -736,7 +736,7 @@ const Students = () => {
   }, []);
 
   useEffect(() => {
-    let result = students;
+    let result = students.filter(s => !s.admissionPhase || s.admissionPhase === 'joined');
 
     if (activeTab === "online_students") {
       result = result.filter(s => !s.center);

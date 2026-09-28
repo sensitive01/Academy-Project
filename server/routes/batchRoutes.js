@@ -4,6 +4,7 @@ const Batch = require("../models/Batch");
 const Student = require("../models/Student");
 const { protect } = require("../middleware/authMiddleware");
 const Mark = require("../models/Mark");
+const BatchFee = require("../models/BatchFee");
 
 //////////////////////////////////////////////////////
 // CREATE BATCH
@@ -295,6 +296,40 @@ router.post("/:id/assign-students", protect, async (req, res) => {
     await batch.populate("students", "studentNameEnglish studentId");
 
     res.json(batch);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+//////////////////////////////////////////////////////
+// DEFINE BATCH FEES
+//////////////////////////////////////////////////////
+router.post("/:id/fees", protect, async (req, res) => {
+  try {
+    const { centers, courses, admissionFee, scholarshipFee } = req.body;
+    const batchFee = await BatchFee.create({
+      batch: req.params.id,
+      centers,
+      courses,
+      admissionFee,
+      scholarshipFee
+    });
+    res.status(201).json(batchFee);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+//////////////////////////////////////////////////////
+// GET BATCH FEES
+//////////////////////////////////////////////////////
+router.get("/:id/fees", protect, async (req, res) => {
+  try {
+    const fees = await BatchFee.find({ batch: req.params.id })
+      .populate("centers", "name")
+      .populate("courses", "title name")
+      .lean();
+    res.json(fees);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

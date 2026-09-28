@@ -191,6 +191,11 @@ const studentSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    admissionPhase: {
+      type: String,
+      enum: ["scholarship", "admitted", "joined"],
+      default: "joined" 
+    }
   },
   { timestamps: true }
 );

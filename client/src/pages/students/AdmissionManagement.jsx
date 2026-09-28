@@ -1,26 +1,108 @@
 import React, { useState, useEffect } from "react";
 import { 
   FileText, Users, GraduationCap, Building2, Calendar, LayoutDashboard,
-  Search, Plus, Mail, CheckCircle, Clock
+  Search, Plus, Mail, CheckCircle, Clock, IndianRupee
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import CustomDataTable from "../../components/common/DataTable";
 import Loading from "../../components/common/Loading";
 import toast from "react-hot-toast";
+import FeeDefinitionModal from "../../components/modals/FeeDefinitionModal";
+import ViewListModal from "../../components/modals/ViewListModal";
+import ViewFeesModal from "../../components/modals/ViewFeesModal";
+import CollectFeeModal from "../../components/modals/CollectFeeModal";
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
+import StudentFilterBar from "../../components/common/StudentFilterBar";
 
 const AdmissionManagement = () => {
   const [activeTab, setActiveTab] = useState("admission_form");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [batches, setBatches] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchSearch, setBatchSearch] = useState("");
+  
+  // Modals state
+  const [viewListModalData, setViewListModalData] = useState(null);
+  const [selectedBatchForFee, setSelectedBatchForFee] = useState(null);
+  const [selectedBatchForViewingFees, setSelectedBatchForViewingFees] = useState(null);
+  const [feeModalData, setFeeModalData] = useState(null);
+  
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: () => {}
+  });
+
   const navigate = useNavigate();
 
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
   useEffect(() => {
-    if (activeTab === "admission_form") {
+    if (activeTab === "admission_form" || activeTab === "scholarship_form") {
       fetchStudents();
+    } else if (activeTab === "payment_data" || activeTab === "approvals") {
+      fetchPayments();
     }
   }, [activeTab]);
+
+  const getSessionValue = (key, defaultVal) => {
+    const val = sessionStorage.getItem(key);
+    if (!val) return defaultVal;
+    try { return JSON.parse(val); } catch (e) { return val; }
+  };
+
+  const [filterCenter, setFilterCenter] = useState(() => getSessionValue("admission_filterCenter", []));
+  const [filterCourse, setFilterCourse] = useState(() => getSessionValue("admission_filterCourse", []));
+  const [filterBatch, setFilterBatch] = useState(() => getSessionValue("admission_filterBatch", []));
+  
+  const [centers, setCenters] = useState([]);
+  const [courses, setCourses] = useState([]);
+
+  useEffect(() => {
+    sessionStorage.setItem("admission_filterCenter", JSON.stringify(filterCenter));
+    sessionStorage.setItem("admission_filterCourse", JSON.stringify(filterCourse));
+    sessionStorage.setItem("admission_filterBatch", JSON.stringify(filterBatch));
+  }, [filterCenter, filterCourse, filterBatch]);
+
+  useEffect(() => {
+     fetchCenters();
+     fetchCourses();
+     fetchBatches();
+  }, []);
+
+  const fetchCenters = async () => {
+    try {
+      const { data } = await api.get("/centers");
+      setCenters(data || []);
+    } catch { /* Fail silently */ }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const { data } = await api.get("/courses");
+      const allCourses = data.courses || data || [];
+      setCourses(allCourses.filter(c => c.type === 'Center Courses'));
+    } catch { /* Fail silently */ }
+  };
+
+  const fetchPayments = async () => {
+    try {
+      setPaymentsLoading(true);
+      const res = await api.get('/students/admission-payments/all');
+      setPayments(res.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch payments");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
 
   const fetchStudents = async () => {
     try {
@@ -30,13 +112,47 @@ const AdmissionManagement = () => {
       const allStudents = (res.data.students || []).filter(s => !!s.center);
       setStudents(allStudents);
     } catch (err) {
+      console.error(err);
       toast.error("Failed to fetch students");
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchBatches = async () => {
+    try {
+      setBatchLoading(true);
+      const res = await api.get("/batches");
+      setBatches(res.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch batches");
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   const filteredStudents = students.filter(s => {
+    if (filterCenter && filterCenter.length > 0) {
+      if (!filterCenter.includes(s.center) && !filterCenter.includes(s.center?._id)) return false;
+    }
+    if (filterCourse && filterCourse.length > 0) {
+      if (!s.enrolledCourses?.some(ec => filterCourse.includes(ec.course?._id) || filterCourse.includes(ec.course))) return false;
+    }
+    if (filterBatch && filterBatch.length > 0) {
+      const selectedBatches = batches.filter(b => filterBatch.includes(b.name || b.batchId || b._id));
+      if (selectedBatches.length > 0) {
+        const batchIds = selectedBatches.map(b => b._id.toString());
+        const inBatchState = selectedBatches.some(b => b.students?.some(bs => bs === s._id || bs?._id === s._id));
+        const inStudentState = s.enrolledCourses?.some(ec => {
+          const ecBatchId = typeof ec.batch === 'object' ? ec.batch?._id : ec.batch;
+          return ecBatchId && batchIds.includes(ecBatchId.toString());
+        });
+        if (!inBatchState && !inStudentState) return false;
+      } else {
+        return false;
+      }
+    }
     if (!search) return true;
     const term = search.toLowerCase();
     return (
@@ -46,7 +162,38 @@ const AdmissionManagement = () => {
     );
   });
 
-  const columns = [
+  const scholarshipStudents = filteredStudents.filter(s => ['scholarship', 'admitted', 'joined'].includes(s.admissionPhase));
+  const admissionStudents = filteredStudents.filter(s => ['admitted', 'joined'].includes(s.admissionPhase));
+
+  const handleUpdatePhase = (studentId, newPhase, confirmMessage) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: "Update Phase",
+      message: confirmMessage,
+      type: "info",
+      onConfirm: async () => {
+        try {
+          await api.patch(`/students/${studentId}/admission-phase`, { phase: newPhase });
+          toast.success("Student updated successfully!");
+          fetchStudents();
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to update student phase");
+        }
+      }
+    });
+  };
+
+  const filteredBatches = batches.filter(b => {
+    if (!batchSearch) return true;
+    const term = batchSearch.toLowerCase();
+    return (
+      (b.name || "").toLowerCase().includes(term) ||
+      (b.batchId || "").toLowerCase().includes(term)
+    );
+  });
+
+  const baseColumns = [
     {
       name: "S.No",
       selector: (row, index) => index + 1,
@@ -70,18 +217,9 @@ const AdmissionManagement = () => {
       width: "250px"
     },
     {
-      name: "DOB",
-      selector: row => row.dob,
-      cell: row => (
-        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 whitespace-nowrap">
-          <Calendar size={13} className="text-slate-400" />
-          <span>{row.dob ? new Date(row.dob).toLocaleDateString('en-GB') : "N/A"}</span>
-        </div>
-      ),
-      width: "120px"
-    },
-    {
       name: "Contact Info",
+      selector: row => row.user?.email || "N/A",
+      sortable: true,
       cell: row => (
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-1.5 text-[11px] text-slate-600 truncate">
@@ -90,28 +228,273 @@ const AdmissionManagement = () => {
           </div>
         </div>
       ),
-      width: "200px"
+      width: "250px"
     },
     {
-      name: "Status",
-      selector: row => row.status,
-      cell: row => (
-        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-          row.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-        }`}>
-          {row.status === 'active' ? <CheckCircle size={10} /> : <Clock size={10} />}
+      name: "Academic Info",
+      selector: row => `${row.center?.name || "-"} ${row.enrolledCourses?.[0]?.course?.title || "-"} ${row.enrolledCourses?.[0]?.batch?.name || "-"}`,
+      sortable: true,
+      cell: row => {
+        const center = row.center?.name || "-";
+        const enrolled = row.enrolledCourses?.[0] || {};
+        const course = enrolled.course?.title || "-";
+        const batch = enrolled.batch?.name || "-";
+        return (
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-[11px] font-bold text-slate-700 truncate">{center}</span>
+            <span className="text-[10px] font-medium text-slate-500 truncate">{course}</span>
+            <span className="text-[10px] text-brand-600 font-bold truncate">{batch}</span>
+          </div>
+        );
+      },
+      width: "280px"
+    },
+    {
+      name: "Fee Details",
+      selector: row => {
+        // activeTab cannot be easily referenced safely inside baseColumns without passing it, but baseColumns is re-created on render.
+        // Actually since it's defined inside the component, activeTab is in scope!
+        const feeSummary = activeTab === "scholarship_form" ? row.scholarshipFeeSummary : row.admissionFeeSummary;
+        return feeSummary?.total || 0;
+      },
+      sortable: true,
+      cell: row => {
+        const feeSummary = activeTab === "scholarship_form" ? row.scholarshipFeeSummary : row.admissionFeeSummary;
+        const total = feeSummary?.total || 0;
+        const paid = feeSummary?.paid || 0;
+        const balance = feeSummary?.balance || 0;
+        
+        const openFeeModal = () => {
+          const fType = activeTab === "scholarship_form" ? "Scholarship" : "Admission";
+          setFeeModalData({ student: row, feeType: fType });
+        };
+
+        if (total === 0 && paid === 0) {
+          return (
+            <button 
+              onClick={openFeeModal}
+              className="text-[11px] font-bold text-slate-400 hover:text-brand-600 hover:underline text-left w-full"
+            >
+              N/A (No fees available)
+            </button>
+          ); 
+        }
+
+        return (
+          <button 
+            onClick={openFeeModal}
+            className="flex flex-col gap-1 text-[11px] min-w-0 text-left hover:bg-slate-50 p-1.5 rounded w-full transition-colors group"
+          >
+            <span className="font-medium text-slate-600 group-hover:text-brand-700">Total: ₹{total}</span>
+            <span className="font-medium text-emerald-600">Paid: ₹{paid}</span>
+            <span className="font-bold text-rose-600">Bal: ₹{balance}</span>
+          </button>
+        );
+      },
+      width: "150px"
+    }
+  ];
+
+  const scholarshipColumns = [
+    ...baseColumns,
+    {
+      name: "Action",
+      cell: row => {
+        const isMoved = ['admitted', 'joined'].includes(row.admissionPhase);
+        return (
+          <div className="flex items-center">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={isMoved} 
+                onChange={(e) => {
+                   e.preventDefault();
+                   if (!isMoved) {
+                     handleUpdatePhase(row._id, 'admitted', 'Move this student to the Admission Form?');
+                   } else {
+                     handleUpdatePhase(row._id, 'scholarship', 'Revert this student back to the Scholarship phase?');
+                   }
+                }} 
+              />
+              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+            </label>
+          </div>
+        );
+      },
+      width: "100px"
+    }
+  ];
+
+  const admissionColumns = [
+    ...baseColumns,
+    {
+      name: "Action",
+      cell: row => {
+        const isMoved = row.admissionPhase === 'joined';
+        return (
+          <div className="flex items-center">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={isMoved} 
+                onChange={(e) => {
+                   e.preventDefault();
+                   if (!isMoved) {
+                     handleUpdatePhase(row._id, 'joined', 'Move this student to Center Students?');
+                   } else {
+                     handleUpdatePhase(row._id, 'admitted', 'Revert this student back to the Admission phase?');
+                   }
+                }} 
+              />
+              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+            </label>
+          </div>
+        );
+      },
+      width: "100px"
+    }
+  ];
+
+  const handleUpdatePaymentStatus = (feeId, paymentId, status) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `${status} Payment`,
+      message: `Are you sure you want to ${status.toLowerCase()} this payment?`,
+      type: status === 'Approved' ? "success" : "danger",
+      onConfirm: async () => {
+        try {
+          await api.patch(`/students/admission-payments/${feeId}/status/${paymentId}`, { status });
+          toast.success(`Payment ${status.toLowerCase()}!`);
+          fetchPayments();
+        } catch(err) {
+          toast.error(`Failed to ${status.toLowerCase()} payment`);
+        }
+      }
+    });
+  };
+
+  const paymentColumns = [
+    { name: "S.No", selector: (row, index) => index + 1, width: "70px" },
+    { name: "Student Profile", selector: row => row.studentName, sortable: true, cell: row => (
+      <div className="font-bold text-slate-900 truncate">
+        {row.studentName}
+        <div className="text-[10px] text-slate-500">{row.studentId}</div>
+      </div>
+    )},
+    { name: "Fee Type", selector: row => row.feeType, sortable: true, width: "150px" },
+    { name: "Amount", selector: row => row.amount, sortable: true, cell: row => `₹${row.amount}`, width: "120px" },
+    { name: "Mode", selector: row => row.paymentMode, sortable: true, width: "100px" },
+    { name: "Ref / Proof", selector: row => row.bankReference || "-", sortable: true, cell: row => (
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-xs truncate">{row.bankReference || "-"}</span>
+          {row.proofOfPayment && (
+            <a 
+              href={row.proofOfPayment} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[10px] text-brand-600 font-bold hover:underline"
+            >
+              View Proof
+            </a>
+          )}
+        </div>
+    ), width: "150px" },
+    { name: "Status", selector: row => row.status, sortable: true, cell: row => (
+        <span className={`px-2 py-1 rounded text-xs font-bold ${row.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : row.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
           {row.status}
         </span>
+    ), width: "120px" },
+    { name: "Date", selector: row => new Date(row.paidAt).getTime(), sortable: true, format: row => new Date(row.paidAt).toLocaleDateString(), width: "120px" }
+  ];
+
+  const approvalColumns = [
+    ...paymentColumns.filter(c => c.name !== 'Status'),
+    {
+      name: "Action",
+      cell: row => (
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => handleUpdatePaymentStatus(row.studentFeeId, row.paymentId, 'Approved')}
+            className="px-3 py-1 bg-brand-600 text-white rounded text-xs font-bold hover:bg-brand-700 transition-colors"
+          >
+            Approve
+          </button>
+          <button 
+            onClick={() => handleUpdatePaymentStatus(row.studentFeeId, row.paymentId, 'Rejected')}
+            className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100 transition-colors"
+          >
+            Reject
+          </button>
+        </div>
       ),
-      width: "120px"
+      width: "160px"
+    }
+  ];
+
+  const batchColumns = [
+    {
+      name: "S.No",
+      selector: (row, index) => index + 1,
+      width: "80px"
+    },
+    {
+      name: "Batch Name",
+      selector: row => row.name,
+      sortable: true,
+      cell: row => (
+        <button 
+          onClick={() => setSelectedBatchForViewingFees(row)}
+          className="font-bold text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline text-left"
+        >
+          {row.name}
+        </button>
+      ),
+      width: "250px"
+    },
+    {
+      name: "Batch ID",
+      selector: row => row.batchId,
+      sortable: true,
+    },
+    {
+      name: "Course",
+      cell: row => (
+        <button 
+          onClick={() => setViewListModalData({ title: "Courses", items: row.courses || [] })}
+          className="text-[11px] bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-bold whitespace-nowrap hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+        >
+          View Courses
+          <span className="bg-blue-200 text-blue-800 px-1.5 rounded-md text-[10px]">{row.courses?.length || 0}</span>
+        </button>
+      ),
+      width: "150px"
     },
     {
       name: "Center",
       cell: row => (
-        <div className="text-[11px] font-bold text-slate-600 truncate">
-          {row.center?.name || row.center || "-"}
-        </div>
-      )
+        <button 
+          onClick={() => setViewListModalData({ title: "Centers", items: row.centers || [] })}
+          className="text-[11px] bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg font-bold whitespace-nowrap hover:bg-purple-100 transition-colors flex items-center gap-1.5"
+        >
+          View Centers
+          <span className="bg-purple-200 text-purple-800 px-1.5 rounded-md text-[10px]">{row.centers?.length || 0}</span>
+        </button>
+      ),
+      width: "150px"
+    },
+    {
+      name: "Actions",
+      cell: row => (
+        <button 
+          onClick={() => setSelectedBatchForFee(row)}
+          className="px-4 py-1.5 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold hover:bg-brand-100 transition-colors"
+        >
+          Define Fees
+        </button>
+      ),
+      width: "150px"
     }
   ];
 
@@ -164,29 +547,58 @@ const AdmissionManagement = () => {
               activeTab === "admission_form" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
             }`} />
           </button>
+          <button
+            onClick={() => setActiveTab("fee_setup")}
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
+              activeTab === "fee_setup"
+                ? "text-brand-600"
+                : "text-gray-500 hover:text-brand-600"
+            }`}
+          >
+            <IndianRupee size={20} />
+            Fee Setup
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
+              activeTab === "fee_setup" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+            }`} />
+          </button>
+          <button
+            onClick={() => setActiveTab("payment_data")}
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
+              activeTab === "payment_data"
+                ? "text-brand-600"
+                : "text-gray-500 hover:text-brand-600"
+            }`}
+          >
+            <LayoutDashboard size={20} />
+            Payment Data
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
+              activeTab === "payment_data" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+            }`} />
+          </button>
+          <button
+            onClick={() => setActiveTab("approvals")}
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
+              activeTab === "approvals"
+                ? "text-brand-600"
+                : "text-gray-500 hover:text-brand-600"
+            }`}
+          >
+            <CheckCircle size={20} />
+            Approvals
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
+              activeTab === "approvals" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+            }`} />
+          </button>
         </div>
 
         {/* Tab Content */}
         {activeTab === "scholarship_form" && (
-          <div className="bg-white p-12 rounded-3xl border border-slate-200 shadow-sm text-center animate-fade-in-up flex flex-col items-center justify-center min-h-[400px]">
-            <div className="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mb-6">
-              <FileText size={40} className="text-brand-300" />
-            </div>
-            <h2 className="text-2xl font-black text-slate-800 mb-2">Scholarship Forms Coming Soon</h2>
-            <p className="text-slate-500 max-w-md mx-auto text-sm">
-              The scholarship application tracking and forms management module is currently under development. Please check back later.
-            </p>
-          </div>
-        )}
-
-        {activeTab === "admission_form" && (
           <div className="animate-fade-in-up space-y-6">
-            
             {/* Table */}
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
               <CustomDataTable
-                columns={columns}
-                data={filteredStudents}
+                columns={scholarshipColumns}
+                data={scholarshipStudents}
                 progressPending={loading}
                 progressComponent={
                   <div className="p-12"><Loading /></div>
@@ -195,13 +607,26 @@ const AdmissionManagement = () => {
                 setSearch={setSearch}
                 searchPlaceholder="Search by ID, name, email..."
                 additionalHeaderContent={
-                  <button 
-                    onClick={() => navigate('/student-registration')}
-                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 w-full sm:w-auto"
-                  >
-                    <Plus size={18} />
-                    Add Student
-                  </button>
+                  <div className="flex items-center gap-3 justify-end w-full">
+                    <StudentFilterBar
+                      filterCenter={filterCenter} setFilterCenter={setFilterCenter}
+                      filterCourse={filterCourse} setFilterCourse={setFilterCourse}
+                      filterBatch={filterBatch} setFilterBatch={setFilterBatch}
+                      centers={centers}
+                      courses={courses}
+                      batches={batches}
+                      showType={false}
+                      showVendor={false}
+                      className="flex items-center gap-2"
+                    />
+                    <button 
+                      onClick={() => navigate('/student-registration')}
+                      className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 shrink-0"
+                    >
+                      <Plus size={18} />
+                      Add Student
+                    </button>
+                  </div>
                 }
                 pagination
                 responsive
@@ -210,7 +635,143 @@ const AdmissionManagement = () => {
           </div>
         )}
 
+        {activeTab === "admission_form" && (
+          <div className="animate-fade-in-up space-y-6">
+            {/* Table */}
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
+              <CustomDataTable
+                columns={admissionColumns}
+                data={admissionStudents}
+                progressPending={loading}
+                progressComponent={
+                  <div className="p-12"><Loading /></div>
+                }
+                search={search}
+                setSearch={setSearch}
+                searchPlaceholder="Search by ID, name, email..."
+                additionalHeaderContent={
+                  <div className="flex items-center gap-3 justify-end w-full">
+                    <StudentFilterBar
+                      filterCenter={filterCenter} setFilterCenter={setFilterCenter}
+                      filterCourse={filterCourse} setFilterCourse={setFilterCourse}
+                      filterBatch={filterBatch} setFilterBatch={setFilterBatch}
+                      centers={centers}
+                      courses={courses}
+                      batches={batches}
+                      showType={false}
+                      showVendor={false}
+                      className="flex items-center gap-2"
+                    />
+                    <button 
+                      onClick={() => navigate('/student-registration')}
+                      className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 shrink-0"
+                    >
+                      <Plus size={18} />
+                      Add Student
+                    </button>
+                  </div>
+                }
+                pagination
+                responsive
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "fee_setup" && (
+          <div className="animate-fade-in-up space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
+              <CustomDataTable
+                columns={batchColumns}
+                data={filteredBatches}
+                progressPending={batchLoading}
+                progressComponent={
+                  <div className="p-12"><Loading /></div>
+                }
+                search={batchSearch}
+                setSearch={setBatchSearch}
+                searchPlaceholder="Search batches by name or ID..."
+                pagination
+                responsive
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "payment_data" && (
+          <div className="animate-fade-in-up space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
+              <CustomDataTable
+                columns={paymentColumns}
+                data={payments}
+                progressPending={paymentsLoading}
+                progressComponent={<div className="p-12"><Loading /></div>}
+                search={search}
+                setSearch={setSearch}
+                searchPlaceholder="Search by student or transaction..."
+                pagination
+                responsive
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "approvals" && (
+          <div className="animate-fade-in-up space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
+              <CustomDataTable
+                columns={approvalColumns}
+                data={payments.filter(p => p.status === 'Pending')}
+                progressPending={paymentsLoading}
+                progressComponent={<div className="p-12"><Loading /></div>}
+                search={search}
+                setSearch={setSearch}
+                searchPlaceholder="Search by student or transaction..."
+                pagination
+                responsive
+              />
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* Modals */}
+      <ViewListModal 
+        isOpen={!!viewListModalData} 
+        onClose={() => setViewListModalData(null)}
+        title={viewListModalData?.title || ""}
+        items={viewListModalData?.items || []}
+      />
+      
+      <FeeDefinitionModal 
+        isOpen={!!selectedBatchForFee}
+        onClose={() => setSelectedBatchForFee(null)}
+        batch={selectedBatchForFee}
+      />
+
+      <ViewFeesModal 
+        isOpen={!!selectedBatchForViewingFees}
+        onClose={() => setSelectedBatchForViewingFees(null)}
+        batch={selectedBatchForViewingFees}
+      />
+
+      <CollectFeeModal
+        isOpen={!!feeModalData}
+        onClose={() => setFeeModalData(null)}
+        student={feeModalData?.student}
+        feeType={feeModalData?.feeType}
+        onSuccess={() => {
+          setFeeModalData(null);
+          fetchStudents();
+        }}
+      />
+
+      <ConfirmationModal 
+        {...confirmModalConfig}
+        onClose={() => setConfirmModalConfig({ ...confirmModalConfig, isOpen: false })}
+      />
+
     </div>
   );
 };

@@ -39,7 +39,7 @@ const StudentRegistration = () => {
     fatherName: "",
     gender: "",
     nationality: "",
-    year: "",
+    year: "1st Year",
     aadharNo: "",
     kcetRegNo: "",
     neetRegNo: "",
@@ -482,34 +482,85 @@ const StudentRegistration = () => {
                   <SelectBox label="Gender *" name="gender" value={formData.gender} onChange={handleChange} options={["Male", "Female", "Other"]} />
                   <div className="grid grid-cols-2 gap-6">
                     <FormInput label="Nationality *" name="nationality" value={formData.nationality} onChange={handleChange} />
-                    <SelectBox label="Year" name="year" value={formData.year} onChange={handleChange} options={["1st Year", "2nd Year", "3rd Year", "4th Year"]} />
+                    <SelectBox label="Marital Status" name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} options={["Married", "Unmarried"]} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <SelectBox label="Religion" name="religion" value={formData.religion} onChange={handleChange} options={["Hindu", "Muslim", "Christian", "Others"]} />
+                    <SelectBox label="Community" name="community" value={formData.community} onChange={handleChange} options={["MBC", "OC", "OBC", "BC", "SC", "ST", "Others"]} />
                   </div>
                 </div>
 
-                <StepHeader title="National & Academic IDs" icon={<ShieldCheck className="text-brand-700" />} />
+                <StepHeader title="National IDs" icon={<ShieldCheck className="text-brand-700" />} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <FormInput label="Aadhar No *" name="aadharNo" value={formData.aadharNo} onChange={handleChange} />
                   <FormInput label="KCET Reg No" name="kcetRegNo" value={formData.kcetRegNo} onChange={handleChange} />
                   <FormInput label="NEET Reg No" name="neetRegNo" value={formData.neetRegNo} onChange={handleChange} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <FormInput label="APAAR ID Reg No" name="apaarId" value={formData.apaarId} onChange={handleChange} />
                   <FormInput label="DEB Unique ID No" name="debId" value={formData.debId} onChange={handleChange} />
                   <FormInput label="ABC ID No" name="abcId" value={formData.abcId} onChange={handleChange} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8 border-t border-slate-50">
-                  <div className="grid grid-cols-2 gap-6">
-                    <SelectBox label="Religion" name="religion" value={formData.religion} onChange={handleChange} options={["Hindu", "Muslim", "Christian", "Others"]} />
-                    <SelectBox label="Community" name="community" value={formData.community} onChange={handleChange} options={["MBC", "OC", "OBC", "BC", "SC", "ST", "Others"]} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <SelectBox label="Marital Status" name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} options={["Married", "Unmarried"]} />
-                    {registrationType !== 'online' && (
-                      <SelectBox label="Select Center" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
-                    )}
-                  </div>
+                <div className="pt-4">
+                  <StepHeader title="Academic Data" icon={<BookOpen className="text-brand-700" />} />
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <SelectBox label="Year" name="year" value={formData.year} onChange={handleChange} options={["1st Year", "2nd Year", "3rd Year", "4th Year"]} />
+                  
+                  {registrationType !== 'online' && (
+                    <SelectBox label="Select Center" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
+                  )}
+
+                  {hasFeesStep && (
+                    <>
+                      <SelectBox 
+                        label="Assign Batch" 
+                        value={adminEnrollment.batch} 
+                        defaultOption="Select a Batch"
+                        onChange={(e) => {
+                          const batchId = e.target.value;
+                          const selectedBatchObj = batches.find(b => b._id === batchId);
+                          
+                          let finalCourseId = adminEnrollment.course;
+                          if (selectedBatchObj) {
+                            const batchCourses = selectedBatchObj.courses?.map(c => c._id || c) || [];
+                            const legacyCourse = selectedBatchObj.course?._id || selectedBatchObj.course;
+                            if (legacyCourse && !batchCourses.includes(legacyCourse)) {
+                              batchCourses.push(legacyCourse);
+                            }
+                            if (batchCourses.length === 1) {
+                              finalCourseId = batchCourses[0].toString();
+                            } else if (batchCourses.length > 1 && !batchCourses.includes(finalCourseId)) {
+                              finalCourseId = ""; 
+                            }
+                          }
+
+                          setAdminEnrollment(prev => ({
+                            ...prev,
+                            batch: batchId,
+                            course: finalCourseId
+                          }));
+                        }} 
+                        options={getFilteredBatches().map(b => ({value: b._id, label: b.name}))} 
+                        isObjectOptions 
+                      />
+
+                      <SelectBox 
+                        label="Assign Course" 
+                        value={adminEnrollment.course} 
+                        defaultOption={!adminEnrollment.batch ? "Select a batch first" : "Select a Course"}
+                        onChange={(e) => setAdminEnrollment(prev => ({ ...prev, course: e.target.value }))} 
+                        options={
+                          !adminEnrollment.batch 
+                            ? []
+                            : getAvailableCoursesForBatch().map(c => ({value: c._id, label: c.title || "Unknown Course"}))
+                        } 
+                        isObjectOptions 
+                      />
+                    </>
+                  )}
+                </div>
+
               </div>
             )}
 
@@ -1009,10 +1060,16 @@ const StudentRegistration = () => {
 
             {currentStep === 5 && hasFeesStep && (
               <div className="space-y-8 animate-fade-in-up">
-                <StepHeader title="Fee Structure & Course Assignment" subtitle="Assign Course, Batch, Council Fees, and Course Fee Schemes (Step 5)" icon={<CreditCard className="text-brand-700" />} />
+                <StepHeader title="Fee Structure" subtitle="Assign Council Fees and Course Fee Schemes (Step 5)" icon={<CreditCard className="text-brand-700" />} />
                 
-                {/* Course & Batch Selection */}
+                {/* Academic Data (Syncs with Step 1) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50/70 rounded-2xl border border-slate-100 shadow-sm">
+                  <SelectBox label="Year" name="year" value={formData.year} onChange={handleChange} options={["1st Year", "2nd Year", "3rd Year", "4th Year"]} />
+                  
+                  {registrationType !== 'online' && (
+                    <SelectBox label="Select Center" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
+                  )}
+                  
                   <SelectBox 
                     label="Assign Batch" 
                     value={adminEnrollment.batch} 
@@ -1031,7 +1088,7 @@ const StudentRegistration = () => {
                         if (batchCourses.length === 1) {
                           finalCourseId = batchCourses[0].toString();
                         } else if (batchCourses.length > 1 && !batchCourses.includes(finalCourseId)) {
-                          finalCourseId = ""; // Reset if current course is not in the new batch
+                          finalCourseId = ""; 
                         }
                       }
 
@@ -1044,6 +1101,7 @@ const StudentRegistration = () => {
                     options={getFilteredBatches().map(b => ({value: b._id, label: b.name}))} 
                     isObjectOptions 
                   />
+
                   <SelectBox 
                     label="Assign Course" 
                     value={adminEnrollment.course} 

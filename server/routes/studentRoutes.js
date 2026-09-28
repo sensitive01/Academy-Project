@@ -179,7 +179,8 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       references,
       year,
       status: 'active',
-      parent: parentUserId || undefined
+      parent: parentUserId || undefined,
+      admissionPhase: req.body.admissionPhase || 'scholarship'
     });
 
     if (req.user && req.user.role === 'admin' && req.body.adminEnrollment) {
@@ -297,11 +298,90 @@ router.get("/", protect, async (req, res) => {
       .populate("user", "-password")
       .populate("parent", "name email")
       .populate("enrolledCourses.course", "title price category duration")
-      .populate("center", "centerId name location");
+      .populate("enrolledCourses.batch", "name")
+      .populate("center", "centerId name location")
+      .lean();
+
+    const studentIds = students.map(s => s._id);
+    const fees = await StudentFee.find({ student: { $in: studentIds } }).lean();
+
+    const BatchFee = require('../models/BatchFee');
+    const batchFees = await BatchFee.find().lean();
+    
+    // Create a fast lookup for BatchFees: key = batchId_centerId_courseId
+    const batchFeeMap = {};
+    batchFees.forEach(bf => {
+      bf.centers.forEach(c => {
+        bf.courses.forEach(crs => {
+          const key = `${bf.batch}_${c}_${crs}`;
+          batchFeeMap[key] = bf;
+        });
+      });
+    });
+
+    const feesByStudent = fees.reduce((acc, fee) => {
+      if (!acc[fee.student]) {
+        acc[fee.student] = {};
+      }
+      
+      const type = fee.otherFeeType; // e.g. "Scholarship Fee" or "Admission Fee"
+      if (!acc[fee.student][type]) {
+         acc[fee.student][type] = { totalFee: fee.amount || 0, paidFee: 0 };
+      }
+      
+      const paid = (fee.payments || [])
+        .filter(p => p.status === 'Approved')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      acc[fee.student][type].paidFee += paid;
+
+      return acc;
+    }, {});
+
+    const studentsWithFees = students.map(student => {
+      let expectedScholarship = 0;
+      let expectedAdmission = 0;
+      
+      if (student.enrolledCourses && student.enrolledCourses[0]) {
+         const enrolled = student.enrolledCourses[0];
+         const batchId = enrolled.batch?._id || enrolled.batch;
+         const courseId = enrolled.course?._id || enrolled.course;
+         const centerId = student.center?._id || student.center;
+         if (batchId && courseId && centerId) {
+            const key = `${batchId}_${centerId}_${courseId}`;
+            if (batchFeeMap[key]) {
+               expectedScholarship = batchFeeMap[key].scholarshipFee || 0;
+               expectedAdmission = batchFeeMap[key].admissionFee || 0;
+            }
+         }
+      }
+
+      const studentFees = feesByStudent[student._id] || {};
+      
+      const sf = studentFees['Scholarship Fee'] || { totalFee: expectedScholarship, paidFee: 0 };
+      // If StudentFee was created but amount was 0 for some reason, use expected if expected > 0
+      const sTotal = (sf.totalFee === 0 && expectedScholarship > 0) ? expectedScholarship : sf.totalFee;
+
+      const af = studentFees['Admission Fee'] || { totalFee: expectedAdmission, paidFee: 0 };
+      const aTotal = (af.totalFee === 0 && expectedAdmission > 0) ? expectedAdmission : af.totalFee;
+
+      return {
+        ...student,
+        scholarshipFeeSummary: {
+          total: sTotal,
+          paid: sf.paidFee,
+          balance: sTotal - sf.paidFee
+        },
+        admissionFeeSummary: {
+          total: aTotal,
+          paid: af.paidFee,
+          balance: aTotal - af.paidFee
+        }
+      };
+    });
 
     res.json({
-      count: students.length,
-      students,
+      count: studentsWithFees.length,
+      students: studentsWithFees,
     });
 
   } catch (error) {
@@ -672,6 +752,192 @@ router.patch('/:id/status', protect, adminOrCenter, async (req, res) => {
   }
 });
 
+// ======================================================
+// UPDATE ADMISSION PHASE
+// ======================================================
+router.patch('/:id/admission-phase', protect, adminOrCenter, async (req, res) => {
+  try {
+    const { phase } = req.body;
+    if (!['scholarship', 'admitted', 'joined'].includes(phase)) {
+      return res.status(400).json({ message: 'Invalid phase' });
+    }
+    const student = await Student.findByIdAndUpdate(req.params.id, { admissionPhase: phase }, { new: true });
+    res.json({ message: 'Phase updated successfully', student });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// ======================================================
+// COLLECT SCHOLARSHIP / ADMISSION FEE
+// ======================================================
+router.post('/:id/collect-fee', protect, adminOrCenter, upload.single('proof'), async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const { feeType, amountPaid, paymentMode, bankReference } = req.body;
+
+    if (!['Scholarship', 'Admission'].includes(feeType)) {
+      return res.status(400).json({ message: 'Invalid fee type' });
+    }
+
+    const student = await Student.findById(studentId).populate('enrolledCourses.course');
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    // Identify course and batch
+    const enrolled = student.enrolledCourses && student.enrolledCourses[0];
+    const batchId = enrolled ? enrolled.batch : null;
+    const courseId = enrolled ? (enrolled.course ? enrolled.course._id : null) : null;
+    const centerId = student.center;
+
+    // Find Batch Fee
+    let totalExpectedFee = 0;
+    if (batchId && courseId && centerId) {
+      const BatchFee = require('../models/BatchFee');
+      const batchFee = await BatchFee.findOne({
+        batch: batchId,
+        centers: centerId,
+        courses: courseId
+      });
+      if (batchFee) {
+        totalExpectedFee = feeType === 'Scholarship' ? batchFee.scholarshipFee : batchFee.admissionFee;
+      }
+    }
+
+    // Find or create StudentFee
+    const StudentFee = require('../models/StudentFee');
+    const feeName = `${feeType} Fee`;
+    let studentFee = await StudentFee.findOne({
+      student: studentId,
+      feeType: 'Other',
+      otherFeeType: feeName
+    });
+
+    if (!studentFee) {
+      studentFee = new StudentFee({
+        student: studentId,
+        center: centerId,
+        course: courseId,
+        batch: batchId,
+        feeType: 'Other',
+        otherFeeType: feeName,
+        amount: totalExpectedFee || 0, // Fallback if no batch fee found
+        status: 'pending'
+      });
+    }
+
+    // Add payment
+    const paymentStatus = feeType === 'Scholarship' ? 'Approved' : 'Pending';
+    const proofUrl = req.file ? req.file.path : undefined;
+    
+    studentFee.payments.push({
+      amount: Number(amountPaid),
+      paymentMode,
+      bankReference,
+      proofOfPayment: proofUrl,
+      status: paymentStatus,
+      paidAt: new Date(),
+      approvedBy: feeType === 'Scholarship' ? req.user._id : undefined,
+      approvedAt: feeType === 'Scholarship' ? new Date() : undefined
+    });
+
+    // Update overall fee status if fully paid
+    const totalPaid = studentFee.payments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0);
+    if (totalPaid >= studentFee.amount && studentFee.amount > 0) {
+      studentFee.status = 'paid';
+    }
+
+    await studentFee.save();
+
+    res.json({ message: 'Fee collected successfully', studentFee });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ======================================================
+// GET ADMISSION PAYMENTS & APPROVALS
+// ======================================================
+router.get('/admission-payments/all', protect, adminOrCenter, async (req, res) => {
+  try {
+    const StudentFee = require('../models/StudentFee');
+    let query = { 
+      feeType: 'Other', 
+      otherFeeType: { $in: ['Scholarship Fee', 'Admission Fee'] }
+    };
+    
+    if (req.user.role.toLowerCase() === 'center') {
+      query.center = req.user.center;
+    }
+
+    const fees = await StudentFee.find(query)
+      .populate('student', 'studentId user')
+      .populate({ path: 'student', populate: { path: 'user', select: 'name email' } })
+      .populate('center', 'name location')
+      .lean();
+
+    let allPayments = [];
+    fees.forEach(fee => {
+      if (fee.payments && fee.payments.length > 0) {
+        fee.payments.forEach(payment => {
+          allPayments.push({
+            studentFeeId: fee._id,
+            paymentId: payment._id,
+            feeType: fee.otherFeeType,
+            studentName: fee.student?.user?.name,
+            studentId: fee.student?.studentId,
+            centerName: fee.center?.name,
+            amount: payment.amount,
+            paymentMode: payment.paymentMode,
+            bankReference: payment.bankReference,
+            proofOfPayment: payment.proofOfPayment,
+            status: payment.status,
+            paidAt: payment.paidAt
+          });
+        });
+      }
+    });
+
+    res.json(allPayments.sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt)));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ======================================================
+// UPDATE ADMISSION PAYMENT STATUS
+// ======================================================
+router.patch('/admission-payments/:feeId/status/:paymentId', protect, adminOrCenter, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['Approved', 'Rejected'].includes(status)) {
+       return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const StudentFee = require('../models/StudentFee');
+    const fee = await StudentFee.findById(req.params.feeId);
+    if (!fee) return res.status(404).json({ message: 'Fee not found' });
+
+    const payment = fee.payments.id(req.params.paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    payment.status = status;
+    payment.approvedBy = req.user._id;
+    payment.approvedAt = new Date();
+
+    const totalPaid = fee.payments.filter(p => p.status === 'Approved').reduce((s, p) => s + p.amount, 0);
+    if (totalPaid >= fee.amount && fee.amount > 0) {
+      fee.status = 'paid';
+    } else {
+      fee.status = 'pending';
+    }
+
+    await fee.save();
+    res.json({ message: `Payment ${status.toLowerCase()} successfully` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 //////////////////////////////////////////////////////
 // PROMOTE STUDENT AS INTERN (HR/Admin)
