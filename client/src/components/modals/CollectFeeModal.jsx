@@ -58,10 +58,10 @@ const CollectFeeModal = ({ isOpen, onClose, student, feeType, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
           <div>
             <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
               <IndianRupee className="text-brand-600" size={20} />
@@ -75,7 +75,7 @@ const CollectFeeModal = ({ isOpen, onClose, student, feeType, onSuccess }) => {
         </div>
 
         {/* Body */}
-        <form id="collect-fee-form" onSubmit={handleSave} className="p-6 space-y-6">
+        <form id="collect-fee-form" onSubmit={handleSave} className="p-6 space-y-6 overflow-y-auto flex-1">
           
           <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-xl border border-slate-100">
             <div className="flex justify-between text-sm">
@@ -144,7 +144,7 @@ const CollectFeeModal = ({ isOpen, onClose, student, feeType, onSuccess }) => {
         </form>
 
         {/* Footer */}
-        <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+        <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}

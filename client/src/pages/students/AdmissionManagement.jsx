@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { 
+import {
   FileText, Users, GraduationCap, Building2, Calendar, LayoutDashboard,
   Search, Plus, Mail, CheckCircle, Clock, IndianRupee
 } from "lucide-react";
@@ -14,6 +14,7 @@ import ViewFeesModal from "../../components/modals/ViewFeesModal";
 import CollectFeeModal from "../../components/modals/CollectFeeModal";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import StudentFilterBar from "../../components/common/StudentFilterBar";
+import DocumentUploadModal from "../../components/modals/DocumentUploadModal";
 
 const AdmissionManagement = () => {
   const [activeTab, setActiveTab] = useState("admission_form");
@@ -23,19 +24,20 @@ const AdmissionManagement = () => {
   const [batches, setBatches] = useState([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchSearch, setBatchSearch] = useState("");
-  
+
   // Modals state
   const [viewListModalData, setViewListModalData] = useState(null);
   const [selectedBatchForFee, setSelectedBatchForFee] = useState(null);
   const [selectedBatchForViewingFees, setSelectedBatchForViewingFees] = useState(null);
   const [feeModalData, setFeeModalData] = useState(null);
-  
+  const [documentModalData, setDocumentModalData] = useState(null);
+
   const [confirmModalConfig, setConfirmModalConfig] = useState({
     isOpen: false,
     title: "",
     message: "",
     type: "info",
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   const navigate = useNavigate();
@@ -60,7 +62,7 @@ const AdmissionManagement = () => {
   const [filterCenter, setFilterCenter] = useState(() => getSessionValue("admission_filterCenter", []));
   const [filterCourse, setFilterCourse] = useState(() => getSessionValue("admission_filterCourse", []));
   const [filterBatch, setFilterBatch] = useState(() => getSessionValue("admission_filterBatch", []));
-  
+
   const [centers, setCenters] = useState([]);
   const [courses, setCourses] = useState([]);
 
@@ -71,9 +73,9 @@ const AdmissionManagement = () => {
   }, [filterCenter, filterCourse, filterBatch]);
 
   useEffect(() => {
-     fetchCenters();
-     fetchCourses();
-     fetchBatches();
+    fetchCenters();
+    fetchCourses();
+    fetchBatches();
   }, []);
 
   const fetchCenters = async () => {
@@ -263,7 +265,7 @@ const AdmissionManagement = () => {
         const total = feeSummary?.total || 0;
         const paid = feeSummary?.paid || 0;
         const balance = feeSummary?.balance || 0;
-        
+
         const openFeeModal = () => {
           const fType = activeTab === "scholarship_form" ? "Scholarship" : "Admission";
           setFeeModalData({ student: row, feeType: fType });
@@ -271,17 +273,17 @@ const AdmissionManagement = () => {
 
         if (total === 0 && paid === 0) {
           return (
-            <button 
+            <button
               onClick={openFeeModal}
               className="text-[11px] font-bold text-slate-400 hover:text-brand-600 hover:underline text-left w-full"
             >
               N/A (No fees available)
             </button>
-          ); 
+          );
         }
 
         return (
-          <button 
+          <button
             onClick={openFeeModal}
             className="flex flex-col gap-1 text-[11px] min-w-0 text-left hover:bg-slate-50 p-1.5 rounded w-full transition-colors group"
           >
@@ -304,18 +306,18 @@ const AdmissionManagement = () => {
         return (
           <div className="flex items-center">
             <label className="relative inline-flex items-center cursor-pointer">
-              <input 
-                type="checkbox" 
-                className="sr-only peer" 
-                checked={isMoved} 
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={isMoved}
                 onChange={(e) => {
-                   e.preventDefault();
-                   if (!isMoved) {
-                     handleUpdatePhase(row._id, 'admitted', 'Move this student to the Admission Form?');
-                   } else {
-                     handleUpdatePhase(row._id, 'scholarship', 'Revert this student back to the Scholarship phase?');
-                   }
-                }} 
+                  e.preventDefault();
+                  if (!isMoved) {
+                    handleUpdatePhase(row._id, 'admitted', 'Move this student to the Admission Form?');
+                  } else {
+                    handleUpdatePhase(row._id, 'scholarship', 'Revert this student back to the Scholarship phase?');
+                  }
+                }}
               />
               <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
             </label>
@@ -329,24 +331,36 @@ const AdmissionManagement = () => {
   const admissionColumns = [
     ...baseColumns,
     {
+      name: "Documents",
+      cell: row => (
+        <button
+          onClick={() => setDocumentModalData(row)}
+          className="text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors"
+        >
+          View/Upload
+        </button>
+      ),
+      width: "140px"
+    },
+    {
       name: "Action",
       cell: row => {
         const isMoved = row.admissionPhase === 'joined';
         return (
           <div className="flex items-center">
             <label className="relative inline-flex items-center cursor-pointer">
-              <input 
-                type="checkbox" 
-                className="sr-only peer" 
-                checked={isMoved} 
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={isMoved}
                 onChange={(e) => {
-                   e.preventDefault();
-                   if (!isMoved) {
-                     handleUpdatePhase(row._id, 'joined', 'Move this student to Center Students?');
-                   } else {
-                     handleUpdatePhase(row._id, 'admitted', 'Revert this student back to the Admission phase?');
-                   }
-                }} 
+                  e.preventDefault();
+                  if (!isMoved) {
+                    handleUpdatePhase(row._id, 'joined', 'Move this student to Center Students?');
+                  } else {
+                    handleUpdatePhase(row._id, 'admitted', 'Revert this student back to the Admission phase?');
+                  }
+                }}
               />
               <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
             </label>
@@ -368,7 +382,7 @@ const AdmissionManagement = () => {
           await api.patch(`/students/admission-payments/${feeId}/status/${paymentId}`, { status });
           toast.success(`Payment ${status.toLowerCase()}!`);
           fetchPayments();
-        } catch(err) {
+        } catch (err) {
           toast.error(`Failed to ${status.toLowerCase()} payment`);
         }
       }
@@ -377,22 +391,25 @@ const AdmissionManagement = () => {
 
   const paymentColumns = [
     { name: "S.No", selector: (row, index) => index + 1, width: "70px" },
-    { name: "Student Profile", selector: row => row.studentName, sortable: true, cell: row => (
-      <div className="font-bold text-slate-900 truncate">
-        {row.studentName}
-        <div className="text-[10px] text-slate-500">{row.studentId}</div>
-      </div>
-    )},
+    {
+      name: "Student Profile", selector: row => row.studentName, sortable: true, cell: row => (
+        <div className="font-bold text-slate-900 truncate">
+          {row.studentName}
+          <div className="text-[10px] text-slate-500">{row.studentId}</div>
+        </div>
+      )
+    },
     { name: "Fee Type", selector: row => row.feeType, sortable: true, width: "150px" },
     { name: "Amount", selector: row => row.amount, sortable: true, cell: row => `₹${row.amount}`, width: "120px" },
     { name: "Mode", selector: row => row.paymentMode, sortable: true, width: "100px" },
-    { name: "Ref / Proof", selector: row => row.bankReference || "-", sortable: true, cell: row => (
+    {
+      name: "Ref / Proof", selector: row => row.bankReference || "-", sortable: true, cell: row => (
         <div className="flex flex-col gap-1 min-w-0">
           <span className="text-xs truncate">{row.bankReference || "-"}</span>
           {row.proofOfPayment && (
-            <a 
-              href={row.proofOfPayment} 
-              target="_blank" 
+            <a
+              href={row.proofOfPayment}
+              target="_blank"
               rel="noopener noreferrer"
               className="text-[10px] text-brand-600 font-bold hover:underline"
             >
@@ -400,12 +417,15 @@ const AdmissionManagement = () => {
             </a>
           )}
         </div>
-    ), width: "150px" },
-    { name: "Status", selector: row => row.status, sortable: true, cell: row => (
+      ), width: "150px"
+    },
+    {
+      name: "Status", selector: row => row.status, sortable: true, cell: row => (
         <span className={`px-2 py-1 rounded text-xs font-bold ${row.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : row.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
           {row.status}
         </span>
-    ), width: "120px" },
+      ), width: "120px"
+    },
     { name: "Date", selector: row => new Date(row.paidAt).getTime(), sortable: true, format: row => new Date(row.paidAt).toLocaleDateString(), width: "120px" }
   ];
 
@@ -415,13 +435,13 @@ const AdmissionManagement = () => {
       name: "Action",
       cell: row => (
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={() => handleUpdatePaymentStatus(row.studentFeeId, row.paymentId, 'Approved')}
             className="px-3 py-1 bg-brand-600 text-white rounded text-xs font-bold hover:bg-brand-700 transition-colors"
           >
             Approve
           </button>
-          <button 
+          <button
             onClick={() => handleUpdatePaymentStatus(row.studentFeeId, row.paymentId, 'Rejected')}
             className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100 transition-colors"
           >
@@ -444,7 +464,7 @@ const AdmissionManagement = () => {
       selector: row => row.name,
       sortable: true,
       cell: row => (
-        <button 
+        <button
           onClick={() => setSelectedBatchForViewingFees(row)}
           className="font-bold text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline text-left"
         >
@@ -461,7 +481,7 @@ const AdmissionManagement = () => {
     {
       name: "Course",
       cell: row => (
-        <button 
+        <button
           onClick={() => setViewListModalData({ title: "Courses", items: row.courses || [] })}
           className="text-[11px] bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-bold whitespace-nowrap hover:bg-blue-100 transition-colors flex items-center gap-1.5"
         >
@@ -474,7 +494,7 @@ const AdmissionManagement = () => {
     {
       name: "Center",
       cell: row => (
-        <button 
+        <button
           onClick={() => setViewListModalData({ title: "Centers", items: row.centers || [] })}
           className="text-[11px] bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg font-bold whitespace-nowrap hover:bg-purple-100 transition-colors flex items-center gap-1.5"
         >
@@ -487,7 +507,7 @@ const AdmissionManagement = () => {
     {
       name: "Actions",
       cell: row => (
-        <button 
+        <button
           onClick={() => setSelectedBatchForFee(row)}
           className="px-4 py-1.5 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold hover:bg-brand-100 transition-colors"
         >
@@ -501,7 +521,7 @@ const AdmissionManagement = () => {
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
       <div className="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-        
+
         {/* Header */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-brand-50 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none"></div>
@@ -521,73 +541,63 @@ const AdmissionManagement = () => {
         <div className="flex overflow-x-auto scrollbar-hide border-b border-gray-200 gap-8">
           <button
             onClick={() => setActiveTab("scholarship_form")}
-            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-              activeTab === "scholarship_form"
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "scholarship_form"
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"
-            }`}
+              }`}
           >
             <FileText size={20} />
             Scholarship Form
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === "scholarship_form" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "scholarship_form" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
           <button
             onClick={() => setActiveTab("admission_form")}
-            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-              activeTab === "admission_form"
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "admission_form"
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"
-            }`}
+              }`}
           >
             <Users size={20} />
             Admission Form
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === "admission_form" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "admission_form" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
           <button
             onClick={() => setActiveTab("fee_setup")}
-            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-              activeTab === "fee_setup"
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "fee_setup"
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"
-            }`}
+              }`}
           >
             <IndianRupee size={20} />
             Fee Setup
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === "fee_setup" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "fee_setup" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
           <button
             onClick={() => setActiveTab("payment_data")}
-            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-              activeTab === "payment_data"
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "payment_data"
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"
-            }`}
+              }`}
           >
             <LayoutDashboard size={20} />
             Payment Data
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === "payment_data" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "payment_data" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
           <button
             onClick={() => setActiveTab("approvals")}
-            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${
-              activeTab === "approvals"
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "approvals"
                 ? "text-brand-600"
                 : "text-gray-500 hover:text-brand-600"
-            }`}
+              }`}
           >
             <CheckCircle size={20} />
             Approvals
-            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${
-              activeTab === "approvals" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
-            }`} />
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "approvals" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
           </button>
         </div>
 
@@ -619,7 +629,7 @@ const AdmissionManagement = () => {
                       showVendor={false}
                       className="flex items-center gap-2"
                     />
-                    <button 
+                    <button
                       onClick={() => navigate('/student-registration')}
                       className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 shrink-0"
                     >
@@ -662,7 +672,7 @@ const AdmissionManagement = () => {
                       showVendor={false}
                       className="flex items-center gap-2"
                     />
-                    <button 
+                    <button
                       onClick={() => navigate('/student-registration')}
                       className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 shrink-0"
                     >
@@ -737,20 +747,20 @@ const AdmissionManagement = () => {
       </div>
 
       {/* Modals */}
-      <ViewListModal 
-        isOpen={!!viewListModalData} 
+      <ViewListModal
+        isOpen={!!viewListModalData}
         onClose={() => setViewListModalData(null)}
         title={viewListModalData?.title || ""}
         items={viewListModalData?.items || []}
       />
-      
-      <FeeDefinitionModal 
+
+      <FeeDefinitionModal
         isOpen={!!selectedBatchForFee}
         onClose={() => setSelectedBatchForFee(null)}
         batch={selectedBatchForFee}
       />
 
-      <ViewFeesModal 
+      <ViewFeesModal
         isOpen={!!selectedBatchForViewingFees}
         onClose={() => setSelectedBatchForViewingFees(null)}
         batch={selectedBatchForViewingFees}
@@ -767,9 +777,16 @@ const AdmissionManagement = () => {
         }}
       />
 
-      <ConfirmationModal 
+      <ConfirmationModal
         {...confirmModalConfig}
         onClose={() => setConfirmModalConfig({ ...confirmModalConfig, isOpen: false })}
+      />
+
+      <DocumentUploadModal
+        isOpen={!!documentModalData}
+        onClose={() => setDocumentModalData(null)}
+        student={documentModalData}
+        onUpdate={() => fetchStudents()}
       />
 
     </div>

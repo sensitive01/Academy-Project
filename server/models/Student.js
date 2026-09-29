@@ -180,6 +180,13 @@ const studentSchema = new mongoose.Schema(
     year: String,
     department: String,
 
+    documents: [{
+      name: String,
+      url: String,
+      public_id: String,
+      uploadedAt: { type: Date, default: Date.now }
+    }],
+
     profilePic: {
       url: String,
       public_id: String,

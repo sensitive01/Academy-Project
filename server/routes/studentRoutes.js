@@ -193,7 +193,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
           progress: 0
         });
       }
-      
+
       // Save student here to get _id for fees
       await student.save();
 
@@ -307,7 +307,7 @@ router.get("/", protect, async (req, res) => {
 
     const BatchFee = require('../models/BatchFee');
     const batchFees = await BatchFee.find().lean();
-    
+
     // Create a fast lookup for BatchFees: key = batchId_centerId_courseId
     const batchFeeMap = {};
     batchFees.forEach(bf => {
@@ -323,12 +323,12 @@ router.get("/", protect, async (req, res) => {
       if (!acc[fee.student]) {
         acc[fee.student] = {};
       }
-      
+
       const type = fee.otherFeeType; // e.g. "Scholarship Fee" or "Admission Fee"
       if (!acc[fee.student][type]) {
-         acc[fee.student][type] = { totalFee: fee.amount || 0, paidFee: 0 };
+        acc[fee.student][type] = { totalFee: fee.amount || 0, paidFee: 0 };
       }
-      
+
       const paid = (fee.payments || [])
         .filter(p => p.status === 'Approved')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -340,23 +340,23 @@ router.get("/", protect, async (req, res) => {
     const studentsWithFees = students.map(student => {
       let expectedScholarship = 0;
       let expectedAdmission = 0;
-      
+
       if (student.enrolledCourses && student.enrolledCourses[0]) {
-         const enrolled = student.enrolledCourses[0];
-         const batchId = enrolled.batch?._id || enrolled.batch;
-         const courseId = enrolled.course?._id || enrolled.course;
-         const centerId = student.center?._id || student.center;
-         if (batchId && courseId && centerId) {
-            const key = `${batchId}_${centerId}_${courseId}`;
-            if (batchFeeMap[key]) {
-               expectedScholarship = batchFeeMap[key].scholarshipFee || 0;
-               expectedAdmission = batchFeeMap[key].admissionFee || 0;
-            }
-         }
+        const enrolled = student.enrolledCourses[0];
+        const batchId = enrolled.batch?._id || enrolled.batch;
+        const courseId = enrolled.course?._id || enrolled.course;
+        const centerId = student.center?._id || student.center;
+        if (batchId && courseId && centerId) {
+          const key = `${batchId}_${centerId}_${courseId}`;
+          if (batchFeeMap[key]) {
+            expectedScholarship = batchFeeMap[key].scholarshipFee || 0;
+            expectedAdmission = batchFeeMap[key].admissionFee || 0;
+          }
+        }
       }
 
       const studentFees = feesByStudent[student._id] || {};
-      
+
       const sf = studentFees['Scholarship Fee'] || { totalFee: expectedScholarship, paidFee: 0 };
       // If StudentFee was created but amount was 0 for some reason, use expected if expected > 0
       const sTotal = (sf.totalFee === 0 && expectedScholarship > 0) ? expectedScholarship : sf.totalFee;
@@ -508,7 +508,7 @@ router.put(
       // If enrolledCourses contains a batch, ensure the student is added to that Batch
       if (data.enrolledCourses && Array.isArray(data.enrolledCourses)) {
         const Batch = require('../models/Batch');
-        
+
         // First, remove this student from all batches to clear old assignments
         await Batch.updateMany(
           { students: student._id },
@@ -528,7 +528,7 @@ router.put(
       if (req.body.fees && Array.isArray(req.body.fees)) {
         const StudentFee = require('../models/StudentFee');
         const incomingFees = req.body.fees;
-        
+
         // 1. Delete fees that are no longer in the list
         const incomingFeeIds = incomingFees.filter(f => f._id).map(f => f._id);
         await StudentFee.deleteMany({
@@ -540,7 +540,7 @@ router.put(
         for (const fee of incomingFees) {
           if (fee.amount && Number(fee.amount) > 0) {
             const validFeeType = ['Term', 'Sem', 'Exam', 'Other', 'Monthly'].includes(fee.feeType) ? fee.feeType : 'Other';
-            
+
             const feeData = {
               student: student._id,
               center: student.center,
@@ -554,8 +554,8 @@ router.put(
             };
 
             if (data.enrolledCourses && data.enrolledCourses.length > 0) {
-               feeData.course = data.enrolledCourses[0].course || undefined;
-               feeData.batch = data.enrolledCourses[0].batch || undefined;
+              feeData.course = data.enrolledCourses[0].course || undefined;
+              feeData.batch = data.enrolledCourses[0].batch || undefined;
             }
 
             if (fee._id) {
@@ -701,7 +701,7 @@ router.post("/bulk-delete", protect, adminOrCenter, async (req, res) => {
         }
         await Student.findByIdAndDelete(id);
         await StudentFee.deleteMany({ student: id });
-        
+
         await Batch.updateMany(
           { students: id },
           { $pull: { students: id } }
@@ -829,7 +829,7 @@ router.post('/:id/collect-fee', protect, adminOrCenter, upload.single('proof'), 
     // Add payment
     const paymentStatus = feeType === 'Scholarship' ? 'Approved' : 'Pending';
     const proofUrl = req.file ? req.file.path : undefined;
-    
+
     studentFee.payments.push({
       amount: Number(amountPaid),
       paymentMode,
@@ -861,11 +861,11 @@ router.post('/:id/collect-fee', protect, adminOrCenter, upload.single('proof'), 
 router.get('/admission-payments/all', protect, adminOrCenter, async (req, res) => {
   try {
     const StudentFee = require('../models/StudentFee');
-    let query = { 
-      feeType: 'Other', 
+    let query = {
+      feeType: 'Other',
       otherFeeType: { $in: ['Scholarship Fee', 'Admission Fee'] }
     };
-    
+
     if (req.user.role.toLowerCase() === 'center') {
       query.center = req.user.center;
     }
@@ -911,7 +911,7 @@ router.patch('/admission-payments/:feeId/status/:paymentId', protect, adminOrCen
   try {
     const { status } = req.body;
     if (!['Approved', 'Rejected'].includes(status)) {
-       return res.status(400).json({ message: 'Invalid status' });
+      return res.status(400).json({ message: 'Invalid status' });
     }
 
     const StudentFee = require('../models/StudentFee');
@@ -984,7 +984,7 @@ router.post("/:id/promote-intern", protect, async (req, res) => {
         const lastIndex = student.internships.length - 1;
         const prevInternship = student.internships[lastIndex];
         prevInternship.status = 'completed';
-        
+
         // If it didn't have an end date, set it to the day before the new one starts
         if (!prevInternship.endDate && startDate) {
           const newStart = new Date(startDate);
@@ -1059,7 +1059,7 @@ router.post("/bulk-promote-intern", protect, async (req, res) => {
           const lastIndex = student.internships.length - 1;
           const prevInternship = student.internships[lastIndex];
           prevInternship.status = 'completed';
-          
+
           if (!prevInternship.endDate && startDate) {
             const newStart = new Date(startDate);
             const prevEnd = new Date(newStart);
@@ -1085,7 +1085,7 @@ router.post("/bulk-promote-intern", protect, async (req, res) => {
 router.post("/bulk-promote-academic", protect, async (req, res) => {
   try {
     const { studentIds } = req.body;
-    
+
     if (req.user.role !== 'admin' && req.user.role !== 'hr' && req.user.role !== 'center') {
       return res.status(403).json({ message: "Not authorized to promote students" });
     }
@@ -1105,7 +1105,7 @@ router.post("/bulk-promote-academic", protect, async (req, res) => {
       if (yearMatch) {
         const currentYearNum = parseInt(yearMatch[1], 10);
         const nextYearNum = currentYearNum + 1;
-        
+
         let newYearStr = `${nextYearNum}th Year`;
         if (nextYearNum === 1) newYearStr = "1st Year";
         else if (nextYearNum === 2) newYearStr = "2nd Year";
@@ -1118,7 +1118,7 @@ router.post("/bulk-promote-academic", protect, async (req, res) => {
         const currentFees = await StudentFee.find({ student: student._id });
         // Find only those that are not penalty generated
         const feesToDuplicate = currentFees.filter(f => f.feeType !== 'Council' && !f.isPenaltyApplied && !f.isFinalPenaltyApplied);
-        
+
         for (const fee of feesToDuplicate) {
           const newFee = new StudentFee({
             student: fee.student,
@@ -1156,7 +1156,7 @@ router.post("/bulk-promote-academic", protect, async (req, res) => {
 router.post("/bulk-upload-preview", protect, async (req, res) => {
   try {
     const { students } = req.body;
-    
+
     if (req.user.role !== 'admin' && req.user.role !== 'hr' && req.user.role !== 'center') {
       return res.status(403).json({ message: "Not authorized to perform bulk upload" });
     }
@@ -1174,7 +1174,7 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
     for (let i = 0; i < students.length; i++) {
       const record = students[i];
       const recordId = record.id || `row-${i}`;
-      
+
       let name = record["Name"];
       let studentId = record["Student ID"] ? String(record["Student ID"]).trim() : undefined;
       let dob = record["DOB"];
@@ -1242,7 +1242,7 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
         }
         seenStudentIds.add(studentId);
       }
-      
+
       if (!isDuplicate && email) {
         const emailTrimmed = email.trim();
         const existingUser = await User.findOne({ email: emailTrimmed });
@@ -1282,7 +1282,7 @@ router.post("/bulk-upload-preview", protect, async (req, res) => {
 router.post("/bulk-upload", protect, async (req, res) => {
   try {
     const { recordsToProcess } = req.body;
-    
+
     if (req.user.role !== 'admin' && req.user.role !== 'hr' && req.user.role !== 'center') {
       return res.status(403).json({ message: "Not authorized to perform bulk upload" });
     }
@@ -1301,7 +1301,7 @@ router.post("/bulk-upload", protect, async (req, res) => {
         const dob = record["DOB"];
         const year = record["Year"];
         const email = record["Email"];
-        
+
         const isUpdate = record.isUpdate;
         const centerId = record.resolvedCenterId;
         const batchId = record.resolvedBatchId;
@@ -1443,10 +1443,10 @@ router.post("/bulk-upload", protect, async (req, res) => {
           successCount++;
         }
       } catch (err) {
-        skippedRecords.push({ 
-          name: record["Name"] || "Unknown", 
-          studentId: record["Student ID"] || "", 
-          reason: `System error: ${err.message}` 
+        skippedRecords.push({
+          name: record["Name"] || "Unknown",
+          studentId: record["Student ID"] || "",
+          reason: `System error: ${err.message}`
         });
       }
     }
@@ -1593,51 +1593,51 @@ router.post("/bulk-edit-confirm", protect, async (req, res) => {
 
         // Map editable fields
         const fieldMap = {
-          "Name (English)":           "studentNameEnglish",
-          "Name":                     "studentNameEnglish",  // backward compat
+          "Name (English)": "studentNameEnglish",
+          "Name": "studentNameEnglish",  // backward compat
           // "Name (Mother Tongue)":     "studentNameMotherTongue",
-          "Father Name":              "fatherName",
-          "DOB":                      "dob",
-          "Age":                      "age",
-          "Gender":                   "gender",
-          "Religion":                 "religion",
-          "Community":                "community",
-          "Marital Status":           "maritalStatus",
-          "Nationality":              "nationality",
-          "Email":                    "email",
-          "Phone":                    "phone",
-          "WhatsApp":                 "whatsapp",
-          "Aadhar No":                "aadharNo",
-          "KCET Reg No":              "kcetRegNo",
-          "NEET Reg No":              "neetRegNo",
-          "APAAR ID":                 "apaarId",
-          "DEB ID":                   "debId",
-          "ABC ID":                   "abcId",
-          "Address Village":          "address.village",
-          "Address Post":             "address.post",
-          "Address Taluk":            "address.taluk",
-          "Address District":         "address.district",
-          "Address PIN":              "address.pin",
-          "Bank Account Holder":      "bankDetails.accountHolderName",
-          "Bank Account Number":      "bankDetails.accountNumber",
-          "Bank IFSC Code":           "bankDetails.ifscCode",
-          "Bank Name & Branch":       "bankDetails.bankNameBranch",
-          "SSLC Register No":         "sslcDetails.registerNo",
-          "SSLC Year of Passing":     "sslcDetails.yearOfPassing",
-          "SSLC School Name":         "sslcDetails.schoolName",
-          "SSLC Place of School":     "sslcDetails.placeOfSchool",
-          "SSLC Board of Examination":"sslcDetails.boardOfExamination",
-          "SSLC Percentage":          "sslcDetails.percentage",
-          "HSC Register No":          "hscDetails.registerNo",
-          "HSC Year of Passing":      "hscDetails.yearOfPassing",
-          "HSC School Name":          "hscDetails.schoolName",
-          "HSC Place of School":      "hscDetails.placeOfSchool",
+          "Father Name": "fatherName",
+          "DOB": "dob",
+          "Age": "age",
+          "Gender": "gender",
+          "Religion": "religion",
+          "Community": "community",
+          "Marital Status": "maritalStatus",
+          "Nationality": "nationality",
+          "Email": "email",
+          "Phone": "phone",
+          "WhatsApp": "whatsapp",
+          "Aadhar No": "aadharNo",
+          "KCET Reg No": "kcetRegNo",
+          "NEET Reg No": "neetRegNo",
+          "APAAR ID": "apaarId",
+          "DEB ID": "debId",
+          "ABC ID": "abcId",
+          "Address Village": "address.village",
+          "Address Post": "address.post",
+          "Address Taluk": "address.taluk",
+          "Address District": "address.district",
+          "Address PIN": "address.pin",
+          "Bank Account Holder": "bankDetails.accountHolderName",
+          "Bank Account Number": "bankDetails.accountNumber",
+          "Bank IFSC Code": "bankDetails.ifscCode",
+          "Bank Name & Branch": "bankDetails.bankNameBranch",
+          "SSLC Register No": "sslcDetails.registerNo",
+          "SSLC Year of Passing": "sslcDetails.yearOfPassing",
+          "SSLC School Name": "sslcDetails.schoolName",
+          "SSLC Place of School": "sslcDetails.placeOfSchool",
+          "SSLC Board of Examination": "sslcDetails.boardOfExamination",
+          "SSLC Percentage": "sslcDetails.percentage",
+          "HSC Register No": "hscDetails.registerNo",
+          "HSC Year of Passing": "hscDetails.yearOfPassing",
+          "HSC School Name": "hscDetails.schoolName",
+          "HSC Place of School": "hscDetails.placeOfSchool",
           "HSC Board of Examination": "hscDetails.boardOfExamination",
-          "HSC Percentage":           "hscDetails.percentage",
-          "Year":                     "year",
-          "Department":               "department",
-          "Status":                   "status",
-          "English Fluency":                            "englishFluency",
+          "HSC Percentage": "hscDetails.percentage",
+          "Year": "year",
+          "Department": "department",
+          "Status": "status",
+          "English Fluency": "englishFluency",
           "English Fluency (Fluent/Intermediate/Basic)": "englishFluency",
         };
 
@@ -1654,7 +1654,7 @@ router.post("/bulk-edit-confirm", protect, async (req, res) => {
           const dmyMatch = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
           if (dmyMatch) {
             const [, dd, mm, yyyy] = dmyMatch;
-            const d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+            const d = new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`);
             return isNaN(d) ? null : d;
           }
           // YYYY-MM-DD or any other ISO-ish format
@@ -1699,7 +1699,7 @@ router.post("/bulk-edit-confirm", protect, async (req, res) => {
         // Handle Center, Course, Batch via their system IDs
         const centerIdStr = row["Center ID"] ? String(row["Center ID"]).trim() : null;
         const courseIdStr = row["Course ID"] ? String(row["Course ID"]).trim() : null;
-        const batchIdStr  = row["Batch ID"]  ? String(row["Batch ID"]).trim()  : null;
+        const batchIdStr = row["Batch ID"] ? String(row["Batch ID"]).trim() : null;
 
         if (centerIdStr) {
           const Center = require('../models/Center');
@@ -1734,7 +1734,7 @@ router.post("/bulk-edit-confirm", protect, async (req, res) => {
               : { completed: false, progress: 0 };
 
             if (courseDoc) existingEntry.course = courseDoc._id;
-            if (batchDoc)  existingEntry.batch  = batchDoc._id;
+            if (batchDoc) existingEntry.batch = batchDoc._id;
 
             student.enrolledCourses = [existingEntry, ...(student.enrolledCourses?.slice(1) || [])];
 
@@ -1766,6 +1766,57 @@ router.post("/bulk-edit-confirm", protect, async (req, res) => {
     res.json({ updatedCount, errors });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// ======================================================
+// UPLOAD DOCUMENTS
+// ======================================================
+router.post('/:id/documents', protect, upload.single('document'), async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const { documentName } = req.body;
+    if (!documentName) {
+      return res.status(400).json({ message: 'Document name is required' });
+    }
+
+    student.documents.push({
+      name: documentName,
+      url: req.file.path,
+      public_id: req.file.filename
+    });
+
+    await student.save();
+    res.json({ message: 'Document uploaded successfully', documents: student.documents });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ======================================================
+// DELETE DOCUMENT
+// ======================================================
+router.delete('/:id/documents/:docId', protect, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    student.documents = student.documents.filter(doc => doc._id.toString() !== req.params.docId);
+    await student.save();
+
+    res.json({ message: 'Document deleted successfully', documents: student.documents });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
