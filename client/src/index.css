@@ -10,11 +10,12 @@ body {
 /* Hide number input arrows globally */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+    -webkit-appearance: none;
+    margin: 0;
 }
+
 input[type=number] {
-  -moz-appearance: textfield;
+    -moz-appearance: textfield;
 }
 
 /* Custom Utilities for Academic feel */
@@ -31,15 +32,23 @@ body::-webkit-scrollbar {
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar,
 body {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
 }
 
 /* Premium Animations */
 @keyframes spin-slow {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
+
 .animate-spin-slow {
     animation: spin-slow 3s linear infinite;
 }
@@ -47,6 +56,7 @@ body {
 .scrollbar-hidden::-webkit-scrollbar {
     display: none;
 }
+
 .scrollbar-hidden {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -59,23 +69,49 @@ body {
 
 /* Premium Redesign Animations */
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes zoomIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 @keyframes slideInUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @keyframes slideInDown {
-    from { transform: translateY(-20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .animate-in {
@@ -99,13 +135,21 @@ body {
     animation-name: slideInDown;
 }
 
-.delay-150 { animation-delay: 150ms; }
-.delay-300 { animation-delay: 300ms; }
-.delay-500 { animation-delay: 500ms; }
+.delay-150 {
+    animation-delay: 150ms;
+}
+
+.delay-300 {
+    animation-delay: 300ms;
+}
+
+.delay-500 {
+    animation-delay: 500ms;
+}
 
 /* 🚀 DataTable Truncation Fix: Ensure no dots or semi-words in headers/cells */
-.rdt_TableCol > div, 
-.rdt_TableCell > div {
+.rdt_TableCol>div,
+.rdt_TableCell>div {
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: clip !important;
@@ -113,10 +157,16 @@ body {
     padding-top: 4px !important;
     padding-bottom: 4px !important;
 }
+
 /* Marquee Animation for Top Strip on Mobile */
 @keyframes marquee {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
 }
 
 .animate-marquee {
@@ -166,6 +216,7 @@ body {
     background-color: white;
     z-index: 2;
 }
+
 .table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(1) {
     z-index: 3;
     background-color: #f1f5f9;
@@ -174,10 +225,12 @@ body {
 .table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(2),
 .table-sticky-column.has-selectable .rdt_TableRow .rdt_TableCell:nth-child(2) {
     position: sticky;
-    left: 48px; /* Checkbox default width */
+    left: 48px;
+    /* Checkbox default width */
     background-color: white;
     z-index: 2;
 }
+
 .table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(2) {
     z-index: 3;
     background-color: #f1f5f9;
@@ -186,11 +239,13 @@ body {
 .table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(3),
 .table-sticky-column.has-selectable .rdt_TableRow .rdt_TableCell:nth-child(3) {
     position: sticky;
-    left: 118px; /* 48px + 70px */
+    left: 118px;
+    /* 48px + 70px */
     background-color: white;
     z-index: 2;
     border-right: 2px solid #e2e8f0;
 }
+
 .table-sticky-column.has-selectable .rdt_TableHeadRow .rdt_TableCol:nth-child(3) {
     z-index: 3;
     background-color: #f1f5f9;
@@ -201,4 +256,3 @@ body {
 .table-sticky-column.has-selectable .rdt_TableRow:hover .rdt_TableCell:nth-child(3) {
     background-color: #f8fafc;
 }
-

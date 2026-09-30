@@ -117,7 +117,7 @@ const CustomDataTable = ({
           highlightOnHover
           pointerOnHover={false}
           responsive
-          persistTableHead 
+          persistTableHead
           noDataComponent={
             <div className="p-12 text-center text-slate-500 bg-white w-full border-b border-slate-200">
               <span className="text-4xl block mb-2">📄</span>

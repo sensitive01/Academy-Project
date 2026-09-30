@@ -17,6 +17,7 @@ const PendingApprovalsList = () => {
   const [centers, setCenters] = useState([]);
   const [selectedCenter, setSelectedCenter] = useState("all");
   const [selectedMode, setSelectedMode] = useState("all");
+  const [selectedType, setSelectedType] = useState("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState("excel");
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: null, status: null });
@@ -76,7 +77,12 @@ const PendingApprovalsList = () => {
 
     const matchesMode = selectedMode === "all" || f.paymentMode === selectedMode;
 
-    return matchesSearch && matchesCenter && matchesMode;
+    const isIntern = f.student?.internships?.some(i => i.status === 'active');
+    let matchesType = true;
+    if (selectedType === "intern") matchesType = isIntern;
+    if (selectedType === "inhouse") matchesType = !isIntern;
+
+    return matchesSearch && matchesCenter && matchesMode && matchesType;
   });
 
   const handleExport = () => {
@@ -293,11 +299,22 @@ const PendingApprovalsList = () => {
               <option value="Bank Transfer">Bank Transfer</option>
             </select>
 
-            {(selectedCenter !== "all" || selectedMode !== "all") && (
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[130px] truncate"
+            >
+              <option value="all">All Types</option>
+              <option value="intern">Intern</option>
+              <option value="inhouse">In-house</option>
+            </select>
+
+            {(selectedCenter !== "all" || selectedMode !== "all" || selectedType !== "all") && (
               <button
                 onClick={() => {
                   setSelectedCenter("all");
                   setSelectedMode("all");
+                  setSelectedType("all");
                 }}
                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 shadow-sm shrink-0 whitespace-nowrap animate-in fade-in"
               >

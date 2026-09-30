@@ -23,6 +23,7 @@ const StudentFilterBar = ({
   vendors = [],
   showVendor = false,
   showType = true,
+  typeOptions,
   onReset,
   className
 }) => {
@@ -37,12 +38,21 @@ const StudentFilterBar = ({
     if (onReset) onReset();
   };
 
+  const hasActiveFilters = 
+    (filterType?.length > 0) ||
+    (filterCenter?.length > 0) ||
+    (filterCourse?.length > 0) ||
+    (filterBatch?.length > 0) ||
+    (filterYears?.length > 0) ||
+    (filterVendor?.length > 0) ||
+    (filterStatus?.length > 0);
+
   return (
     <div className={className || "flex flex-wrap items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6"}>
       {showType && setFilterType && (
         <div className="min-w-[140px] flex-1">
           <MultiSelectDropdown
-            options={[
+            options={typeOptions || [
               { label: "Intern", value: "intern" },
               { label: "In-house", value: "inhouse" }
             ]}
@@ -130,15 +140,17 @@ const StudentFilterBar = ({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleReset}
-        title="Reset Filters"
-        className="h-[42px] px-3 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 group cursor-pointer shrink-0"
-      >
-        <RotateCcw size={16} className="transition-transform group-hover:-rotate-90 duration-200" />
-        <span className="text-xs font-bold uppercase tracking-wider">Reset</span>
-      </button>
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={handleReset}
+          title="Reset Filters"
+          className="h-[42px] px-4 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 hover:border-red-200 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 group cursor-pointer shrink-0"
+        >
+          <RotateCcw size={16} className="transition-transform group-hover:-rotate-90 duration-200" />
+          <span className="text-xs font-bold uppercase tracking-wider">Reset</span>
+        </button>
+      )}
     </div>
   );
 };

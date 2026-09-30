@@ -268,12 +268,11 @@ const StudentRegistration = () => {
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = ['admin', 'center', 'hr'].includes(user?.role) || ['admin', 'center', 'hr'].includes(storedUser?.role);
-  const hasFeesStep = isAdmin && registrationType !== 'online';
+  const hasFeesStep = isAdmin && registrationType !== null;
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      const maxSteps = hasFeesStep ? 5 : 4;
-      setCurrentStep((prev) => Math.min(prev + 1, maxSteps));
+      setCurrentStep((prev) => Math.min(prev + 1, 4));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -284,7 +283,14 @@ const StudentRegistration = () => {
   };
 
   const validateStep = (step) => {
-    if (hasFeesStep && step === 5) {
+    if (step === 4) {
+      if (!declaration) {
+        setSubmitAttempted(true);
+        toast.error("Please accept the declaration to continue.");
+        return false;
+      }
+    }
+    if (registrationType === 'admin' && step === 5) {
       if (Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
         toast.error("Please select a course fee payment scheme!");
         return false;
@@ -295,12 +301,18 @@ const StudentRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading || isSubmittingRef.current) return; // prevent double submission
+    if (loading || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setSubmitAttempted(true);
     setLoading(true);
 
-    if (hasFeesStep && Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
+    if (!declaration) {
+      setLoading(false);
+      isSubmittingRef.current = false;
+      return;
+    }
+
+    if (registrationType === 'admin' && Number(adminEnrollment.courseFee) > 0 && !adminEnrollment.selectedScheme) {
       toast.error("Please select a course fee payment scheme!");
       setLoading(false);
       return;
@@ -356,7 +368,7 @@ const StudentRegistration = () => {
           placeOfSchool: formData.hscPlace,
           boardOfExamination: formData.hscBoard,
         },
-        adminEnrollment: hasFeesStep ? adminEnrollment : undefined,
+        adminEnrollment: adminEnrollment,
         createParentLogin: createParentLogin,
         parentLoginEmail: parentLoginEmail,
         parentLoginName: parentLoginName,
@@ -370,7 +382,11 @@ const StudentRegistration = () => {
 
       const res = await api.post("/students/public-registration", payload);
       toast.success("Application Submitted Successfully!");
-      setCurrentStep(hasFeesStep ? 6 : 5);
+      if (isAdmin && registrationType !== null) {
+        navigate('/dashboard/admissions');
+      } else {
+        setCurrentStep(5);
+      }
     } catch (err) {
       console.error(err);
       if (err.response?.data?.errors) {
@@ -390,10 +406,10 @@ const StudentRegistration = () => {
     { title: "Contact", icon: <MapPin size={20} /> },
     { title: "Academics", icon: <GraduationCap size={20} /> },
     { title: "Family", icon: <Users size={20} /> },
-    ...(hasFeesStep ? [{ title: "Fees", icon: <CreditCard size={20} /> }] : [])
+    // No fees step in registration form - fees managed separately via Fee Setup tab
   ];
 
-  if (currentStep === (hasFeesStep ? 6 : 5)) {
+  if (currentStep === 5) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="max-w-2xl w-full bg-white rounded-3xl p-12 text-center shadow-2xl border-t-8 border-brand-700">
@@ -460,7 +476,7 @@ const StudentRegistration = () => {
               <span className="text-[10px] font-bold tracking-widest">Fields marked with (*) are mandatory</span>
             </div>
             <div className="text-[10px] font-bold text-slate-400 tracking-widest">
-              Step {currentStep} of {hasFeesStep ? 5 : 4}
+              Step {currentStep} of 4
             </div>
           </div>
 
@@ -511,10 +527,8 @@ const StudentRegistration = () => {
                     <SelectBox label="Select Center" name="center" value={formData.center} onChange={handleChange} options={centers.map(c => ({ value: c._id, label: `${c.name} - ${c.location}` }))} isObjectOptions disabled={(user?.role === 'center' || user?.role === 'hr')} />
                   )}
 
-                  {hasFeesStep && (
-                    <>
-                      <SelectBox 
-                        label="Assign Batch" 
+                  <SelectBox 
+                    label="Assign Batch" 
                         value={adminEnrollment.batch} 
                         defaultOption="Select a Batch"
                         onChange={(e) => {
@@ -557,8 +571,6 @@ const StudentRegistration = () => {
                         } 
                         isObjectOptions 
                       />
-                    </>
-                  )}
                 </div>
 
               </div>
@@ -1058,7 +1070,7 @@ const StudentRegistration = () => {
               </div>
             )}
 
-            {currentStep === 5 && hasFeesStep && (
+            {currentStep === 5 && registrationType === 'admin' && (
               <div className="space-y-8 animate-fade-in-up">
                 <StepHeader title="Fee Structure" subtitle="Assign Council Fees and Course Fee Schemes (Step 5)" icon={<CreditCard className="text-brand-700" />} />
                 
@@ -1248,15 +1260,17 @@ const StudentRegistration = () => {
                 )}
               </div>
               <div className="flex flex-wrap justify-end gap-4 w-full md:w-auto">
-                {currentStep < (hasFeesStep ? 5 : 4) ? (
-                  <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
-                    Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
-                ) : (
-                  <button type="submit" disabled={loading} className="w-full md:w-auto flex items-center justify-center gap-3 bg-brand-700 text-white px-10 py-4 rounded-xl font-black text-[10px] tracking-[0.2em] hover:bg-brand-800 transition-all shadow-xl shadow-brand-900/30 disabled:opacity-50 hover:shadow-brand-700/40">
-                    {loading ? "Processing..." : "Complete Application"} <CheckCircle size={20} />
-                  </button>
-                )}
+                {(() => {
+                  return currentStep < 4 ? (
+                    <button type="button" onClick={nextStep} className="w-full md:w-auto flex items-center justify-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-xl font-black text-[10px] tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 group transform hover:scale-[1.02] active:scale-95">
+                      Next Step <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  ) : (
+                    <button type="submit" disabled={loading} className="w-full md:w-auto flex items-center justify-center gap-3 bg-brand-700 text-white px-10 py-4 rounded-xl font-black text-[10px] tracking-[0.2em] hover:bg-brand-800 transition-all shadow-xl shadow-brand-900/30 disabled:opacity-50 hover:shadow-brand-700/40">
+                      {loading ? "Processing..." : "Complete Application"} <CheckCircle size={20} />
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </form>

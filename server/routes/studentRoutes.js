@@ -183,7 +183,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       admissionPhase: req.body.admissionPhase || 'scholarship'
     });
 
-    if (req.user && req.user.role === 'admin' && req.body.adminEnrollment) {
+    if (req.body.adminEnrollment) {
       const { course, batch, fees } = req.body.adminEnrollment;
       if (course) {
         student.enrolledCourses.push({
@@ -197,12 +197,11 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       // Save student here to get _id for fees
       await student.save();
 
-      // Update Batch model to include this student
       if (batch) {
         await Batch.findByIdAndUpdate(batch, { $addToSet: { students: student._id } });
       }
 
-      if (fees && Array.isArray(fees) && fees.length > 0) {
+      if (req.user && req.user.role === 'admin' && fees && Array.isArray(fees) && fees.length > 0) {
         for (const fee of fees) {
           if (fee.amount && Number(fee.amount) > 0) {
             const validFeeType = ['Term', 'Sem', 'Exam', 'Other', 'Monthly'].includes(fee.feeType) ? fee.feeType : 'Other';
@@ -326,13 +325,24 @@ router.get("/", protect, async (req, res) => {
 
       const type = fee.otherFeeType; // e.g. "Scholarship Fee" or "Admission Fee"
       if (!acc[fee.student][type]) {
-        acc[fee.student][type] = { totalFee: fee.amount || 0, paidFee: 0 };
+        acc[fee.student][type] = { totalFee: fee.amount || 0, paidFee: 0, history: [] };
       }
 
       const paid = (fee.payments || [])
         .filter(p => p.status === 'Approved')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
       acc[fee.student][type].paidFee += paid;
+      
+      const paymentsList = (fee.payments || []).map(p => ({
+        amount: p.amount,
+        paymentMode: p.paymentMode,
+        date: p.paidAt,
+        bankReference: p.bankReference,
+        status: p.status,
+        proofOfPayment: p.proofOfPayment
+      }));
+
+      acc[fee.student][type].history = [...acc[fee.student][type].history, ...paymentsList];
 
       return acc;
     }, {});
@@ -357,11 +367,11 @@ router.get("/", protect, async (req, res) => {
 
       const studentFees = feesByStudent[student._id] || {};
 
-      const sf = studentFees['Scholarship Fee'] || { totalFee: expectedScholarship, paidFee: 0 };
+      const sf = studentFees['Scholarship Fee'] || { totalFee: expectedScholarship, paidFee: 0, history: [] };
       // If StudentFee was created but amount was 0 for some reason, use expected if expected > 0
       const sTotal = (sf.totalFee === 0 && expectedScholarship > 0) ? expectedScholarship : sf.totalFee;
 
-      const af = studentFees['Admission Fee'] || { totalFee: expectedAdmission, paidFee: 0 };
+      const af = studentFees['Admission Fee'] || { totalFee: expectedAdmission, paidFee: 0, history: [] };
       const aTotal = (af.totalFee === 0 && expectedAdmission > 0) ? expectedAdmission : af.totalFee;
 
       return {
@@ -369,12 +379,14 @@ router.get("/", protect, async (req, res) => {
         scholarshipFeeSummary: {
           total: sTotal,
           paid: sf.paidFee,
-          balance: sTotal - sf.paidFee
+          balance: sTotal - sf.paidFee,
+          history: sf.history
         },
         admissionFeeSummary: {
           total: aTotal,
           paid: af.paidFee,
-          balance: aTotal - af.paidFee
+          balance: aTotal - af.paidFee,
+          history: af.history
         }
       };
     });
@@ -753,12 +765,36 @@ router.patch('/:id/status', protect, adminOrCenter, async (req, res) => {
 });
 
 // ======================================================
+// BULK UPDATE ADMISSION PHASE
+// ======================================================
+router.patch('/bulk/admission-phase', protect, adminOrCenter, async (req, res) => {
+  try {
+    const { ids, phase } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No student IDs provided' });
+    }
+    if (!['scholarship', 'admission', 'approval_pending', 'admitted', 'joined'].includes(phase)) {
+      return res.status(400).json({ message: 'Invalid phase' });
+    }
+    
+    await Student.updateMany(
+      { _id: { $in: ids } },
+      { admissionPhase: phase }
+    );
+    
+    res.json({ message: `${ids.length} students moved to ${phase} phase` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ======================================================
 // UPDATE ADMISSION PHASE
 // ======================================================
 router.patch('/:id/admission-phase', protect, adminOrCenter, async (req, res) => {
   try {
     const { phase } = req.body;
-    if (!['scholarship', 'admitted', 'joined'].includes(phase)) {
+    if (!['scholarship', 'admission', 'approval_pending', 'admitted', 'joined'].includes(phase)) {
       return res.status(400).json({ message: 'Invalid phase' });
     }
     const student = await Student.findByIdAndUpdate(req.params.id, { admissionPhase: phase }, { new: true });
@@ -767,7 +803,6 @@ router.patch('/:id/admission-phase', protect, adminOrCenter, async (req, res) =>
     res.status(500).json({ message: error.message });
   }
 });
-
 
 // ======================================================
 // COLLECT SCHOLARSHIP / ADMISSION FEE
@@ -871,8 +906,15 @@ router.get('/admission-payments/all', protect, adminOrCenter, async (req, res) =
     }
 
     const fees = await StudentFee.find(query)
-      .populate('student', 'studentId user')
-      .populate({ path: 'student', populate: { path: 'user', select: 'name email' } })
+      .populate({
+        path: 'student',
+        select: 'studentId user year enrolledCourses center',
+        populate: [
+          { path: 'user', select: 'name email' },
+          { path: 'enrolledCourses.course', select: 'title type' },
+          { path: 'enrolledCourses.batch', select: 'name' }
+        ]
+      })
       .populate('center', 'name location')
       .lean();
 
@@ -886,7 +928,11 @@ router.get('/admission-payments/all', protect, adminOrCenter, async (req, res) =
             feeType: fee.otherFeeType,
             studentName: fee.student?.user?.name,
             studentId: fee.student?.studentId,
-            centerName: fee.center?.name,
+            centerName: fee.center?.name || fee.student?.center?.name,
+            courseName: fee.student?.enrolledCourses?.[0]?.course?.title,
+            batchName: fee.student?.enrolledCourses?.[0]?.batch?.name,
+            year: fee.student?.year,
+            student: fee.student,
             amount: payment.amount,
             paymentMode: payment.paymentMode,
             bankReference: payment.bankReference,

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -32,6 +33,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const NavItem = ({ item, isCollapsed, closeMobile }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [hoverRect, setHoverRect] = useState(null);
   const location = useLocation();
 
   // If the current path matches any subItem path, we should keep the dropdown open
@@ -41,12 +43,26 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
     }
   }, [location.pathname, item.subItems]);
 
+  const handleMouseEnter = (e) => {
+    if (isCollapsed) {
+      setHoverRect(e.currentTarget.getBoundingClientRect());
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoverRect(null);
+  };
+
   if (item.subItems) {
     return (
-      <li>
+      <li 
+        className="relative group"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex items-center justify-between w-full p-3 my-1 rounded-xl transition-all duration-200 group overflow-hidden whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-white`}
+          className={`flex items-center justify-between w-full p-3 my-1 rounded-xl transition-all duration-200 overflow-hidden whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-white`}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">{item.icon}</div>
@@ -64,6 +80,41 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
             />
           )}
         </button>
+
+        {/* Hover Popover for Collapsed State with Submenu (Portaled) */}
+        {isCollapsed && hoverRect && createPortal(
+          <div 
+            className="fixed z-[100] pl-2 animate-in fade-in zoom-in-95 duration-200"
+            style={{ top: hoverRect.top, left: hoverRect.right }}
+            onMouseEnter={() => setHoverRect(hoverRect)}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="bg-slate-800 text-white rounded-lg shadow-2xl p-2 min-w-[180px] border border-slate-700 before:content-[''] before:absolute before:top-4 before:left-[2px] before:border-[6px] before:border-transparent before:border-r-slate-800">
+              <div className="text-[10px] font-black px-3 py-1.5 mb-1 text-brand-400 border-b border-slate-700/50 uppercase tracking-widest">{item.label}</div>
+              <ul className="space-y-1">
+                {item.subItems.map((subItem) => (
+                  <li key={subItem.path}>
+                    <NavLink
+                      to={subItem.path}
+                      onClick={closeMobile}
+                      className={({ isActive }) =>
+                        `block px-3 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${
+                          isActive
+                            ? "bg-brand-600 text-white shadow-md shadow-brand-900/20"
+                            : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                        }`
+                      }
+                    >
+                      {subItem.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>,
+          document.body
+        )}
+
         <div
           className={`grid transition-all duration-300 ease-in-out ${isOpen && !isCollapsed ? "grid-rows-[1fr] opacity-100 mt-1 mb-2" : "grid-rows-[0fr] opacity-0 mt-0 mb-0"
             }`}
@@ -95,13 +146,17 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
   }
 
   return (
-    <li>
+    <li 
+      className="relative group"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <NavLink
         to={item.path}
         end
         onClick={closeMobile}
         className={({ isActive }) =>
-          `flex items-center p-3 my-1 rounded-xl transition-all duration-200 group overflow-hidden whitespace-nowrap ${isActive
+          `flex items-center p-3 my-1 rounded-xl transition-all duration-200 overflow-hidden whitespace-nowrap ${isActive
             ? "bg-brand-600 text-white shadow-lg shadow-brand-900/30"
             : "text-slate-400 hover:bg-slate-800 hover:text-white"
           }`
@@ -115,6 +170,19 @@ const NavItem = ({ item, isCollapsed, closeMobile }) => {
           {item.label}
         </span>
       </NavLink>
+
+      {/* Tooltip for Collapsed State (Portaled) */}
+      {isCollapsed && hoverRect && createPortal(
+        <div 
+          className="fixed z-[100] pl-3 pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+          style={{ top: hoverRect.top + hoverRect.height / 2, left: hoverRect.right, transform: 'translateY(-50%)' }}
+        >
+          <div className="bg-slate-800 text-white text-[10px] uppercase tracking-widest font-black py-2 px-3 rounded-lg shadow-xl whitespace-nowrap border border-slate-700 before:content-[''] before:absolute before:top-1/2 before:-translate-y-1/2 before:left-[6px] before:border-[5px] before:border-transparent before:border-r-slate-800">
+            {item.label}
+          </div>
+        </div>,
+        document.body
+      )}
     </li>
   );
 };

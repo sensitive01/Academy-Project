@@ -200,7 +200,7 @@ const studentSchema = new mongoose.Schema(
     },
     admissionPhase: {
       type: String,
-      enum: ["scholarship", "admitted", "joined"],
+      enum: ["scholarship", "admission", "approval_pending", "admitted", "joined"],
       default: "joined" 
     }
   },

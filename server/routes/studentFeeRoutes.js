@@ -13,7 +13,7 @@ router.get('/', protect, async (req, res) => {
     let fees = await StudentFee.find()
       .populate({
         path: 'student',
-        select: 'studentNameEnglish studentId year',
+        select: 'studentNameEnglish studentId year internships enrolledCourses',
         match: { status: { $ne: 'inactive' } }
       })
       .populate('center', 'name bankDetails')

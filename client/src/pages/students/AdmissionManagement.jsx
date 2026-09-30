@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   FileText, Users, GraduationCap, Building2, Calendar, LayoutDashboard,
-  Search, Plus, Mail, CheckCircle, Clock, IndianRupee
+  Search, Plus, Mail, CheckCircle, Clock, IndianRupee, Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
@@ -15,6 +15,7 @@ import CollectFeeModal from "../../components/modals/CollectFeeModal";
 import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import StudentFilterBar from "../../components/common/StudentFilterBar";
 import DocumentUploadModal from "../../components/modals/DocumentUploadModal";
+import CenterStudentApprovalModal from "../../components/modals/CenterStudentApprovalModal";
 
 const AdmissionManagement = () => {
   const [activeTab, setActiveTab] = useState("admission_form");
@@ -31,6 +32,7 @@ const AdmissionManagement = () => {
   const [selectedBatchForViewingFees, setSelectedBatchForViewingFees] = useState(null);
   const [feeModalData, setFeeModalData] = useState(null);
   const [documentModalData, setDocumentModalData] = useState(null);
+  const [approvalModalData, setApprovalModalData] = useState(null);
 
   const [confirmModalConfig, setConfirmModalConfig] = useState({
     isOpen: false,
@@ -44,6 +46,35 @@ const AdmissionManagement = () => {
 
   const [payments, setPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
+  
+  // Bulk selection state
+  const [selectedScholarshipRows, setSelectedScholarshipRows] = useState([]);
+  const [selectedAdmissionRows, setSelectedAdmissionRows] = useState([]);
+  const [selectedApprovalRows, setSelectedApprovalRows] = useState([]);
+  const [bulkApprovalModalData, setBulkApprovalModalData] = useState(null);
+
+  const handleBulkUpdatePhase = (selectedRows, newPhase, confirmMessage, clearSelection) => {
+    if (selectedRows.length === 0) return;
+    
+    setConfirmModalConfig({
+      isOpen: true,
+      title: "Bulk Update Phase",
+      message: confirmMessage,
+      type: "info",
+      onConfirm: async () => {
+        try {
+          const ids = selectedRows.map(row => row._id);
+          await api.patch('/students/bulk/admission-phase', { ids, phase: newPhase });
+          toast.success(`${ids.length} students updated successfully!`);
+          fetchStudents();
+          if (clearSelection) clearSelection();
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to bulk update students");
+        }
+      }
+    });
+  };
 
   useEffect(() => {
     if (activeTab === "admission_form" || activeTab === "scholarship_form") {
@@ -62,6 +93,7 @@ const AdmissionManagement = () => {
   const [filterCenter, setFilterCenter] = useState(() => getSessionValue("admission_filterCenter", []));
   const [filterCourse, setFilterCourse] = useState(() => getSessionValue("admission_filterCourse", []));
   const [filterBatch, setFilterBatch] = useState(() => getSessionValue("admission_filterBatch", []));
+  const [filterType, setFilterType] = useState(() => getSessionValue("admission_filterType", []));
 
   const [centers, setCenters] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -70,7 +102,8 @@ const AdmissionManagement = () => {
     sessionStorage.setItem("admission_filterCenter", JSON.stringify(filterCenter));
     sessionStorage.setItem("admission_filterCourse", JSON.stringify(filterCourse));
     sessionStorage.setItem("admission_filterBatch", JSON.stringify(filterBatch));
-  }, [filterCenter, filterCourse, filterBatch]);
+    sessionStorage.setItem("admission_filterType", JSON.stringify(filterType));
+  }, [filterCenter, filterCourse, filterBatch, filterType]);
 
   useEffect(() => {
     fetchCenters();
@@ -164,8 +197,9 @@ const AdmissionManagement = () => {
     );
   });
 
-  const scholarshipStudents = filteredStudents.filter(s => ['scholarship', 'admitted', 'joined'].includes(s.admissionPhase));
-  const admissionStudents = filteredStudents.filter(s => ['admitted', 'joined'].includes(s.admissionPhase));
+  const scholarshipStudents = filteredStudents.filter(s => ['scholarship', 'admission', 'approval_pending', 'admitted', 'joined'].includes(s.admissionPhase));
+  const admissionStudents = filteredStudents.filter(s => ['admission', 'approval_pending', 'admitted', 'joined'].includes(s.admissionPhase));
+  const studentApprovalStudents = filteredStudents.filter(s => ['approval_pending'].includes(s.admissionPhase));
 
   const handleUpdatePhase = (studentId, newPhase, confirmMessage) => {
     setConfirmModalConfig({
@@ -186,12 +220,65 @@ const AdmissionManagement = () => {
     });
   };
 
+  const handleDeleteStudent = (studentId, studentName) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: "Delete Student",
+      message: `Are you sure you want to permanently delete "${studentName}"? This will also delete all their payment records. This action cannot be undone.`,
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await api.delete(`/students/${studentId}`);
+          toast.success("Student and all payment records deleted successfully!");
+          fetchStudents();
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to delete student");
+        }
+      }
+    });
+  };
+
   const filteredBatches = batches.filter(b => {
     if (!batchSearch) return true;
     const term = batchSearch.toLowerCase();
     return (
       (b.name || "").toLowerCase().includes(term) ||
       (b.batchId || "").toLowerCase().includes(term)
+    );
+  });
+
+  const filteredPayments = payments.filter(p => {
+    const s = p.student;
+    if (filterType && filterType.length > 0) {
+      if (!filterType.includes(p.feeType)) return false;
+    }
+    if (filterCenter && filterCenter.length > 0) {
+      if (!filterCenter.includes(s?.center) && !filterCenter.includes(s?.center?._id) && !filterCenter.includes(p.centerName)) return false;
+    }
+    if (filterCourse && filterCourse.length > 0) {
+      if (!s?.enrolledCourses?.some(ec => filterCourse.includes(ec.course?._id) || filterCourse.includes(ec.course))) return false;
+    }
+    if (filterBatch && filterBatch.length > 0) {
+      const selectedBatches = batches.filter(b => filterBatch.includes(b.name || b.batchId || b._id));
+      if (selectedBatches.length > 0) {
+        const batchIds = selectedBatches.map(b => b._id.toString());
+        const inBatchState = selectedBatches.some(b => b.students?.some(bs => bs === s?._id || bs?._id === s?._id));
+        const inStudentState = s?.enrolledCourses?.some(ec => {
+          const ecBatchId = typeof ec.batch === 'object' ? ec.batch?._id : ec.batch;
+          return ecBatchId && batchIds.includes(ecBatchId.toString());
+        });
+        if (!inBatchState && !inStudentState) return false;
+      } else {
+        return false;
+      }
+    }
+    if (!search) return true;
+    const term = search.toLowerCase();
+    return (
+      (p.studentName || "").toLowerCase().includes(term) ||
+      (p.studentId || "").toLowerCase().includes(term) ||
+      (p.bankReference || "").toLowerCase().includes(term)
     );
   });
 
@@ -294,6 +381,29 @@ const AdmissionManagement = () => {
         );
       },
       width: "150px"
+    },
+    {
+      name: "Status",
+      selector: row => row.admissionPhase,
+      sortable: true,
+      cell: row => {
+        let isAdmitted = false;
+        
+        if (activeTab === "scholarship_form") {
+          // In scholarship form, toggle ON means they are admitted to the next phase
+          isAdmitted = ['admission', 'approval_pending', 'admitted', 'joined'].includes(row.admissionPhase);
+        } else {
+          // In admission form, they are admitted only after approval
+          isAdmitted = ['admitted', 'joined'].includes(row.admissionPhase);
+        }
+
+        return (
+          <span className={`px-2 py-1 text-[10px] font-bold rounded-md ${isAdmitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            {isAdmitted ? "Admitted" : "Pending"}
+          </span>
+        );
+      },
+      width: "100px"
     }
   ];
 
@@ -302,18 +412,17 @@ const AdmissionManagement = () => {
     {
       name: "Action",
       cell: row => {
-        const isMoved = ['admitted', 'joined'].includes(row.admissionPhase);
+        const isMoved = ['admission', 'approval_pending', 'admitted', 'joined'].includes(row.admissionPhase);
         return (
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 className="sr-only peer"
                 checked={isMoved}
-                onChange={(e) => {
-                  e.preventDefault();
+                onChange={() => {
                   if (!isMoved) {
-                    handleUpdatePhase(row._id, 'admitted', 'Move this student to the Admission Form?');
+                    handleUpdatePhase(row._id, 'admission', 'Move this student to the Admission Form?');
                   } else {
                     handleUpdatePhase(row._id, 'scholarship', 'Revert this student back to the Scholarship phase?');
                   }
@@ -321,10 +430,17 @@ const AdmissionManagement = () => {
               />
               <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
             </label>
+            <button
+              onClick={() => handleDeleteStudent(row._id, row.user?.name)}
+              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+              title="Delete Student"
+            >
+              <Trash2 size={15} />
+            </button>
           </div>
         );
       },
-      width: "100px"
+      width: "130px"
     }
   ];
 
@@ -345,29 +461,95 @@ const AdmissionManagement = () => {
     {
       name: "Action",
       cell: row => {
-        const isMoved = row.admissionPhase === 'joined';
+        const isMoved = ['approval_pending', 'admitted', 'joined'].includes(row.admissionPhase);
         return (
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 className="sr-only peer"
                 checked={isMoved}
-                onChange={(e) => {
-                  e.preventDefault();
+                onChange={() => {
                   if (!isMoved) {
-                    handleUpdatePhase(row._id, 'joined', 'Move this student to Center Students?');
+                    handleUpdatePhase(row._id, 'approval_pending', 'Send this student to the Approvals Section?');
                   } else {
-                    handleUpdatePhase(row._id, 'admitted', 'Revert this student back to the Admission phase?');
+                    handleUpdatePhase(row._id, 'admission', 'Revert this student back from Approvals?');
                   }
                 }}
               />
               <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
             </label>
+            <button
+              onClick={() => handleDeleteStudent(row._id, row.user?.name)}
+              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+              title="Delete Student"
+            >
+              <Trash2 size={15} />
+            </button>
           </div>
         );
       },
-      width: "100px"
+      width: "130px"
+    }
+  ];
+
+  const studentApprovalColumns = [
+    ...baseColumns.filter(c => c.name !== 'Fee Details'),
+    {
+      name: "Scholarship Fee",
+      cell: row => {
+        const schFee = row.scholarshipFeeSummary || { total: 0, paid: 0, balance: 0 };
+        return (
+          <button
+            onClick={() => setFeeModalData({ student: row, feeType: 'Scholarship', readOnly: true })}
+            className="flex flex-col gap-0.5 text-[10px] min-w-0 text-left hover:bg-slate-50 p-1.5 rounded transition-colors group border border-slate-100 w-full"
+          >
+            <span className="font-bold text-slate-700 group-hover:text-brand-700">Total: ₹{schFee.total}</span>
+            <span className="text-slate-500">Paid: ₹{schFee.paid}</span>
+          </button>
+        );
+      },
+      width: "150px"
+    },
+    {
+      name: "Admission Fee",
+      cell: row => {
+        const admFee = row.admissionFeeSummary || { total: 0, paid: 0, balance: 0 };
+        return (
+          <button
+            onClick={() => setFeeModalData({ student: row, feeType: 'Admission', readOnly: true })}
+            className="flex flex-col gap-0.5 text-[10px] min-w-0 text-left hover:bg-slate-50 p-1.5 rounded transition-colors group border border-slate-100 w-full"
+          >
+            <span className="font-bold text-slate-700 group-hover:text-brand-700">Total: ₹{admFee.total}</span>
+            <span className="text-slate-500">Paid: ₹{admFee.paid}</span>
+          </button>
+        );
+      },
+      width: "150px"
+    },
+    {
+      name: "Documents",
+      cell: row => (
+        <button
+          onClick={() => setDocumentModalData(row)}
+          className="text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors"
+        >
+          View/Upload
+        </button>
+      ),
+      width: "140px"
+    },
+    {
+      name: "Action",
+      cell: row => (
+        <button
+          onClick={() => setApprovalModalData(row)}
+          className="text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors"
+        >
+          Review & Approve
+        </button>
+      ),
+      width: "160px"
     }
   ];
 
@@ -397,7 +579,20 @@ const AdmissionManagement = () => {
           {row.studentName}
           <div className="text-[10px] text-slate-500">{row.studentId}</div>
         </div>
-      )
+      ), width: "200px"
+    },
+    {
+      name: "Academic Info",
+      selector: row => `${row.centerName || "-"} ${row.courseName || "-"} ${row.batchName || "-"}`,
+      sortable: true,
+      cell: row => (
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] font-bold text-slate-700 truncate">{row.centerName || "-"}</span>
+          <span className="text-[10px] font-medium text-slate-500 truncate">{row.courseName || "-"}</span>
+          <span className="text-[10px] text-brand-600 font-bold truncate">{row.batchName || "-"}</span>
+        </div>
+      ),
+      width: "200px"
     },
     { name: "Fee Type", selector: row => row.feeType, sortable: true, width: "150px" },
     { name: "Amount", selector: row => row.amount, sortable: true, cell: row => `₹${row.amount}`, width: "120px" },
@@ -449,7 +644,7 @@ const AdmissionManagement = () => {
           </button>
         </div>
       ),
-      width: "160px"
+      width: "180px"
     }
   ];
 
@@ -588,6 +783,18 @@ const AdmissionManagement = () => {
               }`} />
           </button>
           <button
+            onClick={() => setActiveTab("student_approvals")}
+            className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "student_approvals"
+                ? "text-brand-600"
+                : "text-gray-500 hover:text-brand-600"
+              }`}
+          >
+            <CheckCircle size={20} />
+            Student Approvals
+            <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "student_approvals" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
+              }`} />
+          </button>
+          <button
             onClick={() => setActiveTab("approvals")}
             className={`pb-4 px-2 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 group ${activeTab === "approvals"
                 ? "text-brand-600"
@@ -595,7 +802,7 @@ const AdmissionManagement = () => {
               }`}
           >
             <CheckCircle size={20} />
-            Approvals
+           Fees Approval
             <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full transition-colors ${activeTab === "approvals" ? "bg-brand-600" : "bg-transparent group-hover:bg-brand-600"
               }`} />
           </button>
@@ -629,8 +836,16 @@ const AdmissionManagement = () => {
                       showVendor={false}
                       className="flex items-center gap-2"
                     />
+                    {selectedScholarshipRows.length > 0 && (
+                      <button
+                        onClick={() => handleBulkUpdatePhase(selectedScholarshipRows, 'admission', 'Move selected students to Admission phase?', () => setSelectedScholarshipRows([]))}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-sm shrink-0"
+                      >
+                        <CheckCircle size={18} /> Move ({selectedScholarshipRows.length})
+                      </button>
+                    )}
                     <button
-                      onClick={() => navigate('/student-registration')}
+                      onClick={() => navigate('/student-registration?type=admin')}
                       className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 shrink-0"
                     >
                       <Plus size={18} />
@@ -640,6 +855,9 @@ const AdmissionManagement = () => {
                 }
                 pagination
                 responsive
+                selectableRows
+                onSelectedRowsChange={({ selectedRows }) => setSelectedScholarshipRows(selectedRows)}
+                clearSelectedRows={selectedScholarshipRows.length === 0}
               />
             </div>
           </div>
@@ -660,7 +878,7 @@ const AdmissionManagement = () => {
                 setSearch={setSearch}
                 searchPlaceholder="Search by ID, name, email..."
                 additionalHeaderContent={
-                  <div className="flex items-center gap-3 justify-end w-full">
+                  <div className="flex items-center justify-end w-full">
                     <StudentFilterBar
                       filterCenter={filterCenter} setFilterCenter={setFilterCenter}
                       filterCourse={filterCourse} setFilterCourse={setFilterCourse}
@@ -672,13 +890,52 @@ const AdmissionManagement = () => {
                       showVendor={false}
                       className="flex items-center gap-2"
                     />
-                    <button
-                      onClick={() => navigate('/student-registration')}
-                      className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-sm active:scale-95 shrink-0"
-                    >
-                      <Plus size={18} />
-                      Add Student
-                    </button>
+                    {selectedAdmissionRows.length > 0 && (
+                      <button
+                        onClick={() => handleBulkUpdatePhase(selectedAdmissionRows, 'approval_pending', 'Move selected students to Approvals phase?', () => setSelectedAdmissionRows([]))}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-sm shrink-0 ml-2"
+                      >
+                        <CheckCircle size={18} /> Move ({selectedAdmissionRows.length})
+                      </button>
+                    )}
+                  </div>
+                }
+                pagination
+                responsive
+                selectableRows
+                onSelectedRowsChange={({ selectedRows }) => setSelectedAdmissionRows(selectedRows)}
+                clearSelectedRows={selectedAdmissionRows.length === 0}
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "student_approvals" && (
+          <div className="animate-fade-in-up space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
+              <CustomDataTable
+                columns={studentApprovalColumns}
+                data={studentApprovalStudents}
+                progressPending={loading}
+                progressComponent={
+                  <div className="p-12"><Loading /></div>
+                }
+                search={search}
+                setSearch={setSearch}
+                searchPlaceholder="Search by ID, name, email..."
+                additionalHeaderContent={
+                  <div className="flex items-center justify-end w-full">
+                    <StudentFilterBar
+                      filterCenter={filterCenter} setFilterCenter={setFilterCenter}
+                      filterCourse={filterCourse} setFilterCourse={setFilterCourse}
+                      filterBatch={filterBatch} setFilterBatch={setFilterBatch}
+                      centers={centers}
+                      courses={courses}
+                      batches={batches}
+                      showType={false}
+                      showVendor={false}
+                      className="flex items-center gap-2"
+                    />
                   </div>
                 }
                 pagination
@@ -713,12 +970,32 @@ const AdmissionManagement = () => {
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
               <CustomDataTable
                 columns={paymentColumns}
-                data={payments}
+                data={filteredPayments}
                 progressPending={paymentsLoading}
                 progressComponent={<div className="p-12"><Loading /></div>}
                 search={search}
                 setSearch={setSearch}
                 searchPlaceholder="Search by student or transaction..."
+                additionalHeaderContent={
+                  <div className="flex items-center justify-end w-full">
+                    <StudentFilterBar
+                      filterCenter={filterCenter} setFilterCenter={setFilterCenter}
+                      filterCourse={filterCourse} setFilterCourse={setFilterCourse}
+                      filterBatch={filterBatch} setFilterBatch={setFilterBatch}
+                      filterType={filterType} setFilterType={setFilterType}
+                      typeOptions={[
+                        { label: "Scholarship Fee", value: "Scholarship Fee" },
+                        { label: "Admission Fee", value: "Admission Fee" }
+                      ]}
+                      centers={centers}
+                      courses={courses}
+                      batches={batches}
+                      showType={true}
+                      showVendor={false}
+                      className="flex items-center gap-2"
+                    />
+                  </div>
+                }
                 pagination
                 responsive
               />
@@ -731,12 +1008,32 @@ const AdmissionManagement = () => {
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-visible">
               <CustomDataTable
                 columns={approvalColumns}
-                data={payments.filter(p => p.status === 'Pending')}
+                data={filteredPayments.filter(p => p.status === 'Pending')}
                 progressPending={paymentsLoading}
                 progressComponent={<div className="p-12"><Loading /></div>}
                 search={search}
                 setSearch={setSearch}
                 searchPlaceholder="Search by student or transaction..."
+                additionalHeaderContent={
+                  <div className="flex items-center justify-end w-full">
+                    <StudentFilterBar
+                      filterCenter={filterCenter} setFilterCenter={setFilterCenter}
+                      filterCourse={filterCourse} setFilterCourse={setFilterCourse}
+                      filterBatch={filterBatch} setFilterBatch={setFilterBatch}
+                      filterType={filterType} setFilterType={setFilterType}
+                      typeOptions={[
+                        { label: "Scholarship Fee", value: "Scholarship Fee" },
+                        { label: "Admission Fee", value: "Admission Fee" }
+                      ]}
+                      centers={centers}
+                      courses={courses}
+                      batches={batches}
+                      showType={true}
+                      showVendor={false}
+                      className="flex items-center gap-2"
+                    />
+                  </div>
+                }
                 pagination
                 responsive
               />
@@ -771,6 +1068,7 @@ const AdmissionManagement = () => {
         onClose={() => setFeeModalData(null)}
         student={feeModalData?.student}
         feeType={feeModalData?.feeType}
+        readOnly={feeModalData?.readOnly}
         onSuccess={() => {
           setFeeModalData(null);
           fetchStudents();
@@ -782,11 +1080,46 @@ const AdmissionManagement = () => {
         onClose={() => setConfirmModalConfig({ ...confirmModalConfig, isOpen: false })}
       />
 
-      <DocumentUploadModal
+    <DocumentUploadModal
         isOpen={!!documentModalData}
         onClose={() => setDocumentModalData(null)}
         student={documentModalData}
         onUpdate={() => fetchStudents()}
+      />
+
+      <CenterStudentApprovalModal
+        isOpen={!!approvalModalData}
+        onClose={() => setApprovalModalData(null)}
+        student={approvalModalData}
+        onApprove={async (studentId, phase) => {
+          try {
+            await api.patch(`/students/${studentId}/admission-phase`, { phase });
+            toast.success("Student approved to Center!");
+            setApprovalModalData(null);
+            fetchStudents();
+          } catch(err) {
+            console.error(err);
+            toast.error("Failed to update phase");
+          }
+        }}
+      />
+
+      <CenterStudentApprovalModal
+        isOpen={!!bulkApprovalModalData}
+        onClose={() => setBulkApprovalModalData(null)}
+        students={bulkApprovalModalData}
+        onBulkApprove={async (ids, newPhase) => {
+          try {
+            await api.patch(`/students/bulk/admission-phase`, { ids, phase: newPhase });
+            toast.success(`${ids.length} students approved successfully!`);
+            setBulkApprovalModalData(null);
+            fetchStudents();
+            setSelectedApprovalRows([]);
+          } catch(err) {
+            console.error(err);
+            toast.error("Failed to bulk update phase");
+          }
+        }}
       />
 
     </div>
