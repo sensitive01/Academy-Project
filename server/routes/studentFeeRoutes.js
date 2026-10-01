@@ -13,7 +13,7 @@ router.get('/', protect, async (req, res) => {
     let fees = await StudentFee.find()
       .populate({
         path: 'student',
-        select: 'studentNameEnglish studentId year internships enrolledCourses',
+        select: 'studentNameEnglish studentId year internships enrolledCourses paymentScheme',
         match: { status: { $ne: 'inactive' } }
       })
       .populate('center', 'name bankDetails')
@@ -199,7 +199,7 @@ router.post('/', protect, async (req, res) => {
       finalPenaltyAmount: finalPenaltyAmount || 0
     });
 
-    await fee.populate('student', 'studentNameEnglish studentId user');
+    await fee.populate('student', 'studentNameEnglish studentId user paymentScheme');
     await fee.populate('center', 'name bankDetails');
     await fee.populate('course', 'title');
     await fee.populate('batch', 'name');
@@ -233,7 +233,7 @@ router.patch('/:id/toggle-status', protect, async (req, res) => {
     fee.status = fee.status === 'paid' ? 'pending' : 'paid';
     await fee.save();
     
-    await fee.populate('student', 'studentNameEnglish studentId user');
+    await fee.populate('student', 'studentNameEnglish studentId user paymentScheme');
     await fee.populate('center', 'name bankDetails');
     await fee.populate('course', 'title');
     await fee.populate('batch', 'name');
@@ -454,7 +454,7 @@ router.post('/:id/collect', protect, async (req, res) => {
     fee.markModified('payments');
     await fee.save();
 
-    await fee.populate('student', 'studentNameEnglish studentId');
+    await fee.populate('student', 'studentNameEnglish studentId paymentScheme');
     await fee.populate('center', 'name bankDetails');
     await fee.populate('course', 'title');
     await fee.populate('batch', 'name');
@@ -528,7 +528,7 @@ router.patch('/:id/approve', protect, async (req, res) => {
 
     await fee.save();
 
-    await fee.populate('student', 'studentNameEnglish studentId');
+    await fee.populate('student', 'studentNameEnglish studentId paymentScheme');
     await fee.populate('center', 'name bankDetails');
     await fee.populate('course', 'title');
     await fee.populate('batch', 'name');
@@ -543,7 +543,7 @@ router.patch('/:id/approve', protect, async (req, res) => {
 router.get('/:id/receipt', protect, async (req, res) => {
   try {
     const fee = await StudentFee.findById(req.params.id)
-      .populate('student', 'studentNameEnglish studentId email phone year')
+      .populate('student', 'studentNameEnglish studentId email phone year paymentScheme')
       .populate('center', 'name bankDetails')
       .populate('course', 'title')
       .populate('batch', 'name')

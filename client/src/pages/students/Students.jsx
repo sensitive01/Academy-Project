@@ -1133,10 +1133,7 @@ const Students = () => {
           initialMode={studentMode}
           centers={centers}
           onBack={() => handleSetSelectedStudent(null)}
-          onUpdate={() => {
-            fetchStudents();
-            // Stays on page after update
-          }}
+          onUpdate={handleUpdate}
         />
       </div>
     );

@@ -14,24 +14,9 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
   const [selectedYearIdx, setSelectedYearIdx] = useState(() => {
     if (!hasBreakdown) return -1;
     
-    // Determine the year label of the current fee row
-    let currentRowYearLabel = fee.year || fee.otherFeeType || fee.student?.year || "Unknown";
-    const match = String(currentRowYearLabel).match(/\d+/);
-    if (match) {
-      const n = match[0];
-      if (n === "1") currentRowYearLabel = "1st Year";
-      else if (n === "2") currentRowYearLabel = "2nd Year";
-      else if (n === "3") currentRowYearLabel = "3rd Year";
-      else currentRowYearLabel = `${n}th Year`;
-    }
-
-    // Try to find the exact year match first
-    const exactMatchIdx = fee.feeBreakdown.findIndex(b => b.yearLabel === currentRowYearLabel);
-    if (exactMatchIdx !== -1) return exactMatchIdx;
-
-    // Fallback: first year with a balance
-    const idx = fee.feeBreakdown.findIndex(b => b.balance > 0);
-    return idx !== -1 ? idx : 0;
+    // Auto-select the first year with a pending balance
+    const pendingIdx = fee.feeBreakdown.findIndex(b => b.balance > 0);
+    return pendingIdx !== -1 ? pendingIdx : 0;
   });
 
   const currentFeeData = hasBreakdown && selectedYearIdx >= 0 ? fee.feeBreakdown[selectedYearIdx] : fee;
@@ -216,11 +201,15 @@ const CollectPaymentModal = ({ onClose, onSave, fee, schemeLabel }) => {
               onChange={(e) => setSelectedYearIdx(Number(e.target.value))}
               className="w-full rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 font-bold text-slate-800 bg-white shadow-sm"
             >
-              {fee.feeBreakdown.map((b, idx) => (
-                <option key={idx} value={idx}>
-                  {b.yearLabel}
-                </option>
-              ))}
+              {fee.feeBreakdown.map((b, idx) => {
+                // Check if any prior year has a balance > 0
+                const hasPreviousUnpaid = fee.feeBreakdown.slice(0, idx).some(prev => prev.balance > 0);
+                return (
+                  <option key={idx} value={idx} disabled={hasPreviousUnpaid}>
+                    {b.yearLabel} {hasPreviousUnpaid ? '(Pay previous year first)' : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
         )}
