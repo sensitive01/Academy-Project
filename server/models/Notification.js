@@ -29,7 +29,8 @@ const notificationSchema = new mongoose.Schema(
         "exam_updated",
         "fee_assigned",
         "fee_paid",
-        "result_published"
+        "result_published",
+        "reminder"
       ],
       required: true,
     },

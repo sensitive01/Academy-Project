@@ -36,7 +36,7 @@ const DashboardHeader = ({ toggleMobileSidebar }) => {
 
   const fetchNotifications = async () => {
     try {
-      const { data } = await api.get("/notifications");
+      const { data } = await api.get("/notifications?currentMonth=true");
       setNotifications(data);
     } catch (err) {
       console.error(err);

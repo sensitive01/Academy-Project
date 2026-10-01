@@ -18,11 +18,20 @@ const Notifications = () => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fromDate, setFromDate] = useState("");
+    const [toDate, setToDate] = useState("");
 
     const fetchNotifications = async () => {
         try {
             setLoading(true);
-            const { data } = await api.get("/notifications");
+            let url = "/notifications";
+            const params = new URLSearchParams();
+            if (fromDate) params.append("from", fromDate);
+            if (toDate) params.append("to", toDate);
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+            const { data } = await api.get(url);
             setNotifications(data);
         } catch (err) {
             console.error(err);
@@ -34,7 +43,7 @@ const Notifications = () => {
 
     useEffect(() => {
         if (user) fetchNotifications();
-    }, [user]);
+    }, [user, fromDate, toDate]);
 
     const markAsRead = async (id) => {
         try {
@@ -113,15 +122,32 @@ const Notifications = () => {
                     <p className="text-slate-500 mt-1">Stay updated with your latest activities</p>
                 </div>
                 
-                {notifications.some(n => !n.isRead) && (
-                    <button 
-                        onClick={markAllAsRead}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-all font-medium shadow-sm hover:shadow-md"
-                    >
-                        <Check size={18} />
-                        Mark all as read
-                    </button>
-                )}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <input 
+                            type="date" 
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        <span className="text-slate-400">to</span>
+                        <input 
+                            type="date" 
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                    </div>
+                    {notifications.some(n => !n.isRead) && (
+                        <button 
+                            onClick={markAllAsRead}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-all font-medium shadow-sm hover:shadow-md"
+                        >
+                            <Check size={18} />
+                            Mark all as read
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden min-h-[400px]">

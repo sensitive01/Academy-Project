@@ -17,6 +17,16 @@ const reminderSchema = new mongoose.Schema(
     dueDate: {
       type: Date,
     },
+    remindBeforeDays: {
+      type: Number,
+      default: 0
+    },
+    reminderDate: {
+      type: Date
+    },
+    seriesId: {
+      type: String
+    },
     status: {
       type: String,
       enum: ["pending", "completed"],

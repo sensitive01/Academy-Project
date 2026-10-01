@@ -26,20 +26,49 @@ router.get('/', async (req, res) => {
 // @access  Private
 router.post('/', async (req, res) => {
   try {
-    const { title, description, dueDate } = req.body;
+    const { title, description, dueDate, remindBeforeDays, isMonthly } = req.body;
 
     if (!title) {
       return res.status(400).json({ message: 'Title is required' });
     }
 
-    const reminder = await Reminder.create({
-      user: req.user._id,
-      title,
-      description,
-      dueDate
-    });
+    let remindersToCreate = [];
+    const beforeDays = parseInt(remindBeforeDays) || 0;
 
-    res.status(201).json(reminder);
+    if (!isMonthly) {
+      remindersToCreate.push({
+        user: req.user._id,
+        title,
+        description,
+        dueDate,
+        remindBeforeDays: beforeDays
+      });
+    } else {
+      // If monthly, loop from current dueDate month to end of the year
+      const baseDate = dueDate ? new Date(dueDate) : new Date();
+      const currentMonth = baseDate.getMonth();
+      const year = baseDate.getFullYear();
+      const seriesId = new Date().getTime().toString() + Math.random().toString(36).substring(7);
+      
+      for (let m = currentMonth; m <= 11; m++) {
+        const d = new Date(year, m, baseDate.getDate());
+        
+        remindersToCreate.push({
+          user: req.user._id,
+          title,
+          description,
+          dueDate: d,
+          remindBeforeDays: beforeDays,
+          seriesId
+        });
+      }
+    }
+      
+
+
+    const createdReminders = await Reminder.insertMany(remindersToCreate);
+
+    res.status(201).json(createdReminders);
   } catch (error) {
     console.error('Error creating reminder:', error);
     res.status(500).json({ message: 'Server Error' });
@@ -133,6 +162,31 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Reminder removed' });
   } catch (error) {
     console.error('Error deleting reminder:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @desc    Delete a reminder series
+// @route   DELETE /api/reminders/series/:seriesId
+// @access  Private
+router.delete('/series/:seriesId', async (req, res) => {
+  try {
+    const result = await Reminder.deleteMany({
+      seriesId: req.params.seriesId,
+      user: req.user._id,
+      $or: [
+        { assignedBy: { $exists: false } },
+        { status: 'completed' }
+      ]
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'No reminders found or not authorized to delete' });
+    }
+
+    res.json({ message: 'Reminder series removed' });
+  } catch (error) {
+    console.error('Error deleting reminder series:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
