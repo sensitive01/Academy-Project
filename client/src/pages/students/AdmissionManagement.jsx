@@ -16,9 +16,12 @@ import ConfirmationModal from "../../components/modals/ConfirmationModal";
 import StudentFilterBar from "../../components/common/StudentFilterBar";
 import DocumentUploadModal from "../../components/modals/DocumentUploadModal";
 import CenterStudentApprovalModal from "../../components/modals/CenterStudentApprovalModal";
+import StudentProfilePage from "./StudentProfilePage";
 
 const AdmissionManagement = () => {
   const [activeTab, setActiveTab] = useState("admission_form");
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentMode, setStudentMode] = useState("view");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -197,9 +200,9 @@ const AdmissionManagement = () => {
     );
   });
 
-  const scholarshipStudents = filteredStudents.filter(s => ['scholarship', 'admission', 'approval_pending', 'admitted', 'joined'].includes(s.admissionPhase));
-  const admissionStudents = filteredStudents.filter(s => ['admission', 'approval_pending', 'admitted', 'joined'].includes(s.admissionPhase));
-  const studentApprovalStudents = filteredStudents.filter(s => ['approval_pending'].includes(s.admissionPhase));
+  const scholarshipStudents = filteredStudents.filter(s => s.studentId?.startsWith('APP-') && ['scholarship', 'admission', 'approval_pending', 'admitted', 'joined'].includes(s.admissionPhase));
+  const admissionStudents = filteredStudents.filter(s => s.studentId?.startsWith('APP-') && ['admission', 'approval_pending', 'admitted', 'joined'].includes(s.admissionPhase));
+  const studentApprovalStudents = filteredStudents.filter(s => s.studentId?.startsWith('APP-') && ['approval_pending'].includes(s.admissionPhase));
 
   const handleUpdatePhase = (studentId, newPhase, confirmMessage) => {
     setConfirmModalConfig({
@@ -293,15 +296,22 @@ const AdmissionManagement = () => {
       selector: row => row.user?.name,
       sortable: true,
       cell: row => (
-        <div className="flex items-center gap-3 py-2 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center text-brand-700 font-bold shrink-0">
+        <button
+          onClick={() => {
+            setSelectedStudent(row);
+            setStudentMode("edit");
+          }}
+          className="flex items-center gap-3 py-2 min-w-0 group hover:bg-slate-50 p-2 rounded-lg transition-colors w-full text-left cursor-pointer"
+          title="Click to edit student profile"
+        >
+          <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center text-brand-700 font-bold shrink-0 group-hover:bg-brand-100 transition-colors">
             {row.user?.name?.charAt(0) || "S"}
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-slate-900 truncate">{row.user?.name}</div>
+            <div className="font-bold text-slate-900 truncate group-hover:text-brand-600 transition-colors">{row.user?.name}</div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate">{row.studentId || "NO-ID"}</div>
           </div>
-        </div>
+        </button>
       ),
       width: "250px"
     },
@@ -334,15 +344,13 @@ const AdmissionManagement = () => {
             <span className="text-[10px] font-medium text-slate-500 truncate">{course}</span>
             <span className="text-[10px] text-brand-600 font-bold truncate">{batch}</span>
           </div>
-        );
+        ); 
       },
-      width: "280px"
+      width: "300"
     },
     {
       name: "Fee Details",
       selector: row => {
-        // activeTab cannot be easily referenced safely inside baseColumns without passing it, but baseColumns is re-created on render.
-        // Actually since it's defined inside the component, activeTab is in scope!
         const feeSummary = activeTab === "scholarship_form" ? row.scholarshipFeeSummary : row.admissionFeeSummary;
         return feeSummary?.total || 0;
       },
@@ -592,7 +600,7 @@ const AdmissionManagement = () => {
           <span className="text-[10px] text-brand-600 font-bold truncate">{row.batchName || "-"}</span>
         </div>
       ),
-      width: "200px"
+      width: "300px"
     },
     { name: "Fee Type", selector: row => row.feeType, sortable: true, width: "150px" },
     { name: "Amount", selector: row => row.amount, sortable: true, cell: row => `₹${row.amount}`, width: "120px" },
@@ -712,6 +720,70 @@ const AdmissionManagement = () => {
       width: "150px"
     }
   ];
+
+  if (selectedStudent) {
+    return (
+      <div className="w-full">
+        <StudentProfilePage
+          student={selectedStudent}
+          initialMode={studentMode}
+          centers={centers}
+          onBack={() => setSelectedStudent(null)}
+          onUpdate={() => {
+            fetchStudents();
+            fetchPayments();
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (approvalModalData) {
+    return (
+      <div className="w-full">
+        <CenterStudentApprovalModal
+          isOpen={true}
+          onClose={() => setApprovalModalData(null)}
+          student={approvalModalData}
+          onApprove={async (studentId, phase) => {
+            try {
+              await api.patch(`/students/${studentId}/admission-phase`, { phase });
+              toast.success("Student approved to Center!");
+              setApprovalModalData(null);
+              fetchStudents();
+            } catch(err) {
+              console.error(err);
+              toast.error("Failed to update phase");
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (bulkApprovalModalData) {
+    return (
+      <div className="w-full">
+        <CenterStudentApprovalModal
+          isOpen={true}
+          onClose={() => setBulkApprovalModalData(null)}
+          students={bulkApprovalModalData}
+          onBulkApprove={async (ids, newPhase) => {
+            try {
+              await api.patch(`/students/bulk/admission-phase`, { ids, phase: newPhase });
+              toast.success(`${ids.length} students approved successfully!`);
+              setBulkApprovalModalData(null);
+              fetchStudents();
+              setSelectedApprovalRows([]);
+            } catch(err) {
+              console.error(err);
+              toast.error("Failed to bulk update phase");
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
@@ -1085,41 +1157,6 @@ const AdmissionManagement = () => {
         onClose={() => setDocumentModalData(null)}
         student={documentModalData}
         onUpdate={() => fetchStudents()}
-      />
-
-      <CenterStudentApprovalModal
-        isOpen={!!approvalModalData}
-        onClose={() => setApprovalModalData(null)}
-        student={approvalModalData}
-        onApprove={async (studentId, phase) => {
-          try {
-            await api.patch(`/students/${studentId}/admission-phase`, { phase });
-            toast.success("Student approved to Center!");
-            setApprovalModalData(null);
-            fetchStudents();
-          } catch(err) {
-            console.error(err);
-            toast.error("Failed to update phase");
-          }
-        }}
-      />
-
-      <CenterStudentApprovalModal
-        isOpen={!!bulkApprovalModalData}
-        onClose={() => setBulkApprovalModalData(null)}
-        students={bulkApprovalModalData}
-        onBulkApprove={async (ids, newPhase) => {
-          try {
-            await api.patch(`/students/bulk/admission-phase`, { ids, phase: newPhase });
-            toast.success(`${ids.length} students approved successfully!`);
-            setBulkApprovalModalData(null);
-            fetchStudents();
-            setSelectedApprovalRows([]);
-          } catch(err) {
-            console.error(err);
-            toast.error("Failed to bulk update phase");
-          }
-        }}
       />
 
     </div>

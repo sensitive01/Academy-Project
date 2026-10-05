@@ -1364,8 +1364,8 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       sortable: true, width: "250px",
       cell: row => (
         <div>
-          <div className="font-medium text-gray-700 truncate max-w-[200px]">{row.course?.title || "-"}</div>
-          <div className="text-[10px] text-gray-500 truncate max-w-[200px]">{row.batch?.name || "-"}</div>
+          <div className="font-medium text-gray-700 whitespace-normal break-words">{row.course?.title || "-"}</div>
+          <div className="text-[10px] text-gray-500 whitespace-normal break-words">{row.batch?.name || "-"}</div>
         </div>
       )
     },
@@ -1474,11 +1474,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     {
       name: "Course & Batch",
       selector: row => row.course?.title,
-      sortable: true, width: "200px",
+      sortable: true, width: "300px",
       cell: row => (
         <div>
-          <div className="font-medium text-gray-700 truncate max-w-[200px]">{row.course?.title || "-"}</div>
-          <div className="text-[10px] text-gray-500 truncate max-w-[200px]">{row.batch?.name || "-"}</div>
+          <div className="font-medium text-gray-700 whitespace-normal break-words">{row.course?.title || "-"}</div>
+          <div className="text-[10px] text-gray-500 whitespace-normal break-words">{row.batch?.name || "-"}</div>
         </div>
       )
     },
@@ -1748,7 +1748,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       },
       {
         name: "Total Balance",
-        width: "120px",
+        width: "135px",
         selector: row => row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : getRemainingBalance(row)),
         sortable: true,
         cell: row => {
@@ -1838,7 +1838,32 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       )
     }
   ];
+  const availableCoursesForFilter = React.useMemo(() => {
+    // Only include Center Courses
+    const centerCoursesOnly = courses.filter(c => c.type === 'Center Courses');
 
+    if (selectedCenter === "all") return centerCoursesOnly;
+    
+    const centerCourseSet = new Set();
+    fees.forEach(f => {
+      const fCenterId = f.center?._id ? f.center._id.toString() : f.center ? f.center.toString() : "";
+      if (fCenterId === selectedCenter || f.center?.name === selectedCenter) {
+        if (f.course) {
+          if (f.course._id) centerCourseSet.add(f.course._id.toString());
+          else centerCourseSet.add(f.course.toString());
+          if (f.course.title) centerCourseSet.add(f.course.title);
+          if (f.course.name) centerCourseSet.add(f.course.name);
+        }
+      }
+    });
+
+    return centerCoursesOnly.filter(c => 
+      centerCourseSet.has(c._id?.toString()) || 
+      centerCourseSet.has(c.title) || 
+      centerCourseSet.has(c.name) ||
+      (selectedCourse !== "all" && (c._id?.toString() === selectedCourse || c.title === selectedCourse || c.name === selectedCourse))
+    );
+  }, [courses, fees, selectedCenter, selectedCourse]);
 
   if (showBulkUploadView) {
     return (
@@ -1879,7 +1904,6 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       />
     );
   }
-
   return (
     <div className={`bg-white rounded-3xl shadow-sm border border-slate-100 ${examFilter ? 'p-0 border-0 shadow-none' : 'p-4 sm:p-6'} overflow-hidden`}>
       {!examFilter && (
@@ -2001,7 +2025,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm h-[40px] font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 shadow-sm cursor-pointer hover:bg-slate-100/50 transition-colors max-w-[160px] truncate"
               >
                 <option value="all">All Courses</option>
-                {Array.from(new Map(courses.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values()).map(c => (
+                {Array.from(new Map(availableCoursesForFilter.map(c => [c.title || c.name, { label: c.title || c.name, value: c._id || c.title }])).values()).map(c => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>

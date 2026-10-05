@@ -81,7 +81,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
     } = req.body;
 
     const finalName = (studentNameEnglish && studentNameEnglish.trim()) || "";
-    const finalEmail = (email && email.trim()) ? email.trim() : `student_${Date.now()}@dracademy.internal`;
+    const finalEmail = (email && email.trim()) ? email.trim() : `student_${Date.now()}@dracademy.in`;
     const finalPhone = phone || "";
 
     // Check if email already exists
@@ -128,7 +128,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
     // 2️⃣ Create Student Profile
     const student = await Student.create({
       user: user._id,
-      studentId: `APP-${Date.now()}`,
+      studentId: req.body.direct ? `STU-${Date.now()}` : `APP-${Date.now()}`,
       studentNameEnglish: finalName,
       studentNameMotherTongue,
       email: finalEmail,
@@ -180,7 +180,7 @@ router.post('/public-registration', optionalProtect, publicRegistrationValidatio
       year,
       status: 'active',
       parent: parentUserId || undefined,
-      admissionPhase: req.body.admissionPhase || 'scholarship'
+      admissionPhase: req.body.direct ? 'joined' : (req.body.admissionPhase || 'scholarship')
     });
 
     if (req.body.adminEnrollment) {

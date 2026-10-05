@@ -14,6 +14,7 @@ const StudentRegistration = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const registrationType = queryParams.get("type");
+  const isDirect = queryParams.get("direct") === "true";
   
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -374,6 +375,7 @@ const StudentRegistration = () => {
         parentLoginName: parentLoginName,
         parentLoginPhone: parentLoginPhone,
         parentLoginRelation: parentLoginRelation,
+        direct: isDirect,
       };
 
       if (!payload.center) delete payload.center;

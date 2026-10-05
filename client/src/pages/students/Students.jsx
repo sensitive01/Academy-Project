@@ -106,22 +106,26 @@ const StudentList = ({ students, loading, onEdit, onToggleStatus, onDelete, onVi
       selector: row => row.user?.name,
       sortable: true,
       cell: row => (
-        <div className="flex items-center gap-3 py-1.5 min-w-0 w-full">
-          <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 shadow-sm ring-2 ring-white">
+        <button
+          onClick={() => onEdit(row)}
+          className="flex items-center gap-3 py-1.5 min-w-0 w-full text-left group hover:bg-slate-50 p-1.5 rounded-lg transition-colors cursor-pointer"
+          title="Click to edit student profile"
+        >
+          <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 shadow-sm ring-2 ring-white group-hover:ring-brand-200 transition-all">
             {row.profilePic?.url ? (
               <img src={row.profilePic.url} alt="" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-brand-600 font-bold bg-brand-50">
+              <div className="w-full h-full flex items-center justify-center text-brand-600 font-bold bg-brand-50 group-hover:bg-brand-100 transition-colors">
                 {row.user?.name?.charAt(0) || "S"}
               </div>
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-bold text-slate-900 leading-tight truncate" title={row.user?.name}>{row.user?.name}</div>
+            <div className="font-bold text-slate-900 leading-tight truncate group-hover:text-brand-600 transition-colors" title={row.user?.name}>{row.user?.name}</div>
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter truncate">{row.studentId || "NO-ID"}</div>
             <div className="text-[10px] font-black text-brand-600 uppercase tracking-tighter truncate mt-0.5">{row.year || ""}</div>
           </div>
-        </div>
+        </button>
       ),
       width: "220px"
     },
@@ -1929,7 +1933,7 @@ const Students = () => {
                     <button
                       onClick={() => {
                         const type = activeTab === "online_students" ? "online" : "center";
-                        window.open(`/student-registration?type=${type}`, "_blank");
+                        window.open(`/student-registration?type=${type}&direct=true`, "_blank");
                       }}
                       className="flex items-center gap-2 px-6 py-2.5 font-bold text-white bg-brand-600 rounded-2xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95"
                     >
