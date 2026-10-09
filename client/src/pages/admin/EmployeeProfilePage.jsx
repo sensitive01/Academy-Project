@@ -877,7 +877,7 @@ const EmployeeProfilePage = ({ employee, onBack, onUpdate, centers, roles, depar
 
                 <div className="flex items-center gap-1 mt-2 text-slate-400">
                     <AlertCircle size={12} />
-                    <p className="text-xs">All Verification Reports will be available under <span className="text-blue-500 cursor-pointer hover:underline">Documents</span></p>
+                    <p className="text-xs">All Verification Reports will be available under <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => handleTabChange("documents")}>Documents</span></p>
                 </div>
               </div>
             )}

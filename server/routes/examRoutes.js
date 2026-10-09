@@ -50,7 +50,7 @@ router.get('/:id', protect, async (req, res) => {
 // POST create a new exam (Admin only)
 router.post('/', protect, isAdmin, async (req, res) => {
   try {
-    const { name, course, semester, centers, batch, subjects, examFee } = req.body;
+    const { name, course, semester, centers, batch, subjects, examFee, penaltyDate, penaltyAmount, finalPenaltyDate, finalPenaltyAmount } = req.body;
     
     if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
       return res.status(400).json({ message: "At least one subject is required" });
@@ -63,7 +63,11 @@ router.post('/', protect, isAdmin, async (req, res) => {
       centers: centers || [],
       batch,
       subjects,
-      examFee: examFee || 0
+      examFee: examFee || 0,
+      penaltyDate,
+      penaltyAmount: penaltyAmount || 0,
+      finalPenaltyDate,
+      finalPenaltyAmount: finalPenaltyAmount || 0
     });
 
     // Notify enrolled students in the specific centers
@@ -110,6 +114,10 @@ router.post('/', protect, isAdmin, async (req, res) => {
           otherFeeType: name,
           amount: Number(examFee),
           status: 'pending',
+          dueDate: penaltyDate,
+          penaltyAmount: penaltyAmount || 0,
+          finalDueDate: finalPenaltyDate,
+          finalPenaltyAmount: finalPenaltyAmount || 0,
           payments: []
         };
       });
@@ -128,7 +136,7 @@ router.post('/', protect, isAdmin, async (req, res) => {
 // PUT update an exam (Admin only)
 router.put('/:id', protect, isAdmin, async (req, res) => {
   try {
-    const { name, course, semester, centers, batch, subjects, examFee } = req.body;
+    const { name, course, semester, centers, batch, subjects, examFee, penaltyDate, penaltyAmount, finalPenaltyDate, finalPenaltyAmount } = req.body;
     const exam = await Exam.findById(req.params.id);
     
     if (!exam) {
@@ -142,8 +150,29 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
     if (batch) exam.batch = batch;
     if (subjects) exam.subjects = subjects;
     if (examFee !== undefined) exam.examFee = examFee;
+    
+    if (penaltyDate !== undefined) exam.penaltyDate = penaltyDate;
+    if (penaltyAmount !== undefined) exam.penaltyAmount = penaltyAmount;
+    if (finalPenaltyDate !== undefined) exam.finalPenaltyDate = finalPenaltyDate;
+    if (finalPenaltyAmount !== undefined) exam.finalPenaltyAmount = finalPenaltyAmount;
 
     await exam.save();
+
+    // Update existing student fees associated with this exam
+    let updateFields = {};
+    if (examFee !== undefined) updateFields.amount = Number(examFee);
+    if (penaltyDate !== undefined) updateFields.dueDate = penaltyDate;
+    if (penaltyAmount !== undefined) updateFields.penaltyAmount = Number(penaltyAmount);
+    if (finalPenaltyDate !== undefined) updateFields.finalDueDate = finalPenaltyDate;
+    if (finalPenaltyAmount !== undefined) updateFields.finalPenaltyAmount = Number(finalPenaltyAmount);
+
+    if (Object.keys(updateFields).length > 0) {
+      await StudentFee.updateMany(
+        { feeType: 'Exam', otherFeeType: exam.name, status: 'pending' },
+        { $set: updateFields }
+      );
+    }
+
 
     // Notify enrolled students in the specific centers
     if (exam.course && exam.centers && exam.centers.length > 0) {

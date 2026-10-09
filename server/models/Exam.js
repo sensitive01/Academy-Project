@@ -28,6 +28,20 @@ const examSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  penaltyDate: {
+    type: Date,
+  },
+  penaltyAmount: {
+    type: Number,
+    default: 0
+  },
+  finalPenaltyDate: {
+    type: Date,
+  },
+  finalPenaltyAmount: {
+    type: Number,
+    default: 0
+  },
   subjects: [{
     subject: {
       type: mongoose.Schema.Types.ObjectId,

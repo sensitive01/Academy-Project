@@ -12,6 +12,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
+import PayslipTemplate from "../../components/employee-management/PayslipTemplate";
 
 const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) => {
   const { user } = useAuth();
@@ -52,6 +53,7 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   const [payslipModalOpen, setPayslipModalOpen] = useState(false);
   const [currentPayslipUrl, setCurrentPayslipUrl] = useState(null);
   const [currentPayslipName, setCurrentPayslipName] = useState("");
+  const [selectedPayrollData, setSelectedPayrollData] = useState(null);
 
   const [selectedTableRows, setSelectedTableRows] = useState([]);
   const [toggleClearRows, setToggleClearRows] = useState(false);
@@ -609,6 +611,22 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
   const generatePayslip = async (payrollId, employeeName) => {
     console.log("Generating payslip for:", payrollId, employeeName);
     const toastId = toast.loading("Generating Payslip...");
+    
+    const record = payrolls.find(p => p._id === payrollId);
+    let fullProfile = null;
+    if (internOnly) {
+      fullProfile = Object.values(studentsMap).find(s => String(s._id) === String(record.employeeId) || String(s.user?._id) === String(record.employeeId));
+    } else {
+      fullProfile = employees.find(e => String(e._id) === String(record.employeeId));
+    }
+    
+    setSelectedPayrollData({
+      ...record,
+      displayId: fullProfile?.studentId || fullProfile?.employeeId || fullProfile?.empId || record.employeeId,
+      joiningDate: fullProfile?.joiningDate || fullProfile?.createdAt || null,
+      isIntern: !!internOnly
+    });
+    
     try {
       const res = await api.get(`/payroll/payslip/${payrollId}`, {
         responseType: "blob"
@@ -1666,12 +1684,8 @@ const Payroll = ({ hideHeader = false, internOnly = false, paidOnly = false }) =
               </div>
             </div>
 
-            <div className="flex-1 w-full bg-gray-100 overflow-hidden relative">
-              <iframe
-                src={currentPayslipUrl}
-                className="w-full h-full border-none"
-                title="Payslip PDF"
-              />
+            <div className="flex-1 w-full bg-gray-100 overflow-y-auto relative p-6">
+              <PayslipTemplate payrollData={selectedPayrollData} selectedMonth={selectedMonth} />
             </div>
           </div>
         </div>,

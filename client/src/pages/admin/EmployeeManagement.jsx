@@ -310,7 +310,7 @@ const EmployeeTable = ({ employees, loading, onEdit, onView, onToggleStatus, onD
         progressPending={loading}
         search={search}
         setSearch={setSearch}
-        searchPlaceholder="Search employees by name, ID, or role..."
+        searchPlaceholder="Search by name, ID, or role..."
         additionalHeaderContent={
           <div className="flex flex-wrap items-center gap-2">
             <select

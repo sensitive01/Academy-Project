@@ -132,6 +132,10 @@ const ExamManagement = () => {
     centers: [],
     batch: "",
     examFee: "",
+    penaltyDate: "",
+    penaltyAmount: 0,
+    finalPenaltyDate: "",
+    finalPenaltyAmount: 0,
     subjects: [] // array of { subject, date, totalMark, passMark, internalMark, externalMark, theoryMark }
   });
 
@@ -275,7 +279,17 @@ const ExamManagement = () => {
     setFormData(prev => {
       const newSubjects = prev.subjects.map(s => {
         if (String(s.subject) === String(subjectId)) {
-          return { ...s, [field]: value };
+          let updated = { ...s, [field]: value };
+          if (field === 'externalMark' && value !== '') {
+            const externalVal = Number(value);
+            const totalVal = Number(s.totalMark) || 0;
+            updated.internalMark = Math.max(0, totalVal - externalVal);
+          } else if (field === 'totalMark' && value !== '') {
+            const totalVal = Number(value);
+            const externalVal = Number(s.externalMark) || 0;
+            updated.internalMark = Math.max(0, totalVal - externalVal);
+          }
+          return updated;
         }
         return s;
       });
@@ -348,6 +362,10 @@ const ExamManagement = () => {
         centers: exam.centers?.map(c => c._id) || [],
         batch: exam.batch?._id || "",
         examFee: exam.examFee || "",
+        penaltyDate: exam.penaltyDate ? new Date(exam.penaltyDate).toISOString().split('T')[0] : "",
+        penaltyAmount: exam.penaltyAmount || 0,
+        finalPenaltyDate: exam.finalPenaltyDate ? new Date(exam.finalPenaltyDate).toISOString().split('T')[0] : "",
+        finalPenaltyAmount: exam.finalPenaltyAmount || 0,
         subjects: exam.subjects?.map(s => ({
           subject: s.subject?._id || s.subject,
           date: s.date ? new Date(s.date).toISOString().split('T')[0] : "",
@@ -368,6 +386,10 @@ const ExamManagement = () => {
         centers: [],
         batch: "",
         examFee: "",
+        penaltyDate: "",
+        penaltyAmount: 0,
+        finalPenaltyDate: "",
+        finalPenaltyAmount: 0,
         subjects: []
       });
       setCurrentId(null);
@@ -2318,6 +2340,28 @@ const ExamManagement = () => {
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Exam Fee (₹)</label>
                     <input type="number" min="0" placeholder="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.examFee} onChange={(e) => setFormData({ ...formData, examFee: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="mt-6 border-t border-slate-200 pt-6">
+                  <h3 className="text-sm font-bold text-slate-800 mb-4">Penalty Tracking Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Due Date</label>
+                      <input type="date" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.penaltyDate} onChange={(e) => setFormData({ ...formData, penaltyDate: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Penalty Amount (₹)</label>
+                      <input type="number" min="0" placeholder="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.penaltyAmount} onChange={(e) => setFormData({ ...formData, penaltyAmount: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Final Due Date</label>
+                      <input type="date" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.finalPenaltyDate} onChange={(e) => setFormData({ ...formData, finalPenaltyDate: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Final Penalty Amount (₹)</label>
+                      <input type="number" min="0" placeholder="0" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-brand-500 focus:ring-brand-500 border p-3 text-sm bg-slate-50" value={formData.finalPenaltyAmount} onChange={(e) => setFormData({ ...formData, finalPenaltyAmount: e.target.value })} />
+                    </div>
                   </div>
                 </div>
 

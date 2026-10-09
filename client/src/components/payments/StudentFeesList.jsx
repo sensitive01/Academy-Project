@@ -9,7 +9,8 @@ import BulkUploadFeeView from "./BulkUploadFeeView";
 import BulkUploadHistoryModal from "../modals/BulkUploadHistoryModal";
 import { Upload } from "lucide-react";
 import { downloadReceipt } from "../../utils/downloadReceipt";
-import { Download, FileSpreadsheet, FileText, Search } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Search, Receipt } from "lucide-react";
+import FeeReceiptTemplate from "./FeeReceiptTemplate";
 import ReactDOM from "react-dom";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
@@ -36,6 +37,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
   const [showBulkDropdown, setShowBulkDropdown] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [breakdownModal, setBreakdownModal] = useState({ isOpen: false, studentName: "", breakdown: [] });
+  const [receiptModal, setReceiptModal] = useState({ isOpen: false, data: null });
   const fileInputRef = React.useRef(null);
 
   const getSessionValue = (key, defaultVal) => {
@@ -586,6 +588,45 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGenerateReceipt = (row) => {
+    const currentYearTotal = row.amount + (row.isPenaltyApplied ? (row.penaltyAmount || 0) : 0) + (row.isFinalPenaltyApplied ? (row.finalPenaltyAmount || 0) : 0);
+    const approvedPayments = row.payments?.filter(p => p.status === 'Approved') || [];
+    const totalFeesPaid = approvedPayments.reduce((acc, p) => acc + p.amount, 0);
+
+    const paymentDetails = approvedPayments.map(p => ({
+      description: feeType === 'Exam' ? 'Exam Fee' : (feeType === 'Hostel' ? 'Hostel Fee' : (feeType === 'Course' ? 'Course Fee' : 'Fee')),
+      amount: p.amount,
+      date: new Date(p.paymentDate || p.createdAt).toLocaleDateString('en-GB'),
+      methodRef: `${p.mode || 'CASH'}${p.transactionId ? ` / ${p.transactionId}` : ''}`
+    }));
+
+    const lastPayment = approvedPayments[approvedPayments.length - 1] || {};
+
+    const baseFee = row.amount || 0;
+    const penaltyAmountApplied = (row.isPenaltyApplied ? (row.penaltyAmount || 0) : 0) + (row.isFinalPenaltyApplied ? (row.finalPenaltyAmount || 0) : 0);
+
+    const receiptData = {
+      receiptNo: lastPayment.transactionId || `REC-${row._id?.substring(0, 6)?.toUpperCase()}`,
+      date: new Date().toLocaleDateString('en-GB'),
+      academicYear: row.student?.year || row.year || '-',
+      department: row.student?.department || '-',
+      studentName: row.student?.studentNameEnglish || row.student?.studentNameArabic || '-',
+      rollNo: row.student?.studentId || '-',
+      course: row.course?.title || row.course?.name || '-',
+      semester: row.student?.semester || row.semester || '-',
+      feeCategory: feeType === 'Exam' ? `Exam Fee - ${row.otherFeeType || ''}` : feeType,
+      paymentDetails,
+      baseFee,
+      penaltyAmountApplied,
+      totalFeesDue: currentYearTotal,
+      totalFeesPaid,
+      paymentMethod: lastPayment.mode || '-',
+      transactionRef: lastPayment.transactionId || '-'
+    };
+
+    setReceiptModal({ isOpen: true, data: receiptData });
   };
 
   const handleToggleStatus = async (id) => {
@@ -1573,7 +1614,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         }
       }
     ] : [
-      {
+      ...(feeType !== 'Exam' ? [{
         name: "Fee Details", width: "160px",
         selector: row => row.amount,
         sortable: true,
@@ -1606,7 +1647,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
             </div>
           );
         }
-      },
+      }] : []),
       {
         name: "Total Fee", width: "120px",
         selector: row => row.isSummary ? row.amount : (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)),
@@ -1706,7 +1747,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         }
       }
     ] : [
-      {
+      ...(feeType !== 'Exam' ? [{
         name: "Balance",
         width: "160px",
         selector: row => row.isSummary ? row.totalRemainingBalance : (row.unifiedBalance !== undefined ? row.unifiedBalance : getRemainingBalance(row)),
@@ -1745,7 +1786,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
             </div>
           );
         }
-      },
+      }] : []),
       {
         name: "Total Balance",
         width: "135px",
@@ -1831,6 +1872,15 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       width: "100px",
       cell: row => row.isSummary ? null : (
         <div className="flex items-center gap-1">
+          {row.payments && row.payments.length > 0 && (
+            <button
+              onClick={() => handleGenerateReceipt(row)}
+              className="text-brand-600 hover:text-brand-800 hover:bg-brand-50 p-2 rounded-lg transition-colors"
+              title="View Receipt"
+            >
+              <Receipt size={16} />
+            </button>
+          )}
           <button onClick={() => setConfirmModal({ isOpen: true, id: row.originalFeeId || row._id })} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
           </button>
@@ -2397,6 +2447,45 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           onClose={() => setShowHistoryModal(false)}
           module="Fees"
         />
+      )}
+
+      {receiptModal.isOpen && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[10000] p-4 sm:p-6 overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col h-[90vh]">
+            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center rounded-t-2xl">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Fee Receipt Preview</h2>
+                <p className="text-sm text-gray-500 mt-1">Review the fee receipt before printing.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    const printContents = document.getElementById('receipt-print-area').innerHTML;
+                    const originalContents = document.body.innerHTML;
+                    document.body.innerHTML = printContents;
+                    window.print();
+                    document.body.innerHTML = originalContents;
+                    window.location.reload();
+                  }}
+                  className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-brand-700 transition flex items-center gap-2"
+                >
+                  <Receipt size={16} /> Print Receipt
+                </button>
+                <button
+                  onClick={() => setReceiptModal({ isOpen: false, data: null })}
+                  className="bg-white rounded-full p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition shadow-sm border"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+              </div>
+            </div>
+            
+            <div id="receipt-print-area" className="flex-1 w-full bg-gray-100 overflow-y-auto relative p-6">
+              <FeeReceiptTemplate receiptData={receiptModal.data} />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
