@@ -192,6 +192,12 @@ const BulkUploadFeeView = ({ onBack, onSuccess, parsedData = [], isTemplate = fa
         
         formData.append('status', status);
         formData.append('summary', `Uploaded ${response.data.successCount} of ${dataToUpload.length} fee records.`);
+        if (response.data.batchId) {
+          formData.append('batchId', response.data.batchId);
+        }
+        if (response.data.affectedRecords) {
+          formData.append('affectedRecords', JSON.stringify(response.data.affectedRecords));
+        }
 
         await api.post('/bulk-upload-history', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       } catch (historyErr) {

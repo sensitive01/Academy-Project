@@ -38,7 +38,15 @@ const bulkUploadHistorySchema = new mongoose.Schema({
   },
   summary: {
     type: String
-  }
+  },
+  batchId: {
+    type: String
+  },
+  affectedRecords: [
+    {
+      type: mongoose.Schema.Types.Mixed
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model('BulkUploadHistory', bulkUploadHistorySchema);

@@ -91,7 +91,8 @@ const studentFeeSchema = new mongoose.Schema({
       status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
       paidAt: { type: Date, default: Date.now },
       approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      approvedAt: { type: Date }
+      approvedAt: { type: Date },
+      bulkUploadBatch: { type: String }
     }
   ]
 }, { timestamps: true });

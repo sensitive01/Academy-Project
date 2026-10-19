@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Download, Clock, CheckCircle, XCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { X, Download, Clock, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import BulkUploadDataModal from './BulkUploadDataModal';
 
-const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
+const BulkUploadHistoryModal = ({ isOpen, onClose, module, onSuccess }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [confirmDeleteRecord, setConfirmDeleteRecord] = useState(null);
+  const [revertingId, setRevertingId] = useState(null);
 
   useEffect(() => {
     if (isOpen && module) {
@@ -31,6 +33,26 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
 
   const handleDownload = (fileUrl) => {
     window.open(fileUrl, '_blank');
+  };
+
+  const handleConfirmRevert = async () => {
+    if (!confirmDeleteRecord) return;
+    setRevertingId(confirmDeleteRecord._id);
+    const toastId = toast.loading('Reverting bulk upload and restoring fee balances...');
+    try {
+      const res = await api.delete(`/bulk-upload-history/${confirmDeleteRecord._id}`);
+      toast.success(res.data?.message || 'Bulk upload reverted and deleted successfully!', { id: toastId });
+      setConfirmDeleteRecord(null);
+      await fetchHistory();
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to revert bulk upload', { id: toastId });
+    } finally {
+      setRevertingId(null);
+    }
   };
 
   if (!isOpen) return null;
@@ -118,7 +140,7 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                       </div>
 
                       {/* Right Stats & Action */}
-                      <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-4">
                         <div className="flex gap-4">
                           <div className="text-center">
                             <div className="text-xs font-bold text-slate-500 mb-1">Total</div>
@@ -134,15 +156,30 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
                           </div>
                         </div>
 
-                        {entry.fileUrl && (
+                        <div className="flex items-center gap-2">
+                          {entry.fileUrl && (
+                            <button
+                              onClick={() => handleDownload(entry.fileUrl)}
+                              className="flex items-center justify-center w-10 h-10 bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white rounded-xl transition-colors border border-brand-200"
+                              title="Download Original File"
+                            >
+                              <Download size={18} />
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => handleDownload(entry.fileUrl)}
-                            className="flex items-center justify-center w-10 h-10 bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white rounded-xl transition-colors border border-brand-200"
-                            title="Download Original File"
+                            onClick={() => setConfirmDeleteRecord(entry)}
+                            disabled={revertingId === entry._id}
+                            className="flex items-center justify-center w-10 h-10 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-colors border border-red-200 disabled:opacity-50"
+                            title="Revert and delete this bulk upload data"
                           >
-                            <Download size={18} />
+                            {revertingId === entry._id ? (
+                              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
                           </button>
-                        )}
+                        </div>
                       </div>
 
                     </div>
@@ -160,6 +197,60 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module }) => {
           historyRecord={selectedRecord}
           onClose={() => setSelectedRecord(null)}
         />
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmDeleteRecord && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full p-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertCircle size={28} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Revert & Delete Upload?</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Are you sure you want to revert and delete <strong className="text-slate-800">{confirmDeleteRecord.fileName}</strong>?
+            </p>
+            <div className="bg-red-50/80 border border-red-100 rounded-xl p-3 text-left mb-6 text-xs text-red-800 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertCircle size={14} className="shrink-0" />
+                This will automatically:
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-red-700 pl-1">
+                <li>Remove all <strong>{confirmDeleteRecord.successfulRecords || confirmDeleteRecord.totalRecords}</strong> payment records created by this file.</li>
+                <li>Restore affected students' fee balances and reset their status back to <strong>pending</strong>.</li>
+                <li>Preserve the student records and base fee structures safely.</li>
+              </ul>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={revertingId !== null}
+                onClick={() => setConfirmDeleteRecord(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={revertingId !== null}
+                onClick={handleConfirmRevert}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-200"
+              >
+                {revertingId ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Reverting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Yes, Revert & Delete
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const StudentFee = require('../models/StudentFee');
 const Center = require('../models/Center');
 const Student = require('../models/Student');
@@ -63,13 +64,15 @@ router.get('/', protect, async (req, res) => {
 // Bulk Upload Fees
 router.post('/bulk-upload', protect, async (req, res) => {
   try {
-    const { fees } = req.body;
+    const { fees, batchId: reqBatchId } = req.body;
     if (!fees || !Array.isArray(fees)) {
       return res.status(400).json({ message: "Invalid payload format. Expected an array of fees." });
     }
 
+    const batchId = reqBatchId || new mongoose.Types.ObjectId().toString();
     let successCount = 0;
     let failedRows = [];
+    const affectedRecords = [];
 
     for (let i = 0; i < fees.length; i++) {
       const row = fees[i];
@@ -142,7 +145,8 @@ router.post('/bulk-upload', protect, async (req, res) => {
         paymentMode: paymentMode || 'Cash',
         bankReference: bankReference || '',
         status: 'Approved',
-        paidAt: finalPaidDate
+        paidAt: finalPaidDate,
+        bulkUploadBatch: batchId
       };
 
       if (!existingFee.course || !existingFee.batch) {
@@ -151,6 +155,12 @@ router.post('/bulk-upload', protect, async (req, res) => {
       }
 
       existingFee.payments.push(paymentDetail);
+      const addedPayment = existingFee.payments[existingFee.payments.length - 1];
+      affectedRecords.push({
+        feeId: existingFee._id,
+        paymentId: addedPayment._id,
+        studentId: student._id
+      });
       
       const totalPaid = existingFee.payments.filter(p => p.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0);
       const totalDue = existingFee.amount + 
@@ -167,7 +177,7 @@ router.post('/bulk-upload', protect, async (req, res) => {
       successCount++;
     }
 
-    res.json({ successCount, failedCount: failedRows.length, failedRows });
+    res.json({ successCount, failedCount: failedRows.length, failedRows, batchId, affectedRecords });
   } catch (error) {
     console.error("Bulk Upload Error:", error);
     res.status(500).json({ message: "Internal server error during bulk upload." });

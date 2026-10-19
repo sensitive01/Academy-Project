@@ -2445,6 +2445,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         <BulkUploadHistoryModal
           isOpen={showHistoryModal}
           onClose={() => setShowHistoryModal(false)}
+          onSuccess={fetchFees}
           module="Fees"
         />
       )}
