@@ -36,6 +36,9 @@ router.get("/", protect, async (req, res) => {
       revenueQuery.course = { $in: coachCourseIds };
     }
 
+    // Only count enrolled/joined students (exclude applications in admission/scholarship phase)
+    studentQuery.admissionPhase = { $in: [null, 'joined'] };
+
     // Total students
     const totalStudents = await Student.countDocuments(studentQuery);
 

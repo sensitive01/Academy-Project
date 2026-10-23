@@ -38,7 +38,7 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module, onSuccess }) => {
   const handleConfirmRevert = async () => {
     if (!confirmDeleteRecord) return;
     setRevertingId(confirmDeleteRecord._id);
-    const toastId = toast.loading('Reverting bulk upload and restoring fee balances...');
+    const toastId = toast.loading(`Reverting ${module || ''} bulk upload records...`);
     try {
       const res = await api.delete(`/bulk-upload-history/${confirmDeleteRecord._id}`);
       toast.success(res.data?.message || 'Bulk upload reverted and deleted successfully!', { id: toastId });
@@ -216,9 +216,39 @@ const BulkUploadHistoryModal = ({ isOpen, onClose, module, onSuccess }) => {
                 This will automatically:
               </div>
               <ul className="list-disc list-inside space-y-1 text-[11px] text-red-700 pl-1">
-                <li>Remove all <strong>{confirmDeleteRecord.successfulRecords || confirmDeleteRecord.totalRecords}</strong> payment records created by this file.</li>
-                <li>Restore affected students' fee balances and reset their status back to <strong>pending</strong>.</li>
-                <li>Preserve the student records and base fee structures safely.</li>
+                {(confirmDeleteRecord.module || module) === 'Fees' && (
+                  <>
+                    <li>Remove all <strong>{confirmDeleteRecord.successfulRecords || confirmDeleteRecord.totalRecords}</strong> payment records created by this file.</li>
+                    <li>Restore affected students' fee balances and reset their status back to <strong>pending</strong>.</li>
+                    <li>Preserve the student records and base fee structures safely.</li>
+                  </>
+                )}
+                {(confirmDeleteRecord.module || module) === 'Students' && (
+                  <>
+                    <li>Remove student profiles and user logins created by this upload file.</li>
+                    <li>Unlink students from their assigned batches.</li>
+                    <li>Delete associated initial fee structures safely.</li>
+                  </>
+                )}
+                
+                {(confirmDeleteRecord.module || module) === 'Attendance' && (
+                  <>
+                    <li>Remove attendance records created by this upload file.</li>
+                    <li>Leave manual punches and device attendance untouched.</li>
+                  </>
+                )}
+                {(confirmDeleteRecord.module || module) === 'Marks' && (
+                  <>
+                    <li>Clear exam marks and grades recorded by this upload batch.</li>
+                    <li>Preserve student course enrollments and exam schedules.</li>
+                  </>
+                )}
+                {(confirmDeleteRecord.module || module) === 'Payroll' && (
+                  <>
+                    <li>Revert salary adjustments, allowances, and deductions from this file.</li>
+                    <li>Automatically recalculate affected employees' net salaries.</li>
+                  </>
+                )}
               </ul>
             </div>
             <div className="flex gap-3">

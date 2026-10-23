@@ -146,8 +146,7 @@ const AdmissionManagement = () => {
     try {
       setLoading(true);
       const res = await api.get("/students");
-      // Filter for center students or all students, depending on requirement
-      const allStudents = (res.data.students || []).filter(s => !!s.center);
+      const allStudents = res.data.students || [];
       setStudents(allStudents);
     } catch (err) {
       console.error(err);

@@ -1644,6 +1644,8 @@ const Students = () => {
     );
   }
 
+  const enrolledStudents = students.filter(s => !s.admissionPhase || s.admissionPhase === 'joined');
+
   return (
     <div className="p-4 sm:p-6 space-y-6 animate-in fade-in duration-500 max-w-full overflow-hidden">
       {/* Header */}
@@ -1713,11 +1715,11 @@ const Students = () => {
                 </div>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-slate-900">{students.length}</span>
+                <span className="text-4xl font-bold text-slate-900">{enrolledStudents.length}</span>
               </div>
               <div className="mt-4 flex gap-4 text-xs font-medium text-slate-400">
-                <span>Active: <span className="text-slate-700">{students.filter(s => s.status === 'active').length}</span></span>
-                <span>Inactive: <span className="text-slate-700">{students.filter(s => s.status !== 'active').length}</span></span>
+                <span>Active: <span className="text-slate-700">{enrolledStudents.filter(s => s.status === 'active').length}</span></span>
+                <span>Inactive: <span className="text-slate-700">{enrolledStudents.filter(s => s.status !== 'active').length}</span></span>
               </div>
             </div>
 
@@ -1730,7 +1732,7 @@ const Students = () => {
                 </div>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-slate-900">{students.filter(s => !s.center).length}</span>
+                <span className="text-4xl font-bold text-slate-900">{enrolledStudents.filter(s => !s.center).length}</span>
               </div>
               <div className="mt-4 text-xs font-medium text-slate-400">
                 Remote learners
@@ -1746,7 +1748,7 @@ const Students = () => {
                 </div>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-slate-900">{students.filter(s => !!s.center).length}</span>
+                <span className="text-4xl font-bold text-slate-900">{enrolledStudents.filter(s => !!s.center).length}</span>
               </div>
               <div className="mt-4 text-xs font-medium text-slate-400">
                 In-person learners
@@ -1762,7 +1764,7 @@ const Students = () => {
                 </div>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-slate-900">{students.filter(s => s.internships?.length > 0).length}</span>
+                <span className="text-4xl font-bold text-slate-900">{enrolledStudents.filter(s => s.internships?.length > 0).length}</span>
               </div>
               <div className="mt-4 text-xs font-medium text-slate-400">
                 Currently on internship
