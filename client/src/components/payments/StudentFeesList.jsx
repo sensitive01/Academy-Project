@@ -74,6 +74,27 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
   }, [search, selectedCenter, selectedCourse, selectedBatch, selectedFeeYear, selectedStatus, selectedScheme, fromDate, toDate, feeType, paidOnly]);
 
   let maxYearInDataset = -1;
+  const studentMaxYears = {};
+  fees.forEach(f => {
+    let rowYearDigit = null;
+    if (f.year) {
+      const match = String(f.year).match(/\d+/);
+      if (match) rowYearDigit = Number(match[0]);
+    } else if (f.otherFeeType) {
+      const match = String(f.otherFeeType).match(/Year\s*(\d+)/i);
+      if (match) rowYearDigit = Number(match[1]);
+    }
+    if (rowYearDigit === null && f.student?.year) {
+      const match = String(f.student.year).match(/\d+/);
+      if (match) rowYearDigit = Number(match[0]);
+    }
+
+    const sId = f.student?._id ? f.student._id.toString() : (f.student ? f.student.toString() : "");
+    if (sId && rowYearDigit !== null) {
+      studentMaxYears[sId] = Math.max(studentMaxYears[sId] || 0, rowYearDigit);
+    }
+  });
+
   if (selectedFeeYear === "all") {
     fees.forEach(f => {
       const term = search.toLowerCase();
@@ -726,12 +747,14 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         matchesYear = false;
       }
     } else {
-      if (maxYearInDataset !== -1) {
-        if (rowYearDigit !== null) {
-          matchesYear = rowYearDigit === maxYearInDataset;
-        } else {
-          matchesYear = false;
-        }
+      const sId = f.student?._id ? f.student._id.toString() : (f.student ? f.student.toString() : "");
+      const sMaxYear = studentMaxYears[sId];
+      if (sMaxYear !== undefined && rowYearDigit !== null) {
+        matchesYear = rowYearDigit === sMaxYear;
+      } else if (maxYearInDataset !== -1 && rowYearDigit !== null) {
+        matchesYear = rowYearDigit === maxYearInDataset;
+      } else {
+        matchesYear = true;
       }
     }
 
@@ -821,7 +844,29 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       return studentMatch && typeMatch;
     });
 
-    const breakdown = studentFees.map(sf => {
+    const maxYear = selectedFeeYear !== "all" ? Number(selectedFeeYear) : Infinity;
+
+    const allowedStudentFees = studentFees.filter(sf => {
+      if (maxYear === Infinity) return true;
+      let yrDigit = null;
+      if (sf.year) {
+        const match = String(sf.year).match(/\d+/);
+        if (match) yrDigit = Number(match[0]);
+      } else if (sf.otherFeeType) {
+        const match = String(sf.otherFeeType).match(/Year\s*(\d+)/i);
+        if (match) yrDigit = Number(match[1]);
+      }
+      if (yrDigit === null && sf.student?.year) {
+        const match = String(sf.student.year).match(/\d+/);
+        if (match) yrDigit = Number(match[0]);
+      }
+      if (yrDigit !== null) {
+        return yrDigit <= maxYear;
+      }
+      return true;
+    });
+
+    const breakdown = allowedStudentFees.map(sf => {
       const sfTotalDue = (sf.amount || 0) +
         (sf.isPenaltyApplied ? (sf.penaltyAmount || 0) : 0) +
         (sf.isFinalPenaltyApplied ? (sf.finalPenaltyAmount || 0) : 0);
@@ -870,8 +915,16 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
     const unifiedCouncilTotal = breakdown.reduce((sum, item) => sum + item.councilTotal, 0);
     const unifiedCouncilBalance = breakdown.reduce((sum, item) => sum + item.councilBalance, 0);
 
+    const combinedPayments = [];
+    allowedStudentFees.forEach(sf => {
+      if (sf.payments && sf.payments.length > 0) {
+        combinedPayments.push(...sf.payments);
+      }
+    });
+
     return {
       ...f,
+      payments: combinedPayments.length > 0 ? combinedPayments : (f.payments || []),
       unifiedTotalDue,
       unifiedBalance,
       unifiedCourseTotal,
@@ -889,7 +942,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         isSummary: true,
         _id: 'summary_row_totals',
         student: { studentNameEnglish: 'TOTALS' },
-        amount: filtered.reduce((sum, f) => sum + (f.amount || 0), 0),
+        amount: filteredWithUnified.reduce((sum, f) => sum + (f.unifiedTotalDue !== undefined ? f.unifiedTotalDue : (f.amount || 0)), 0),
         penaltyAmount: filtered.reduce((sum, f) => sum + (f.penaltyAmount || 0), 0),
         finalPenaltyAmount: filtered.reduce((sum, f) => sum + (f.finalPenaltyAmount || 0), 0),
         courseAmount: filtered.reduce((sum, f) => sum + (f.courseAmount || 0), 0),
@@ -909,7 +962,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       };
 
       dynamicMonths.forEach(m => {
-        summaryRow['month_' + m.label] = filtered.reduce((sum, f) => sum + getAmountForMonth(f, m), 0);
+        summaryRow['month_' + m.label] = filteredWithUnified.reduce((sum, f) => sum + getAmountForMonth(f, m), 0);
       });
 
       dataWithSummary.push(summaryRow);
@@ -1189,9 +1242,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
 
     if (exportFormat === "excel") {
       const data = dataWithSummary.map((f, i) => {
-        const totalDue = f.amount +
+        const totalDue = f.unifiedTotalDue !== undefined ? f.unifiedTotalDue : (f.amount +
           (f.isPenaltyApplied ? f.penaltyAmount : 0) +
-          (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
+          (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0));
+        const remBal = f.unifiedBalance !== undefined ? f.unifiedBalance : getRemainingBalance(f);
 
         const exportRow = {
           "S.No": f.isSummary ? "" : i + 1,
@@ -1205,7 +1259,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           "2nd Year": f.isSummary ? "" : f.feeBreakdown?.find(b => b.yearLabel === "2nd Year")?.balance || 0,
           "3rd Year": f.isSummary ? "" : f.feeBreakdown?.find(b => b.yearLabel === "3rd Year")?.balance || 0,
           "Fee Type": f.feeType === 'Other' && f.otherFeeType ? f.otherFeeType : f.feeType,
-          "Total Fee": totalDue || 0,
+          "Total Fee": f.isSummary ? (f.unifiedTotalDue !== undefined ? f.unifiedTotalDue : f.amount) : (totalDue || 0),
         };
 
         if (feeType !== 'Exam') {
@@ -1214,7 +1268,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           });
         }
 
-        exportRow["Balance"] = getRemainingBalance(f);
+        exportRow["Balance"] = f.isSummary ? (f.totalRemainingBalance !== undefined ? f.totalRemainingBalance : remBal) : remBal;
         exportRow["Status"] = f.status || "-";
         exportRow["Created Date"] = f.createdAt ? new Date(f.createdAt).toLocaleDateString("en-IN") : "-";
 
@@ -1237,9 +1291,10 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
 
       const tableRows = [];
       dataWithSummary.forEach((f, index) => {
-        const totalDue = f.amount +
+        const totalDue = f.unifiedTotalDue !== undefined ? f.unifiedTotalDue : (f.amount +
           (f.isPenaltyApplied ? f.penaltyAmount : 0) +
-          (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0);
+          (f.isFinalPenaltyApplied ? f.finalPenaltyAmount : 0));
+        const remBal = f.unifiedBalance !== undefined ? f.unifiedBalance : getRemainingBalance(f);
 
         const rowData = [
           index + 1,
@@ -1250,7 +1305,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
           f.feeBreakdown?.find(b => b.yearLabel === "1st Year")?.balance || 0,
           f.feeBreakdown?.find(b => b.yearLabel === "2nd Year")?.balance || 0,
           f.feeBreakdown?.find(b => b.yearLabel === "3rd Year")?.balance || 0,
-          `Rs.${totalDue.toLocaleString("en-IN")}`
+          `Rs.${(f.isSummary ? (f.unifiedTotalDue !== undefined ? f.unifiedTotalDue : f.amount) : totalDue).toLocaleString("en-IN")}`
         ];
 
         if (feeType !== 'Exam') {
@@ -1260,7 +1315,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
         }
 
         rowData.push(
-          `Rs.${getRemainingBalance(f).toLocaleString("en-IN")}`,
+          `Rs.${(f.isSummary ? (f.totalRemainingBalance !== undefined ? f.totalRemainingBalance : remBal) : remBal).toLocaleString("en-IN")}`,
           f.status || "-"
         );
         tableRows.push(rowData);
@@ -1650,11 +1705,11 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       }] : []),
       {
         name: "Total Fee", width: "120px",
-        selector: row => row.isSummary ? row.amount : (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)),
+        selector: row => row.isSummary ? (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : row.amount) : (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0)),
         sortable: true,
         cell: row => {
           const currentYearTotal = row.amount + (row.isPenaltyApplied ? row.penaltyAmount : 0) + (row.isFinalPenaltyApplied ? row.finalPenaltyAmount : 0);
-          const unifiedTotal = row.isSummary ? row.amount : (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : currentYearTotal);
+          const unifiedTotal = row.isSummary ? (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : row.amount) : (row.unifiedTotalDue !== undefined ? row.unifiedTotalDue : currentYearTotal);
           return <span className="text-[11px] font-black text-slate-700">₹{unifiedTotal.toLocaleString("en-IN")}</span>;
         }
       }
@@ -1819,7 +1874,7 @@ const StudentFeesList = ({ feeType, paidOnly, excludePaid, batchObj, examFilter 
       center: true,
       cell: row => {
         if (row.isSummary) return null;
-        const bal = getRemainingBalance(row);
+        const bal = row.unifiedBalance !== undefined ? row.unifiedBalance : getRemainingBalance(row);
         if (row.status === 'paid' || bal === 0) {
           return (
             <span className="px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-green-100 text-green-700">
